@@ -415,30 +415,60 @@ function buildFolge(spec, seed) {
   }
 
   if (t === "badewanne") {
-    // Badewanne links, Seifenblasen steigen nach rechts
-    const bx = 22, by = 168, bw = 300, bh = 140;
+    // Freistehende Wanne (Klauenfuss) links, Seifenblasen steigen nach rechts
+    const x0 = 34, x1 = 320;          // linke / rechte Aussenkante
+    const yL = 112, yR = 158;         // Randhoehe hinten (links) / vorne (rechts)
+    const yB = 262;                   // Wannenboden
+    // Wasserspiegel (leicht schraeg wie der Rand)
+    const wl = (x) => yL + 34 + (yR - yL) * (x - x0) / (x1 - x0);
+
+    // Wannenkoerper (Silhouette)
+    const body =
+      `M ${x0} ${yL} ` +
+      `C ${x0 - 10} ${yL + 66}, ${x0 + 4} ${yB - 34}, ${x0 + 52} ${yB} ` +
+      `L ${x1 - 46} ${yB} ` +
+      `C ${x1 + 2} ${yB - 30}, ${x1 + 8} ${yR + 54}, ${x1} ${yR} ` +
+      `Q ${(x0 + x1) / 2} ${(yL + yR) / 2 + 16} ${x0} ${yL} Z`;
+    svg.appendChild(rc.path(body,
+      { roughness: 1.4, bowing: 1, seed: seed + 1, stroke: INK, strokeWidth: 3.2,
+        fill: "#f2fbff", fillStyle: "solid" }));
+    // Wasser (innen, unterhalb des Wasserspiegels)
     svg.appendChild(rc.path(
-      `M ${bx} ${by} L ${bx} ${by + bh - 26} Q ${bx} ${by + bh} ${bx + 28} ${by + bh} ` +
-      `L ${bx + bw - 28} ${by + bh} Q ${bx + bw} ${by + bh} ${bx + bw} ${by + bh - 26} ` +
-      `L ${bx + bw} ${by} Z`,
-      { roughness: 1.5, seed: seed + 1, stroke: INK, strokeWidth: 3.2,
-        fill: "#b6e3f5", fillStyle: "hachure", hachureGap: 10, fillWeight: 1,
+      `M ${x0 + 6} ${wl(x0) - 2} ` +
+      `C ${x0 + 2} ${yB - 56}, ${x0 + 18} ${yB - 12}, ${x0 + 58} ${yB - 10} ` +
+      `L ${x1 - 52} ${yB - 10} ` +
+      `C ${x1 - 10} ${yB - 14}, ${x1 - 4} ${yR + 46}, ${x1 - 7} ${wl(x1) - 2} Z`,
+      { roughness: 1.5, seed: seed + 3, stroke: "#7fd1f5", strokeWidth: 2,
+        fill: "#b6e3f5", fillStyle: "hachure", hachureGap: 9, fillWeight: 1,
         hachureAngle: 12 }));
-    // Wannenrand
-    svg.appendChild(rc.line(bx - 10, by, bx + bw + 10, by,
-      { roughness: 1.3, seed: seed + 2, stroke: INK, strokeWidth: 3.4 }));
-    // Fuesse
-    [bx + 40, bx + bw - 40].forEach((fx, k) =>
-      svg.appendChild(rc.line(fx, by + bh, fx, by + bh + 22,
-        { roughness: 1.3, seed: seed + 5 + k, stroke: INK, strokeWidth: 3 })));
+    // Rollrand (doppelte Linie entlang der Oeffnung)
+    svg.appendChild(rc.path(
+      `M ${x0 - 2} ${yL + 11} Q ${(x0 + x1) / 2} ${(yL + yR) / 2 + 27} ${x1 + 2} ${yR + 11}`,
+      { roughness: 1.2, seed: seed + 4, stroke: INK, strokeWidth: 2.6 }));
+    // Klauenfuesse
+    [x0 + 62, x1 - 58].forEach((fx, k) => {
+      svg.appendChild(rc.path(
+        `M ${fx - 15} ${yB - 4} C ${fx - 13} ${yB + 16}, ${fx - 22} ${yB + 20}, ${fx - 20} ${yB + 30} ` +
+        `L ${fx + 20} ${yB + 30} C ${fx + 22} ${yB + 20}, ${fx + 13} ${yB + 16}, ${fx + 15} ${yB - 4} Z`,
+        { roughness: 1.3, seed: seed + 5 + k, stroke: INK, strokeWidth: 2.8,
+          fill: "#dfe8f2", fillStyle: "solid" }));
+    });
+    // Wasserhahn hinten links
+    svg.appendChild(rc.path(
+      `M ${x0 + 6} ${yL - 6} L ${x0 + 6} ${yL - 62} Q ${x0 + 8} ${yL - 78} ${x0 + 30} ${yL - 78} ` +
+      `L ${x0 + 52} ${yL - 78} L ${x0 + 52} ${yL - 60}`,
+      { roughness: 1.2, seed: seed + 9, stroke: "#8a94a6", strokeWidth: 4.2 }));
+    svg.appendChild(rc.circle(x0 + 6, yL - 72, 16,
+      { roughness: 1.1, seed: seed + 10, stroke: "#8a94a6", strokeWidth: 3 }));
     // Schaumkrone auf dem Wasser
-    for (let k = 0; k < 7; k++) {
-      svg.appendChild(rc.circle(bx + 26 + k * (bw - 52) / 6, by - 4, 46,
+    for (let k = 0; k < 8; k++) {
+      const sx = x0 + 14 + k * (x1 - x0 - 30) / 7;
+      svg.appendChild(rc.circle(sx, wl(sx) - 8 - (k % 2) * 9, 40 - (k % 3) * 6,
         { roughness: 1.6, seed: seed + 800 + k, stroke: "#7fd1f5", strokeWidth: 2.4,
           fill: "#eaf7fd", fillStyle: "solid" }));
     }
     // Blasen
-    const startX = bx + bw * 0.55;
+    const startX = x0 + (x1 - x0) * 0.62;
     const stepX = (W - 26 - startX) / N;
     for (let i = 0; i < N; i++) {
       const cx = startX + stepX * (i + 0.5);
