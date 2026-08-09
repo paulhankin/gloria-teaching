@@ -30,14 +30,14 @@ function buildFolge(spec, seed) {
   const nums = spec.zahlen;
   const N = nums.length;
   const t = spec.typ;
-  const W = (t === "schornstein" || t === "badewanne") ? 1450 : 900, H = 300;
+  const W = (t === "schornstein" || t === "badewanne") ? 1450 : (t === "waescheleine" ? 1250 : 900), H = 300;
   const svg = mk("svg", { xmlns: SVGNS, viewBox: `0 0 ${W} ${H}`,
                           preserveAspectRatio: "xMidYMid meet" });
   const st = mk("style", {});
   st.textContent = `
-    .n{font:700 34px 'Caveat',cursive;fill:#1f3550;
-       paint-order:stroke;stroke:#fff;stroke-width:5px;stroke-linejoin:round}
-    .nw{font:700 34px 'Caveat',cursive;fill:#1f3550}
+    .n{font:700 52px 'Caveat',cursive;fill:#1f3550;
+       paint-order:stroke;stroke:#fff;stroke-width:7px;stroke-linejoin:round}
+    .nw{font:700 40px 'Caveat',cursive;fill:#1f3550}
   `;
   svg.appendChild(st);
   const rc = rough.svg(svg);
@@ -71,19 +71,35 @@ function buildFolge(spec, seed) {
       [x + wW * 0.25, x + wW * 0.75].forEach((wx, k) =>
         svg.appendChild(rc.circle(wx, baseY + 10, 30,
           { roughness: 1.3, seed: seed + 40 + i * 2 + k, stroke: INK, strokeWidth: 2.4 })));
-      txt(svg, x + wW / 2, baseY - wH / 2 + 12, nums[i], "n");
+      txt(svg, x + wW / 2, baseY - wH / 2 + 18, nums[i], "n");
     }
     return svg;
   }
 
   if (t === "waescheleine") {
-    const margin = 46, step = (W - 2 * margin) / N;
-    const sw = Math.min(step * 0.50, 54), sh = 150;
+    const margin = 140, step = (W - margin - 30) / N;
+    const sw = Math.min(step * 0.44, 56), sh = 176;
     const y0 = 60, sag = 22;
     const lineY = (x) => y0 + sag * Math.sin(Math.PI * (x - 10) / (W - 20));
-    let d = `M 10 ${y0}`;
-    for (let x = 30; x <= W - 10; x += 20) d += ` L ${x} ${lineY(x)}`;
+    let d = `M 70 ${y0}`;
+    for (let x = 90; x <= W - 10; x += 20) d += ` L ${x} ${lineY(x)}`;
     svg.appendChild(rc.path(d, { roughness: 1.4, seed: seed, stroke: "#8a94a6", strokeWidth: 3.5 }));
+    // Startpfahl mit Vogel
+    svg.appendChild(rc.line(70, y0 - 6, 70, y0 + 216,
+      { roughness: 1.3, seed: seed + 900, stroke: "#8a5a35", strokeWidth: 7 }));
+    svg.appendChild(rc.line(34, y0 + 30, 106, y0 + 30,
+      { roughness: 1.3, seed: seed + 901, stroke: "#8a5a35", strokeWidth: 5 }));
+    // Vogel auf dem Pfahl
+    svg.appendChild(rc.ellipse(70, y0 - 34, 54, 40,
+      { roughness: 1.3, seed: seed + 902, stroke: INK, strokeWidth: 2.6,
+        fill: "#e8548c", fillStyle: "solid" }));
+    svg.appendChild(rc.circle(52, y0 - 52, 30,
+      { roughness: 1.2, seed: seed + 903, stroke: INK, strokeWidth: 2.4,
+        fill: "#e8548c", fillStyle: "solid" }));
+    svg.appendChild(rc.polygon([[38, y0 - 54], [18, y0 - 48], [38, y0 - 42]],
+      { roughness: 1.0, seed: seed + 904, stroke: "#e0a01e", strokeWidth: 2,
+        fill: "#e0a01e", fillStyle: "solid" }));
+    eye(rc, svg, 48, y0 - 58, 3);
     for (let i = 0; i < N; i++) {
       const cx = margin + step * (i + 0.5), ly = lineY(cx);
       // Klammer
@@ -92,9 +108,9 @@ function buildFolge(spec, seed) {
       // Socke: Schaft nach unten, Fuss nach rechts
       const top = ly + 14, w = sw, h = sh;
       const l = cx - w / 2, r2 = cx + w / 2;
-      const ankle = top + h * 0.60;          // Beginn Ferse
+      const ankle = top + h * 0.54;          // Beginn Ferse
       const footY = top + h;                 // Sohle
-      const toe = r2 + w * 0.62;             // Zehenspitze
+      const toe = r2 + w * 0.80;             // Zehenspitze
       const sockPath =
         `M ${l} ${top} L ${r2} ${top} L ${r2} ${ankle} ` +
         `Q ${toe} ${ankle + 4} ${toe} ${(ankle + footY) / 2} ` +
@@ -108,7 +124,8 @@ function buildFolge(spec, seed) {
       // Bündchen
       svg.appendChild(rc.line(l, top + 16, r2, top + 16,
         { roughness: 1.2, seed: seed + 90 + i, stroke: col(i), strokeWidth: 2.4 }));
-      txt(svg, cx, top + h * 0.40, nums[i], "n");
+      // Zahl in den Fuss der Socke (dort ist mehr Platz)
+      txt(svg, (l + toe) / 2 - 2, (ankle + footY) / 2 + 16, nums[i], "n");
     }
     return svg;
   }
@@ -153,7 +170,7 @@ function buildFolge(spec, seed) {
         Object.assign({}, oo, { seed: seed + 72 + i * 5 })));
       svg.appendChild(rc.circle(cx + rr * 0.30, cy + rr * 0.34, rr * 1.20,
         Object.assign({}, oo, { seed: seed + 73 + i * 5 })));
-      txt(svg, cx, cy + 14, nums[i], "n");
+      txt(svg, cx, cy + 19, nums[i], "n");
     }
     return svg;
   }
@@ -186,7 +203,7 @@ function buildFolge(spec, seed) {
     const stepX = (W - 26 - startX) / N;
     for (let i = 0; i < N; i++) {
       const cx = startX + stepX * (i + 0.5);
-      const rr = Math.min(42, stepX * 0.46) * (1 + (i % 3) * 0.08);
+      const rr = Math.min(48, stepX * 0.50) * (1 + (i % 3) * 0.07);
       const cy = 112 - 16 * Math.sin(i * 1.15) - i * 4;
       svg.appendChild(rc.circle(cx, cy, rr * 2,
         { roughness: 1.4, bowing: 1.2, seed: seed + 70 + i * 3, stroke: col(i),
@@ -196,7 +213,7 @@ function buildFolge(spec, seed) {
       svg.appendChild(rc.arc(cx - rr * 0.30, cy - rr * 0.34, rr * 0.7, rr * 0.6,
         Math.PI * 1.05, Math.PI * 1.65, false,
         { roughness: 0.8, seed: seed + 150 + i, stroke: "#fff", strokeWidth: 2.6 }));
-      txt(svg, cx, cy + 12, nums[i], "n");
+      txt(svg, cx, cy + 18, nums[i], "n");
     }
     return svg;
   }
@@ -206,7 +223,7 @@ function buildFolge(spec, seed) {
     const R = Math.min(step * 0.56, 54);
     // Mond als Start
     svg.appendChild(rc.path(
-      "M 44 118 A 34 34 0 1 0 44 182 A 26 26 0 1 1 44 118 Z",
+      "M 50 108 A 42 42 0 1 0 50 192 A 32 32 0 1 1 50 108 Z",
       { roughness: 1.3, seed: seed, stroke: "#e0a01e", strokeWidth: 3,
         fill: "#e0a01e", fillStyle: "hachure", hachureGap: 7, fillWeight: 1 }));
     for (let i = 0; i < N; i++) {
@@ -216,7 +233,7 @@ function buildFolge(spec, seed) {
         { roughness: 1.4, bowing: 1.2, seed: seed + 30 + i, stroke: col(i),
           strokeWidth: 3, fill: col(i), fillStyle: "hachure", hachureGap: 8,
           fillWeight: 1, hachureAngle: 30 + i * 19 }));
-      txt(svg, cx, cy + 12, nums[i], "n");
+      txt(svg, cx, cy + 18, nums[i], "n");
     }
     return svg;
   }
@@ -253,7 +270,7 @@ function buildFolge(spec, seed) {
         { roughness: 1.4, seed: seed + 400 + i, stroke: "#5eb85e", strokeWidth: 2.6,
           fill: "#5eb85e", fillStyle: "hachure", hachureGap: 7, fillWeight: 1 }));
     }
-    txt(svg, x, y + 12, nums[i], "n");
+    txt(svg, x, y + 18, nums[i], "n");
   }
   // Kopf
   const hx = cx(0), hy = cy(0), hr = r * 1.22;

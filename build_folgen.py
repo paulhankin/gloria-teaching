@@ -12,44 +12,49 @@ A = [
     dict(key='f1', typ='raupe', kopffarbe='#ffd76a',
          titel='Aufgabe 1', name='Raupe Rosi',
          story='Raupe Rosi tr&auml;gt Zahlen auf dem R&uuml;cken. '
-               'Wir z&auml;hlen immer vom <b>Kopf</b> aus!',
+               'Wir z&auml;hlen <b>beim Kopf</b> los: die Zahl neben dem Kopf '
+               'ist die <b>1. Zahl</b>.',
          zahlen=[3, 10, 5, 9, 6, 4, 8, 1, 7, 2],
          fragen=[('stelle', 3), ('stelle', 7), ('plus', 2, 5), ('minus', 2, 8)]),
 
     dict(key='f2', typ='zug',
          titel='Aufgabe 2', name='Der Zahlenzug',
-         story='Der Zahlenzug hat viele Waggons. Der erste Waggon ist gleich '
-               'hinter der <b>Lok</b>.',
+         story='Der Zahlenzug hat viele Waggons. Wir z&auml;hlen <b>bei der Lok</b> '
+               'los: der Waggon direkt hinter der Lok ist der <b>1.</b>',
          zahlen=[4, 10, 9, 0, 8, 7, 2, 1, 6, 3, 5],
          fragen=[('stelle', 4), ('stelle', 8), ('welche_stelle', 6), ('plus', 3, 9)]),
 
     dict(key='f3', typ='schornstein',
          titel='Aufgabe 3', name='Der Rauch vom Schornstein',
-         story='Aus dem Schornstein steigen Rauchwolken. Die <b>erste</b> Wolke '
-               'ist ganz nah am Schornstein.',
+         story='Aus dem Schornstein steigen Rauchwolken. Wir z&auml;hlen '
+               '<b>beim Schornstein</b> los: die Wolke direkt &uuml;ber dem '
+               'Schornstein ist die <b>1. Zahl</b>.',
          zahlen=[6, 12, 16, 18, 4, 2, 20, 8, 14, 10],
          fragen=[('stelle', 5), ('stelle', 9), ('plus', 1, 6), ('minus', 7, 3)]),
 
     dict(key='f4', typ='waescheleine',
          titel='Aufgabe 4', name='Die Zahlen-W&auml;scheleine',
          story='An der W&auml;scheleine h&auml;ngen Socken mit Zahlen. '
-               'Wir z&auml;hlen von <b>links</b> nach rechts.',
+               'Wir z&auml;hlen <b>beim Vogel</b> los: die Socke neben dem '
+               'Vogel ist die <b>1. Zahl</b>.',
          zahlen=[20, 50, 5, 25, 10, 15, 35, 30, 45, 40],
          fragen=[('stelle', 6), ('welche_stelle', 30), ('plus', 2, 4),
                  ('minus', 7, 5)]),
 
     dict(key='f5', typ='badewanne',
          titel='Aufgabe 5', name='Blasen in der Badewanne',
-         story='Aus der Badewanne steigen Seifenblasen. Die <b>erste</b> Blase '
-               'ist ganz links.',
+         story='Aus der Badewanne steigen Seifenblasen. Wir z&auml;hlen '
+               '<b>bei der Badewanne</b> los: die Blase direkt &uuml;ber dem '
+               'Schaum ist die <b>1. Zahl</b>.',
          zahlen=[50, 30, 60, 100, 80, 90, 70, 40, 10, 20],
          fragen=[('stelle', 7), ('welche_stelle', 40), ('plus', 8, 9),
                  ('minus', 4, 9)]),
 
     dict(key='f6', typ='sterne',
          titel='Aufgabe 6', name='Die Sternenkette',
-         story='Am Himmel funkeln Sterne mit Zahlen. Der <b>erste</b> Stern ist '
-               'neben dem Mond.',
+         story='Am Himmel funkeln Sterne mit Zahlen. Wir z&auml;hlen '
+               '<b>beim Mond</b> los: der Stern neben dem Mond ist die '
+               '<b>1. Zahl</b>.',
          zahlen=[12, 2, 6, 20, 16, 8, 14, 4, 10, 18],
          fragen=[('stelle', 2), ('stelle', 8), ('minus', 4, 1), ('plus', 6, 10)]),
 ]
