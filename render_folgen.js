@@ -249,15 +249,38 @@ function buildFolge(spec, seed) {
   }
 
   if (t === "sterne") {
-    const margin = 60, step = (W - 2 * margin) / N;
+    const margin = 60, step = (W - margin - 150) / N;
     const R = Math.min(step * 0.56, 54);
-    // Mond als Start
+    // Mond als Start: dicke Sichel mit Gesicht
+    const mx = 72, my = 150, MR = 54;      // Aussenkreis
+    const ix = mx + 32, iy = my - 14, IR = 47;  // ausgestanzter Kreis
+    // Schnittpunkte der beiden Kreise
+    const dx = ix - mx, dy = iy - my, d = Math.hypot(dx, dy);
+    const a = (d * d + MR * MR - IR * IR) / (2 * d);
+    const h = Math.sqrt(Math.max(0, MR * MR - a * a));
+    const px = mx + a * dx / d, py = my + a * dy / d;
+    const p1 = [px + h * dy / d, py - h * dx / d];
+    const p2 = [px - h * dy / d, py + h * dx / d];
     svg.appendChild(rc.path(
-      "M 50 108 A 42 42 0 1 0 50 192 A 32 32 0 1 1 50 108 Z",
-      { roughness: 1.3, seed: seed, stroke: "#e0a01e", strokeWidth: 3,
-        fill: "#e0a01e", fillStyle: "hachure", hachureGap: 7, fillWeight: 1 }));
+      `M ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} ` +
+      `A ${MR} ${MR} 0 1 0 ${p2[0].toFixed(1)} ${p2[1].toFixed(1)} ` +
+      `A ${IR} ${IR} 0 0 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z`,
+      { roughness: 1.2, bowing: 1, seed: seed, stroke: "#e0a01e", strokeWidth: 3.2,
+        fill: "#ffd76a", fillStyle: "solid" }));
+    // Krater
+    [[mx - 22, my - 24, 15], [mx - 30, my + 16, 21], [mx - 8, my + 44, 13]]
+      .forEach((c, k) => svg.appendChild(rc.circle(c[0], c[1], c[2],
+        { roughness: 1.2, seed: seed + 20 + k, stroke: "#e0a01e", strokeWidth: 2,
+          fill: "#f3c23f", fillStyle: "solid" })));
+    // Schlafendes Gesicht (auf der Sichel)
+    svg.appendChild(rc.arc(mx + 2, my - 12, 20, 14, Math.PI, Math.PI * 2, false,
+      { roughness: 0.9, seed: seed + 31, stroke: INK, strokeWidth: 2.6 }));  // Auge zu
+    svg.appendChild(rc.arc(mx + 6, my + 20, 26, 20, 0.15, Math.PI - 0.15, false,
+      { roughness: 0.9, seed: seed + 32, stroke: INK, strokeWidth: 2.6 }));  // Mund
+    svg.appendChild(rc.circle(mx - 12, my + 12, 16,
+      { roughness: 1, seed: seed + 33, stroke: "#ef9aa8", strokeWidth: 2 })); // Wange
     for (let i = 0; i < N; i++) {
-      const cx = margin + step * (i + 0.5);
+      const cx = 140 + step * (i + 0.5);
       const cy = 150 + (i % 2 ? 34 : -30);
       svg.appendChild(rc.polygon(starPts(cx, cy, R, R * 0.44),
         { roughness: 1.4, bowing: 1.2, seed: seed + 30 + i, stroke: col(i),
