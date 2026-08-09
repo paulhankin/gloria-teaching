@@ -267,17 +267,17 @@ function buildFolge(spec, seed) {
       `A ${IR} ${IR} 0 0 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z`,
       { roughness: 1.2, bowing: 1, seed: seed, stroke: "#e0a01e", strokeWidth: 3.2,
         fill: "#ffd76a", fillStyle: "solid" }));
-    // Krater
-    [[mx - 22, my - 24, 15], [mx - 30, my + 16, 21], [mx - 8, my + 44, 13]]
+    // Krater (auf dem breiten Teil der Sichel, nicht im Gesicht)
+    [[mx - 34, my - 34, 12], [mx - 20, my + 42, 15]]
       .forEach((c, k) => svg.appendChild(rc.circle(c[0], c[1], c[2],
         { roughness: 1.2, seed: seed + 20 + k, stroke: "#e0a01e", strokeWidth: 2,
           fill: "#f3c23f", fillStyle: "solid" })));
-    // Schlafendes Gesicht (auf der Sichel)
-    svg.appendChild(rc.arc(mx + 2, my - 12, 20, 14, Math.PI, Math.PI * 2, false,
+    // Schlafendes Gesicht (mittig auf der Sichel)
+    svg.appendChild(rc.arc(mx - 30, my - 8, 20, 13, Math.PI, Math.PI * 2, false,
       { roughness: 0.9, seed: seed + 31, stroke: INK, strokeWidth: 2.6 }));  // Auge zu
-    svg.appendChild(rc.arc(mx + 6, my + 20, 26, 20, 0.15, Math.PI - 0.15, false,
+    svg.appendChild(rc.arc(mx - 27, my + 12, 20, 15, 0.2, Math.PI - 0.2, false,
       { roughness: 0.9, seed: seed + 32, stroke: INK, strokeWidth: 2.6 }));  // Mund
-    svg.appendChild(rc.circle(mx - 12, my + 12, 16,
+    svg.appendChild(rc.circle(mx - 40, my + 6, 13,
       { roughness: 1, seed: seed + 33, stroke: "#ef9aa8", strokeWidth: 2 })); // Wange
     for (let i = 0; i < N; i++) {
       const cx = 140 + step * (i + 0.5);
