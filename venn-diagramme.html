@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="utf-8">
+<title>Mathe-Arbeitsblatt: Venn-Diagramme</title>
+<style>
+  @page { size: A4; margin: 15mm 16mm; }
+  * { box-sizing: border-box; }
+  body {
+    font-family: "Verdana", "Trebuchet MS", sans-serif;
+    font-size: 12pt; line-height: 1.45; color: #1d1d28; margin: 0;
+  }
+  .page { page-break-after: always; }
+  .page:last-child { page-break-after: auto; }
+
+  h1 { font-size: 22pt; margin: 0 0 2mm; color: #b3005e; }
+  .untertitel { margin: 0 0 6mm; font-size: 11pt; color: #555; }
+  .namenszeile { font-size: 10.5pt; color: #666; border-top: 1.5px dashed #bbb;
+                 padding-top: 2mm; margin-top: 4mm; }
+
+  .aufgabe { border: 2.5px solid #ffd0e4; border-radius: 10px;
+             padding: 4mm 5mm 3mm; margin-bottom: 6mm; page-break-inside: avoid;
+             background: #fffafc; }
+  .aufgabe h2 { font-size: 14pt; margin: 0 0 2mm; color: #b3005e; }
+  .aufgabe h2 .stern { color: #f0a500; font-size: 12pt; letter-spacing: 1px; }
+  .story { margin: 0 0 3mm; }
+  .inhalt { display: flex; gap: 5mm; align-items: flex-start; }
+  .inhalt .text { flex: 1 1 50%; }
+  .inhalt .bild { flex: 0 0 44%; }
+  .inhalt.gross .bild { flex: 0 0 40%; }
+  .inhalt.gross .bild svg { max-height: 105mm; display:block; margin:0 auto; }
+  .bild svg { width: 100%; height: auto; }
+
+  ol.fragen { margin: 0; padding-left: 6mm; }
+  ol.fragen li { margin-bottom: 3.5mm; }
+  .linie { display: inline-block; border-bottom: 1.5px dotted #999;
+           min-width: 28mm; margin-left: 2mm; }
+
+  .tipp { font-size: 10.5pt; background: #eef6ff; border-left: 4px solid #7fb3ff;
+          padding: 2mm 3mm; margin-top: 3mm; border-radius: 0 6px 6px 0; }
+
+  /* Venn-Farben */
+  .kA { fill: #ff8fb1; }
+  .kB { fill: #7fd1f5; }
+  .kC { fill: #ffd76a; }
+  circle.venn { fill-opacity: .45; stroke: #444; stroke-width: 2.5; }
+  .titel { font: bold 15px Verdana, sans-serif; fill: #333; }
+  .zahl  { font: bold 17px Verdana, sans-serif; fill: #1d1d28; }
+  .frageZ { font: bold 19px Verdana, sans-serif; fill: #d10000; }
+  .rahmen { fill: #fdfdf5; stroke: #999; stroke-width: 2; }
+  .rlabel { font: italic 12px Verdana, sans-serif; fill: #777; }
+
+  /* Lösungsblatt */
+  .loesung { page-break-before: always; }
+  .loesung h1 { color: #006b3c; }
+  .lbox { break-inside: avoid; border: 2px solid #b8e6cc; background: #f4fff9; border-radius: 8px;
+          padding: 3mm 4mm; margin-bottom: 4mm; page-break-inside: avoid; }
+  .lbox h3 { margin: 0 0 1.5mm; font-size: 12.5pt; color: #006b3c; }
+  .lbox p { margin: 0 0 1mm; font-size: 11pt; }
+  .rechnung { font-family: "Courier New", monospace; background: #fff;
+              border: 1px dashed #b8e6cc; padding: 1mm 2mm; border-radius: 4px; }
+</style>
+</head>
+<body>
+
+<!-- ================= SEITE 1 ================= -->
+<div class="page">
+  <h1>Venn-Diagramme &ndash; Teil 1</h1>
+  <p class="untertitel">Mathe-Arbeitsblatt &middot; Mengen und Schnittmengen &middot; Rechne sorgf&auml;ltig und schreibe deinen Rechenweg auf.</p>
+
+  <!-- Aufgabe 1 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 1 <span class="stern">&#9733;&#9734;&#9734;&#9734;&#9734;</span></h2>
+    <p class="story">In der Klasse 4b spielen einige Kinder <b>Fu&szlig;ball</b> &#9917; und einige gehen zum <b>Tanzen</b> &#128131;. Manche Kinder machen sogar beides! Im Diagramm siehst du alle Zahlen.</p>
+    <div class="inhalt">
+      <div class="bild">
+        <svg viewBox="0 0 400 250">
+          <circle class="venn kA" cx="150" cy="130" r="100"/>
+          <circle class="venn kB" cx="250" cy="130" r="100"/>
+          <text class="titel" x="95" y="25" text-anchor="middle">&#9917; Fu&szlig;ball</text>
+          <text class="titel" x="310" y="25" text-anchor="middle">&#128131; Tanzen</text>
+          <text class="zahl" x="105" y="138" text-anchor="middle">12</text>
+          <text class="zahl" x="200" y="138" text-anchor="middle">5</text>
+          <text class="zahl" x="296" y="138" text-anchor="middle">8</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>Wie viele Kinder spielen <b>nur</b> Fu&szlig;ball? <span class="linie"></span></li>
+          <li>Wie viele Kinder machen <b>beides</b>? <span class="linie"></span></li>
+          <li>Wie viele Kinder spielen <b>insgesamt</b> Fu&szlig;ball? <span class="linie"></span></li>
+          <li>Wie viele Kinder sind es <b>zusammen</b>? <span class="linie"></span></li>
+        </ol>
+      </div>
+    </div>
+    <p class="tipp">&#128161; Tipp: Die Zahl in der Mitte geh&ouml;rt zu <i>beiden</i> Kreisen gleichzeitig.</p>
+  </div>
+
+  <!-- Aufgabe 2 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 2 <span class="stern">&#9733;&#9733;&#9734;&#9734;&#9734;</span></h2>
+    <p class="story">In der Musik-AG sind <b>24 M&auml;dchen</b>. <b>15</b> von ihnen spielen <b>Hockey</b> &#127954;, <b>12</b> spielen <b>Gitarre</b> &#127928;, und <b>6</b> M&auml;dchen machen <b>beides</b>.</p>
+    <div class="inhalt">
+      <div class="bild">
+        <svg viewBox="0 0 400 250">
+          <circle class="venn kA" cx="150" cy="130" r="100"/>
+          <circle class="venn kB" cx="250" cy="130" r="100"/>
+          <text class="titel" x="95" y="25" text-anchor="middle">&#127954; Hockey</text>
+          <text class="titel" x="310" y="25" text-anchor="middle">&#127928; Gitarre</text>
+          <text class="frageZ" x="105" y="138" text-anchor="middle">?</text>
+          <text class="zahl" x="200" y="138" text-anchor="middle">6</text>
+          <text class="frageZ" x="296" y="138" text-anchor="middle">?</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>Wie viele spielen <b>nur</b> Hockey? <span class="linie"></span></li>
+          <li>Wie viele spielen <b>nur</b> Gitarre? <span class="linie"></span></li>
+          <li>Wie viele M&auml;dchen machen <b>keins</b> von beidem? <span class="linie"></span></li>
+        </ol>
+        <p style="font-size:10.5pt;color:#666;">Trage deine Zahlen in das Diagramm ein!</p>
+      </div>
+    </div>
+    <p class="tipp">&#128161; Achtung: Die <b>15</b> Hockey-M&auml;dchen sind <i>alle</i> Hockeyspielerinnen &ndash; auch die, die zus&auml;tzlich Gitarre spielen.</p>
+  </div>
+
+  <p class="namenszeile">Name: ______________________________ &nbsp;&nbsp; Datum: ________________</p>
+</div>
+
+<!-- ================= SEITE 2 ================= -->
+<div class="page">
+  <h1>Venn-Diagramme &ndash; Teil 2</h1>
+
+  <!-- Aufgabe 3 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 3 <span class="stern">&#9733;&#9733;&#9733;&#9734;&#9734;</span></h2>
+    <p class="story">In einer Umfrage werden <b>30 Kinder</b> gefragt, welche Haustiere sie haben. <b>18</b> Kinder haben einen <b>Hund</b> &#128054;, <b>14</b> Kinder haben eine <b>Katze</b> &#128049;. <b>5</b> Kinder haben <b>weder</b> Hund <b>noch</b> Katze.</p>
+    <div class="inhalt">
+      <div class="bild">
+        <svg viewBox="0 0 400 285">
+          <rect class="rahmen" x="8" y="8" width="384" height="250" rx="12"/>
+          <text class="rlabel" x="20" y="250">alle 30 Kinder</text>
+          <circle class="venn kA" cx="150" cy="140" r="100"/>
+          <circle class="venn kB" cx="250" cy="140" r="100"/>
+          <text class="titel" x="95" y="35" text-anchor="middle">&#128054; Hund</text>
+          <text class="titel" x="310" y="35" text-anchor="middle">&#128049; Katze</text>
+          <text class="frageZ" x="105" y="148" text-anchor="middle">?</text>
+          <text class="frageZ" x="200" y="148" text-anchor="middle">?</text>
+          <text class="frageZ" x="296" y="148" text-anchor="middle">?</text>
+          <text class="zahl" x="355" y="245" text-anchor="middle">5</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>Wie viele Kinder haben ein Haustier (Hund <b>oder</b> Katze)? <span class="linie"></span></li>
+          <li>Wie viele Kinder haben <b>Hund und Katze</b>? <span class="linie"></span></li>
+          <li>Wie viele Kinder haben <b>nur</b> einen Hund? <span class="linie"></span></li>
+          <li>Wie viele Kinder haben <b>nur</b> eine Katze? <span class="linie"></span></li>
+        </ol>
+      </div>
+    </div>
+    <p class="tipp">&#128161; Tipp: Rechne zuerst aus, wie viele Kinder <i>&uuml;berhaupt</i> ein Haustier haben. Wenn du dann 18 + 14 rechnest, z&auml;hlst du einige Kinder <b>doppelt</b> &ndash; welche?</p>
+  </div>
+
+  <!-- Aufgabe 4 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 4 <span class="stern">&#9733;&#9733;&#9733;&#9734;&#9734;</span></h2>
+    <p class="story">Im Ferienkurs kann man <b>Schwimmen</b> &#127946;, <b>Reiten</b> &#128014; und <b>Klavier</b> &#127929; w&auml;hlen. Alle Zahlen stehen schon im Diagramm.</p>
+    <div class="inhalt gross">
+      <div class="bild">
+        <svg viewBox="0 0 400 420">
+          <rect class="rahmen" x="6" y="6" width="388" height="390" rx="12"/>
+          <text class="rlabel" x="18" y="388">alle Kinder</text>
+          <circle class="venn kA" cx="150" cy="150" r="98"/>
+          <circle class="venn kB" cx="252" cy="150" r="98"/>
+          <circle class="venn kC" cx="201" cy="240" r="98"/>
+          <text class="titel" x="80" y="42" text-anchor="middle">&#127946; Schwimmen</text>
+          <text class="titel" x="322" y="42" text-anchor="middle">&#128014; Reiten</text>
+          <text class="titel" x="201" y="370" text-anchor="middle">&#127929; Klavier</text>
+          <text class="zahl" x="100" y="130" text-anchor="middle">6</text>
+          <text class="zahl" x="303" y="130" text-anchor="middle">4</text>
+          <text class="zahl" x="201" y="330" text-anchor="middle">3</text>
+          <text class="zahl" x="201" y="120" text-anchor="middle">2</text>
+          <text class="zahl" x="146" y="240" text-anchor="middle">5</text>
+          <text class="zahl" x="258" y="240" text-anchor="middle">1</text>
+          <text class="zahl" x="201" y="190" text-anchor="middle">2</text>
+          <text class="zahl" x="355" y="330" text-anchor="middle">4</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>Wie viele Kinder <b>schwimmen</b> (insgesamt)? <span class="linie"></span></li>
+          <li>Wie viele Kinder machen <b>genau zwei</b> Sachen? <span class="linie"></span></li>
+          <li>Wie viele Kinder reiten, spielen aber <b>kein</b> Klavier? <span class="linie"></span></li>
+          <li>Wie viele Kinder sind es <b>insgesamt</b>? <span class="linie"></span></li>
+        </ol>
+      </div>
+    </div>
+  </div>
+
+  <p class="namenszeile">Name: ______________________________ &nbsp;&nbsp; Datum: ________________</p>
+</div>
+
+<!-- ================= SEITE 3 ================= -->
+<div class="page">
+  <h1>Venn-Diagramme &ndash; Teil 3 (Knobel-Aufgaben)</h1>
+
+  <!-- Aufgabe 5 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 5 <span class="stern">&#9733;&#9733;&#9733;&#9733;&#9734;</span></h2>
+    <p class="story">Auf dem Sommerfest d&uuml;rfen <b>40 Kinder</b> Eis probieren: <b>Schokolade</b> &#127851;, <b>Vanille</b> &#127846; und <b>Erdbeere</b> &#127827;.<br>
+    <b>22</b> Kinder mochten Schokolade, <b>18</b> mochten Vanille und <b>15</b> mochten Erdbeere.<br>
+    <b>8</b> Kinder mochten Schokolade <b>und</b> Vanille, <b>7</b> mochten Schokolade <b>und</b> Erdbeere, <b>6</b> mochten Vanille <b>und</b> Erdbeere.<br>
+    <b>3</b> Kinder mochten <b>alle drei</b> Sorten.</p>
+    <div class="inhalt gross">
+      <div class="bild">
+        <svg viewBox="0 0 400 420">
+          <rect class="rahmen" x="6" y="6" width="388" height="390" rx="12"/>
+          <text class="rlabel" x="18" y="388">alle 40 Kinder</text>
+          <circle class="venn kA" cx="150" cy="150" r="98"/>
+          <circle class="venn kB" cx="252" cy="150" r="98"/>
+          <circle class="venn kC" cx="201" cy="240" r="98"/>
+          <text class="titel" x="78" y="42" text-anchor="middle">&#127851; Schokolade</text>
+          <text class="titel" x="325" y="42" text-anchor="middle">&#127846; Vanille</text>
+          <text class="titel" x="201" y="370" text-anchor="middle">&#127827; Erdbeere</text>
+          <text class="frageZ" x="100" y="130" text-anchor="middle">?</text>
+          <text class="frageZ" x="303" y="130" text-anchor="middle">?</text>
+          <text class="frageZ" x="201" y="330" text-anchor="middle">?</text>
+          <text class="frageZ" x="201" y="120" text-anchor="middle">?</text>
+          <text class="frageZ" x="146" y="240" text-anchor="middle">?</text>
+          <text class="frageZ" x="258" y="240" text-anchor="middle">?</text>
+          <text class="zahl" x="201" y="190" text-anchor="middle">3</text>
+          <text class="frageZ" x="355" y="330" text-anchor="middle">?</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>F&uuml;lle zuerst das ganze Diagramm aus. Beginne <b>in der Mitte</b>!</li>
+          <li>Wie viele Kinder mochten <b>nur</b> Schokolade? <span class="linie"></span></li>
+          <li>Wie viele mochten <b>nur</b> Erdbeere? <span class="linie"></span></li>
+          <li>Wie viele mochten <b>genau eine</b> Sorte? <span class="linie"></span></li>
+          <li>Wie viele mochten <b>keine</b> der drei Sorten? <span class="linie"></span></li>
+        </ol>
+      </div>
+    </div>
+    <p class="tipp">&#128161; Tipp: Die <b>8</b> Kinder &bdquo;Schokolade und Vanille&ldquo; sind <i>alle</i> Kinder, die beide Sorten mochten &ndash; auch die 3 aus der Mitte. In das Feld &bdquo;nur Schoko + Vanille&ldquo; kommt also 8 &minus; 3.</p>
+  </div>
+
+  <p class="namenszeile">Name: ______________________________ &nbsp;&nbsp; Datum: ________________</p>
+</div>
+
+<!-- ================= SEITE 4 ================= -->
+<div class="page">
+  <h1>Venn-Diagramme &ndash; Teil 4 (Superknobel)</h1>
+
+  <!-- Aufgabe 6 -->
+  <div class="aufgabe">
+    <h2>Aufgabe 6 <span class="stern">&#9733;&#9733;&#9733;&#9733;&#9733;</span></h2>
+    <p class="story">Im Zeltlager sind <b>36 Kinder</b>. Man kann <b>Bogenschie&szlig;en</b> &#127993;, <b>Kanufahren</b> &#128675; und <b>Klettern</b> &#129495; ausprobieren.<br>
+    <b>20</b> Kinder machen Bogenschie&szlig;en, <b>17</b> fahren Kanu, <b>15</b> klettern.<br>
+    <b>4</b> Kinder machen <b>alle drei</b> Sachen. <b>10</b> Kinder machen <b>genau zwei</b> Sachen.</p>
+    <div class="inhalt gross">
+      <div class="bild">
+        <svg viewBox="0 0 400 420">
+          <rect class="rahmen" x="6" y="6" width="388" height="390" rx="12"/>
+          <text class="rlabel" x="18" y="388">alle 36 Kinder</text>
+          <circle class="venn kA" cx="150" cy="150" r="98"/>
+          <circle class="venn kB" cx="252" cy="150" r="98"/>
+          <circle class="venn kC" cx="201" cy="240" r="98"/>
+          <text class="titel" x="72" y="42" text-anchor="middle">&#127993; Bogen</text>
+          <text class="titel" x="330" y="42" text-anchor="middle">&#128675; Kanu</text>
+          <text class="titel" x="201" y="370" text-anchor="middle">&#129495; Klettern</text>
+          <text class="zahl" x="201" y="190" text-anchor="middle">4</text>
+          <text class="frageZ" x="355" y="330" text-anchor="middle">?</text>
+          <text class="rlabel" x="201" y="285" text-anchor="middle">genau zwei zusammen: 10</text>
+        </svg>
+      </div>
+      <div class="text">
+        <ol class="fragen">
+          <li>Wie viele Kinder machen <b>mindestens eine</b> Aktivit&auml;t? <span class="linie"></span></li>
+          <li>Wie viele Kinder machen <b>gar nichts</b> davon? <span class="linie"></span></li>
+          <li>Wie viele Kinder machen <b>genau eine</b> Aktivit&auml;t? <span class="linie"></span></li>
+          <li>Wie viele Kinder machen <b>mindestens zwei</b> Aktivit&auml;ten? <span class="linie"></span></li>
+        </ol>
+      </div>
+    </div>
+    <p class="tipp">&#128161; Tipp: Rechne 20 + 17 + 15 = 52. Ein Kind mit <b>genau zwei</b> Aktivit&auml;ten wurde dabei <b>2-mal</b> gez&auml;hlt, ein Kind mit <b>drei</b> Aktivit&auml;ten sogar <b>3-mal</b>. Wie viele Kinder sind es dann wirklich?</p>
+  </div>
+
+  <p class="namenszeile">Name: ______________________________ &nbsp;&nbsp; Datum: ________________</p>
+</div>
+
+<!-- ================= LÖSUNGEN ================= -->
+<div class="page loesung">
+  <h1>L&ouml;sungen &#9989;</h1>
+  <p class="untertitel">(Blatt f&uuml;r die Lehrerin / die Eltern)</p>
+
+  <div class="lbox">
+    <h3>Aufgabe 1</h3>
+    <p>a) <b>12</b> &nbsp;&nbsp; b) <b>5</b> &nbsp;&nbsp; c) 12 + 5 = <b>17</b> &nbsp;&nbsp; d) 12 + 5 + 8 = <b>25</b></p>
+  </div>
+
+  <div class="lbox">
+    <h3>Aufgabe 2</h3>
+    <p class="rechnung">nur Hockey = 15 &minus; 6 = 9 &nbsp;|&nbsp; nur Gitarre = 12 &minus; 6 = 6</p>
+    <p>a) <b>9</b> &nbsp;&nbsp; b) <b>6</b> &nbsp;&nbsp; c) 24 &minus; (9 + 6 + 6) = 24 &minus; 21 = <b>3</b></p>
+  </div>
+
+  <div class="lbox">
+    <h3>Aufgabe 3</h3>
+    <p>a) 30 &minus; 5 = <b>25</b> Kinder haben ein Haustier.</p>
+    <p class="rechnung">18 + 14 = 32, aber es sind nur 25 &rarr; doppelt gez&auml;hlt: 32 &minus; 25 = 7</p>
+    <p>b) <b>7</b> Kinder haben Hund und Katze &nbsp;&nbsp; c) 18 &minus; 7 = <b>11</b> &nbsp;&nbsp; d) 14 &minus; 7 = <b>7</b></p>
+    <p>Probe: 11 + 7 + 7 + 5 = 30 &#10004;</p>
+  </div>
+
+  <div class="lbox">
+    <h3>Aufgabe 4</h3>
+    <p>a) 6 + 2 + 5 + 2 = <b>15</b></p>
+    <p>b) 2 + 5 + 1 = <b>8</b></p>
+    <p>c) Reiten ohne Klavier: 4 + 2 = <b>6</b></p>
+    <p>d) 6 + 4 + 3 + 2 + 5 + 1 + 2 + 4 = <b>27</b></p>
+  </div>
+
+  <div class="lbox">
+    <h3>Aufgabe 5</h3>
+    <p>Mitte: <b>3</b>. Dann die Zweier-Felder:</p>
+    <p class="rechnung">Scho&amp;Van nur: 8 &minus; 3 = 5 &nbsp;|&nbsp; Scho&amp;Erd nur: 7 &minus; 3 = 4 &nbsp;|&nbsp; Van&amp;Erd nur: 6 &minus; 3 = 3</p>
+    <p class="rechnung">nur Schoko: 22 &minus; 5 &minus; 4 &minus; 3 = 10 &nbsp;|&nbsp; nur Vanille: 18 &minus; 5 &minus; 3 &minus; 3 = 7 &nbsp;|&nbsp; nur Erdbeere: 15 &minus; 4 &minus; 3 &minus; 3 = 5</p>
+    <p>b) <b>10</b> &nbsp;&nbsp; c) <b>5</b> &nbsp;&nbsp; d) 10 + 7 + 5 = <b>22</b> &nbsp;&nbsp; e) 40 &minus; 37 = <b>3</b></p>
+    <p>Probe: 10 + 7 + 5 + 5 + 4 + 3 + 3 = 37 Kinder mit Eis, dazu 3 ohne = 40 &#10004;</p>
+  </div>
+
+  <div class="lbox">
+    <h3>Aufgabe 6</h3>
+    <p class="rechnung">20 + 17 + 15 = 52 (Kinder mehrfach gez&auml;hlt)</p>
+    <p>Die 10 Kinder mit genau zwei Aktivit&auml;ten wurden 1-mal zu viel gez&auml;hlt (&minus;10).<br>
+       Die 4 Kinder mit drei Aktivit&auml;ten wurden 2-mal zu viel gez&auml;hlt (&minus;8).</p>
+    <p class="rechnung">52 &minus; 10 &minus; 8 = 34</p>
+    <p>a) <b>34</b> &nbsp;&nbsp; b) 36 &minus; 34 = <b>2</b> &nbsp;&nbsp; c) 34 &minus; 10 &minus; 4 = <b>20</b> &nbsp;&nbsp; d) 10 + 4 = <b>14</b></p>
+  </div>
+</div>
+
+</body>
+</html>
