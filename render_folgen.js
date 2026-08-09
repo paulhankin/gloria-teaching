@@ -29,7 +29,8 @@ function starPts(cx, cy, R, r) {
 function buildFolge(spec, seed) {
   const nums = spec.zahlen;
   const N = nums.length;
-  const W = 900, H = 300;
+  const t = spec.typ;
+  const W = (t === "schornstein" || t === "badewanne") ? 1450 : 900, H = 300;
   const svg = mk("svg", { xmlns: SVGNS, viewBox: `0 0 ${W} ${H}`,
                           preserveAspectRatio: "xMidYMid meet" });
   const st = mk("style", {});
@@ -40,7 +41,6 @@ function buildFolge(spec, seed) {
   `;
   svg.appendChild(st);
   const rc = rough.svg(svg);
-  const t = spec.typ;
   const col = (i) => PAL[i % PAL.length];
 
   if (t === "zug") {
@@ -78,21 +78,125 @@ function buildFolge(spec, seed) {
 
   if (t === "waescheleine") {
     const margin = 46, step = (W - 2 * margin) / N;
-    const sw = Math.min(step * 0.74, 78), sh = 150;
-    const y0 = 66, sag = 26;
+    const sw = Math.min(step * 0.50, 54), sh = 150;
+    const y0 = 60, sag = 22;
     const lineY = (x) => y0 + sag * Math.sin(Math.PI * (x - 10) / (W - 20));
     let d = `M 10 ${y0}`;
     for (let x = 30; x <= W - 10; x += 20) d += ` L ${x} ${lineY(x)}`;
     svg.appendChild(rc.path(d, { roughness: 1.4, seed: seed, stroke: "#8a94a6", strokeWidth: 3.5 }));
     for (let i = 0; i < N; i++) {
       const cx = margin + step * (i + 0.5), ly = lineY(cx);
-      svg.appendChild(rc.line(cx, ly, cx, ly + 14,
-        { roughness: 1.2, seed: seed + i, stroke: INK, strokeWidth: 2.2 }));
-      svg.appendChild(rc.rectangle(cx - sw / 2, ly + 14, sw, sh,
-        { roughness: 1.6, bowing: 1.6, seed: seed + 60 + i, stroke: col(i),
-          strokeWidth: 3, fill: col(i), fillStyle: "hachure", hachureGap: 10,
-          fillWeight: 1, hachureAngle: 35 + i * 17 }));
-      txt(svg, cx, ly + 14 + sh / 2 + 12, nums[i], "n");
+      // Klammer
+      svg.appendChild(rc.line(cx, ly - 6, cx, ly + 16,
+        { roughness: 1.0, seed: seed + i, stroke: INK, strokeWidth: 2.6 }));
+      // Socke: Schaft nach unten, Fuss nach rechts
+      const top = ly + 14, w = sw, h = sh;
+      const l = cx - w / 2, r2 = cx + w / 2;
+      const ankle = top + h * 0.60;          // Beginn Ferse
+      const footY = top + h;                 // Sohle
+      const toe = r2 + w * 0.62;             // Zehenspitze
+      const sockPath =
+        `M ${l} ${top} L ${r2} ${top} L ${r2} ${ankle} ` +
+        `Q ${toe} ${ankle + 4} ${toe} ${(ankle + footY) / 2} ` +
+        `Q ${toe} ${footY} ${toe - w * 0.5} ${footY} ` +
+        `L ${l} ${footY} Z`;
+      const o1 = { roughness: 1.5, bowing: 1.3, seed: seed + 60 + i,
+                   stroke: col(i), strokeWidth: 3 };
+      svg.appendChild(rc.path(sockPath, Object.assign({}, o1,
+        { fill: col(i), fillStyle: "hachure", hachureGap: 9, fillWeight: 1,
+          hachureAngle: 35 + i * 17 })));
+      // Bündchen
+      svg.appendChild(rc.line(l, top + 16, r2, top + 16,
+        { roughness: 1.2, seed: seed + 90 + i, stroke: col(i), strokeWidth: 2.4 }));
+      txt(svg, cx, top + h * 0.40, nums[i], "n");
+    }
+    return svg;
+  }
+
+  if (t === "schornstein") {
+    // Haus mit Schornstein links, Rauchwolken steigen nach rechts oben
+    const hx = 26, hy = 206, hw = 124, hh = 84;
+    // Dach
+    svg.appendChild(rc.polygon([[hx - 12, hy], [hx + hw / 2, hy - 48], [hx + hw + 12, hy]],
+      { roughness: 1.5, seed: seed + 1, stroke: "#b5553d", strokeWidth: 3,
+        fill: "#b5553d", fillStyle: "hachure", hachureGap: 8, fillWeight: 1 }));
+    // Wand
+    svg.appendChild(rc.rectangle(hx, hy, hw, hh,
+      { roughness: 1.5, seed: seed + 2, stroke: INK, strokeWidth: 3,
+        fill: "#e8d8b0", fillStyle: "hachure", hachureGap: 10, fillWeight: 1,
+        hachureAngle: 80 }));
+    // Fenster
+    svg.appendChild(rc.rectangle(hx + 30, hy + 24, 38, 36,
+      { roughness: 1.3, seed: seed + 3, stroke: INK, strokeWidth: 2.4 }));
+    // Schornstein
+    const sx = hx + hw * 0.66, sy = hy - 44;
+    svg.appendChild(rc.rectangle(sx, sy - 40, 34, 56,
+      { roughness: 1.4, seed: seed + 4, stroke: INK, strokeWidth: 3,
+        fill: "#9a8f86", fillStyle: "hachure", hachureGap: 8, fillWeight: 1 }));
+    // Wolken
+    const startX = sx + 50, startY = sy - 34;
+    const stepX = (W - 26 - startX) / N;
+    for (let i = 0; i < N; i++) {
+      const cx = startX + stepX * (i + 0.5);
+      const rr = Math.min(44, stepX * 0.46) * (1 + i * 0.035);
+      const cy = startY - 6 * Math.sin(i * 0.9) - i * 5;
+      const o = { roughness: 1.7, bowing: 1.5, seed: seed + 70 + i * 5,
+                  stroke: col(i), strokeWidth: 3,
+                  fill: col(i), fillStyle: "hachure", hachureGap: 9,
+                  fillWeight: 1, hachureAngle: 30 + i * 23 };
+      // Wolke aus 4 ueberlappenden Kreisen (Umriss)
+      const oo = Object.assign({}, o, { fillStyle: "hachure", hachureGap: 10 });
+      svg.appendChild(rc.circle(cx - rr * 0.72, cy + rr * 0.26, rr * 1.10, oo));
+      svg.appendChild(rc.circle(cx + rr * 0.74, cy + rr * 0.30, rr * 1.00,
+        Object.assign({}, oo, { seed: seed + 71 + i * 5 })));
+      svg.appendChild(rc.circle(cx - rr * 0.10, cy - rr * 0.34, rr * 1.30,
+        Object.assign({}, oo, { seed: seed + 72 + i * 5 })));
+      svg.appendChild(rc.circle(cx + rr * 0.30, cy + rr * 0.34, rr * 1.20,
+        Object.assign({}, oo, { seed: seed + 73 + i * 5 })));
+      txt(svg, cx, cy + 14, nums[i], "n");
+    }
+    return svg;
+  }
+
+  if (t === "badewanne") {
+    // Badewanne links, Seifenblasen steigen nach rechts
+    const bx = 22, by = 168, bw = 300, bh = 140;
+    svg.appendChild(rc.path(
+      `M ${bx} ${by} L ${bx} ${by + bh - 26} Q ${bx} ${by + bh} ${bx + 28} ${by + bh} ` +
+      `L ${bx + bw - 28} ${by + bh} Q ${bx + bw} ${by + bh} ${bx + bw} ${by + bh - 26} ` +
+      `L ${bx + bw} ${by} Z`,
+      { roughness: 1.5, seed: seed + 1, stroke: INK, strokeWidth: 3.2,
+        fill: "#b6e3f5", fillStyle: "hachure", hachureGap: 10, fillWeight: 1,
+        hachureAngle: 12 }));
+    // Wannenrand
+    svg.appendChild(rc.line(bx - 10, by, bx + bw + 10, by,
+      { roughness: 1.3, seed: seed + 2, stroke: INK, strokeWidth: 3.4 }));
+    // Fuesse
+    [bx + 40, bx + bw - 40].forEach((fx, k) =>
+      svg.appendChild(rc.line(fx, by + bh, fx, by + bh + 22,
+        { roughness: 1.3, seed: seed + 5 + k, stroke: INK, strokeWidth: 3 })));
+    // Schaumkrone auf dem Wasser
+    for (let k = 0; k < 7; k++) {
+      svg.appendChild(rc.circle(bx + 26 + k * (bw - 52) / 6, by - 4, 46,
+        { roughness: 1.6, seed: seed + 800 + k, stroke: "#7fd1f5", strokeWidth: 2.4,
+          fill: "#eaf7fd", fillStyle: "solid" }));
+    }
+    // Blasen
+    const startX = bx + bw * 0.55;
+    const stepX = (W - 26 - startX) / N;
+    for (let i = 0; i < N; i++) {
+      const cx = startX + stepX * (i + 0.5);
+      const rr = Math.min(42, stepX * 0.46) * (1 + (i % 3) * 0.08);
+      const cy = 112 - 16 * Math.sin(i * 1.15) - i * 4;
+      svg.appendChild(rc.circle(cx, cy, rr * 2,
+        { roughness: 1.4, bowing: 1.2, seed: seed + 70 + i * 3, stroke: col(i),
+          strokeWidth: 3, fill: col(i), fillStyle: "hachure", hachureGap: 9,
+          fillWeight: 1, hachureAngle: 25 + i * 19 }));
+      // Glanzpunkt
+      svg.appendChild(rc.arc(cx - rr * 0.30, cy - rr * 0.34, rr * 0.7, rr * 0.6,
+        Math.PI * 1.05, Math.PI * 1.65, false,
+        { roughness: 0.8, seed: seed + 150 + i, stroke: "#fff", strokeWidth: 2.6 }));
+      txt(svg, cx, cy + 12, nums[i], "n");
     }
     return svg;
   }

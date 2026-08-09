@@ -13,43 +13,45 @@ A = [
          titel='Aufgabe 1', name='Raupe Rosi',
          story='Raupe Rosi tr&auml;gt Zahlen auf dem R&uuml;cken. '
                'Wir z&auml;hlen immer vom <b>Kopf</b> aus!',
-         zahlen=list(range(1, 11)),
-         fragen=[('stelle', 3), ('stelle', 7), ('plus', 2, 5), ('minus', 9, 4)]),
+         zahlen=[3, 10, 5, 9, 6, 4, 8, 1, 7, 2],
+         fragen=[('stelle', 3), ('stelle', 7), ('plus', 2, 5), ('minus', 2, 8)]),
 
     dict(key='f2', typ='zug',
          titel='Aufgabe 2', name='Der Zahlenzug',
          story='Der Zahlenzug hat viele Waggons. Der erste Waggon ist gleich '
                'hinter der <b>Lok</b>.',
-         zahlen=list(range(0, 11)),
+         zahlen=[4, 10, 9, 0, 8, 7, 2, 1, 6, 3, 5],
          fragen=[('stelle', 4), ('stelle', 8), ('welche_stelle', 6), ('plus', 3, 9)]),
 
-    dict(key='f3', typ='schlange', kopffarbe='#a8e6a1',
-         titel='Aufgabe 3', name='Schlange Susi',
-         story='Schlange Susi z&auml;hlt in <b>Zweierschritten</b>.',
-         zahlen=list(range(2, 21, 2)),
-         fragen=[('stelle', 5), ('stelle', 9), ('plus', 1, 6), ('minus', 10, 3)]),
+    dict(key='f3', typ='schornstein',
+         titel='Aufgabe 3', name='Der Rauch vom Schornstein',
+         story='Aus dem Schornstein steigen Rauchwolken. Die <b>erste</b> Wolke '
+               'ist ganz nah am Schornstein.',
+         zahlen=[6, 12, 16, 18, 4, 2, 20, 8, 14, 10],
+         fragen=[('stelle', 5), ('stelle', 9), ('plus', 1, 6), ('minus', 7, 3)]),
 
     dict(key='f4', typ='waescheleine',
          titel='Aufgabe 4', name='Die Zahlen-W&auml;scheleine',
          story='An der W&auml;scheleine h&auml;ngen Socken mit Zahlen. '
                'Wir z&auml;hlen von <b>links</b> nach rechts.',
-         zahlen=list(range(5, 51, 5)),
+         zahlen=[20, 50, 5, 25, 10, 15, 35, 30, 45, 40],
          fragen=[('stelle', 6), ('welche_stelle', 30), ('plus', 2, 4),
-                 ('minus', 8, 2)]),
+                 ('minus', 7, 5)]),
 
-    dict(key='f5', typ='drache', kopffarbe='#b6e3f5',
-         titel='Aufgabe 5', name='Drache Dodo',
-         story='Drache Dodo z&auml;hlt in <b>Zehnerschritten</b>.',
-         zahlen=list(range(10, 101, 10)),
-         fragen=[('stelle', 7), ('welche_stelle', 40), ('plus', 3, 5),
-                 ('minus', 9, 6)]),
+    dict(key='f5', typ='badewanne',
+         titel='Aufgabe 5', name='Blasen in der Badewanne',
+         story='Aus der Badewanne steigen Seifenblasen. Die <b>erste</b> Blase '
+               'ist ganz links.',
+         zahlen=[50, 30, 60, 100, 80, 90, 70, 40, 10, 20],
+         fragen=[('stelle', 7), ('welche_stelle', 40), ('plus', 8, 9),
+                 ('minus', 4, 9)]),
 
     dict(key='f6', typ='sterne',
          titel='Aufgabe 6', name='Die Sternenkette',
-         story='Die Sterne z&auml;hlen <b>r&uuml;ckw&auml;rts</b> in Zweierschritten. '
-               'Der erste Stern ist neben dem Mond.',
-         zahlen=list(range(20, 1, -2)),
-         fragen=[('stelle', 2), ('stelle', 8), ('minus', 1, 10), ('plus', 4, 7)]),
+         story='Am Himmel funkeln Sterne mit Zahlen. Der <b>erste</b> Stern ist '
+               'neben dem Mond.',
+         zahlen=[12, 2, 6, 20, 16, 8, 14, 4, 10, 18],
+         fragen=[('stelle', 2), ('stelle', 8), ('minus', 4, 1), ('plus', 6, 10)]),
 ]
 
 ORD = {1: 'erste', 2: 'zweite', 3: 'dritte', 4: 'vierte', 5: 'f&uuml;nfte',

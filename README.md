@@ -16,7 +16,8 @@ Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, R
 ## Zahlenfolgen (Mathe, jünger, Deutsch)
 
 - `zahlenfolgen.pdf` / `zahlenfolgen.html` — 3 Blätter A4 quer, je 2 Aufgaben (halbe Seite),
-  plus Lösungsblatt. Motive: Raupe, Zug, Schlange, Wäscheleine, Drache, Sternenkette.
+  plus Lösungsblatt. Motive: Raupe, Zug, Schornstein-Rauch, Wäscheleine (Socken), Badewannen-Blasen, Sternenkette.
+  Die Zahlenfolgen sind bewusst UNSORTIERT (zufällige Reihenfolge).
   Lernziel: „die 7. Zahl" (Ordnungszahlen / Position in einer Folge).
 - Quellen: `build_folgen.py` (Aufgaben + Layout), `render_folgen.js` (Zeichnungen).
 - Neu bauen: `python3 build_folgen.py && python3 topdf.py http://localhost:8000/zahlenfolgen.html zahlenfolgen.pdf`
