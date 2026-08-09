@@ -8,6 +8,7 @@ import (
 	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"os"
@@ -61,7 +62,7 @@ button{width:100%;padding:10px;font-size:16px;font-weight:600;color:#fff;backgro
 border:0;border-radius:999px;cursor:pointer}
 .err{color:#e8548c;font-size:14px;margin:-6px 0 12px}</style></head><body>
 <form method="POST"><h1>Lernmaterial</h1><p>Bitte Passwort eingeben.</p>
-%s<input type="password" name="pw" autofocus autocomplete="current-password" placeholder="Passwort">
+{{ERR}}<input type="password" name="pw" autofocus autocomplete="current-password" placeholder="Passwort">
 <button type="submit">Weiter</button></form></body></html>`
 
 func auth(next http.Handler) http.Handler {
@@ -87,7 +88,7 @@ func auth(next http.Handler) http.Handler {
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintf(w, loginPage, errMsg)
+		io.WriteString(w, strings.Replace(loginPage, "{{ERR}}", errMsg, 1))
 	})
 }
 
