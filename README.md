@@ -25,3 +25,10 @@ Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, R
 ## Startseite
 
 - `index.html` — Übersicht mit Links auf die PDFs (`busybox httpd -f -p 8000 -h .`)
+
+## Server (passwortgeschützt)
+
+- `server/main.go` — statischer Server mit Passwort-Login (HMAC-signiertes Cookie, 1 Jahr).
+- Bauen: `cd server && go build -o ../lernmaterial-server .`
+- Konfiguration: `/etc/lernmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — nicht im Repo.
+- systemd: `lernmaterial.service` (nach `/etc/systemd/system/` kopieren, `enable --now`).
