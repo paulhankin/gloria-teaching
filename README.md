@@ -21,3 +21,7 @@ Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, R
   Lernziel: „die 7. Zahl" (Ordnungszahlen / Position in einer Folge).
 - Quellen: `build_folgen.py` (Aufgaben + Layout), `render_folgen.js` (Zeichnungen).
 - Neu bauen: `python3 build_folgen.py && python3 topdf.py http://localhost:8000/zahlenfolgen.html zahlenfolgen.pdf`
+
+## Startseite
+
+- `index.html` — Übersicht mit Links auf die PDFs (`busybox httpd -f -p 8000 -h .`)
