@@ -16,6 +16,7 @@ import (
 
 	"learningmaterial/internal/pdf"
 	"learningmaterial/internal/sheet"
+	"learningmaterial/internal/site"
 
 	_ "learningmaterial/generate/math/number_sequences"
 	_ "learningmaterial/generate/math/price_puzzles"
@@ -64,9 +65,11 @@ func main() {
 		log.Fatal("no worksheet matches the filter")
 	}
 
-	// The index page always covers every known worksheet.
+	// The index page always covers every known worksheet. This static copy
+	// has no request UI; cmd/serve renders the interactive front page.
 	idx := filepath.Join(*out, "index.html")
-	if err := os.WriteFile(idx, []byte(indexHTML(sheet.All())), 0o644); err != nil {
+	page := site.Index(site.Data{Worksheets: sheet.All(), Static: true})
+	if err := os.WriteFile(idx, []byte(page), 0o644); err != nil {
 		log.Fatal(err)
 	}
 	fmt.Println(idx)
