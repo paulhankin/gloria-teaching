@@ -272,7 +272,7 @@ function buildSequence(spec, seed) {
 
   if (t === "stars") {
     const margin = 60, step = (W - margin - 150) / N;
-    const R = Math.min(step * 0.56, 54);
+    const R = Math.min(step * 0.48, 50);
     // Moon as the start: thick crescent with a face
     const mx = 72, my = 150, MR = 54;      // outer circle
     const ix = mx + 32, iy = my - 14, IR = 47;  // punched-out circle
@@ -296,7 +296,7 @@ function buildSequence(spec, seed) {
           fill: "#f3c23f", fillStyle: "solid" })));
     for (let i = 0; i < N; i++) {
       const cx = 140 + step * (i + 0.5);
-      const cy = 150 + (i % 2 ? 34 : -30);
+      const cy = 150;
       svg.appendChild(rc.polygon(starPts(cx, cy, R, R * 0.44),
         { roughness: 1.4, bowing: 1.2, seed: seed + 30 + i, stroke: col(i),
           strokeWidth: 3, fill: col(i), fillStyle: "hachure", hachureGap: 8,

@@ -19,7 +19,7 @@ cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    static server with password protection
 ```
 
-Currently: `generate/math/venn_diagrams`, `generate/math/number_sequences`,
+Currently: `generate/math/venn_diagrams`, `generate/math/ordinal_numbers`,
 `generate/math/price_puzzles`.
 
 ## Building

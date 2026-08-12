@@ -1,4 +1,4 @@
-package numbersequences
+package ordinalnumbers
 
 // Question kinds.
 const (

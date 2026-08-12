@@ -1,5 +1,5 @@
-// Package numbersequences builds the "Zahlenfolgen" worksheet (ordinal numbers).
-package numbersequences
+// Package ordinalnumbers builds the "Ordnungszahlen" worksheet.
+package ordinalnumbers
 
 import (
 	_ "embed"
@@ -35,8 +35,8 @@ const css = `
 func init() {
 	sheet.Register(sheet.Worksheet{
 		Subject: "math",
-		Name:    "number_sequences",
-		Title:   "Zahlenfolgen",
+		Name:    "ordinal_numbers",
+		Title:   "Ordnungszahlen",
 		Meta:    "Mathe, jünger · 3 Aufgabenblätter + Lösungen · Ordnungszahlen",
 		Build:   build,
 	})
@@ -68,7 +68,7 @@ func (t task) questionText(q question) (text, answer string) {
 
 func build() *sheet.Doc {
 	d := &sheet.Doc{
-		Title: "Mathe-Arbeitsblatt: Zahlenfolgen",
+		Title: "Mathe-Arbeitsblatt: Ordnungszahlen",
 		CSS:   css,
 		Rough: true,
 	}
@@ -98,7 +98,7 @@ func build() *sheet.Doc {
 `, t.Title, t.Name, t.Story, t.Key, lis.String())
 		}
 		body.WriteString(sheet.Page(
-			fmt.Sprintf("Zahlenfolgen &ndash; Blatt %d", i/2+1),
+			fmt.Sprintf("Ordnungszahlen &ndash; Blatt %d", i/2+1),
 			fmt.Sprintf("  <div class=\"halves\">\n%s  </div>\n", halves.String())))
 	}
 

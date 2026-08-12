@@ -41,31 +41,33 @@ function drawPot(svg, rc, x, seed, tall) {
     opts(seed, "#a9542c", "#f0a878")));
   svg.appendChild(rc.rectangle(x - 70, top - 20, 140, 22, opts(seed + 1, "#a9542c", "#f7c1a1")));
 }
-function drawPlant(svg, rc, x, seed) {
-  // free-standing plant WITHOUT pot: stem down to the ground, small root ball below
-  const b = BASE;
-  line(svg, rc, x, b - 12, x, b - 168, opts(seed, "#3f8f3f"));
-  const leaves = [[-2, b-44, -52, b-64], [2, b-72, 52, b-92], [-2, b-100, -46, b-120],
-                  [2, b-126, 46, b-144]];
+// The plant grows IN its pot: unlike the other puzzles both objects are drawn
+// together as one picture, with leader lines pointing at the two parts.
+function drawPottedPlant(svg, rc, x, seed) {
+  const potTop = 128;
+  // plant: stem rooted inside the pot, leaves and a shoot above the rim
+  line(svg, rc, x, potTop + 10, x, 48, opts(seed, "#3f8f3f"));
+  const leaves = [[-2, 104, -60, 82], [2, 78, 60, 56], [-2, 52, -54, 32]];
   leaves.forEach((L, i) => {
     const [sx, sy, ex, ey] = [x + L[0], L[1], x + L[2], L[3]];
     svg.appendChild(rc.path(
-      `M ${sx} ${sy} Q ${(sx+ex)/2} ${ey - 26} ${ex} ${ey} Q ${(sx+ex)/2} ${ey + 18} ${sx} ${sy} Z`,
+      `M ${sx} ${sy} Q ${(sx + ex) / 2} ${ey - 26} ${ex} ${ey} Q ${(sx + ex) / 2} ${ey + 18} ${sx} ${sy} Z`,
       opts(seed + i + 1, "#3f8f3f", "#a8dc87")));
   });
-  // blossom/shoot on top
-  svg.appendChild(rc.path(`M ${x} ${b-168} Q ${x-22} ${b-196} ${x} ${b-206} Q ${x+22} ${b-196} ${x} ${b-168} Z`,
+  svg.appendChild(rc.path(`M ${x} 50 Q ${x - 22} 30 ${x} 20 Q ${x + 22} 30 ${x} 50 Z`,
     opts(seed + 9, "#3f8f3f", "#c6ecab")));
-  // roots
-  const roots = [[-44, 22], [-22, 32], [0, 36], [22, 32], [44, 22]];
-  roots.forEach((r, i) => {
-    svg.appendChild(rc.path(
-      `M ${x} ${b-14} Q ${x + r[0] * 0.4} ${b + r[1] * 0.45} ${x + r[0]} ${b + r[1]}`,
-      opts(seed + 20 + i, "#a07a4a", null, 2.5)));
-  });
-  [[-30, 26], [12, 30]].forEach((r, i) =>
-    svg.appendChild(rc.path(`M ${x + r[0] * 0.6} ${b + r[1] * 0.5} q ${r[0] * 0.3} 6 ${r[0] * 0.45} 11`,
-      opts(seed + 30 + i, "#a07a4a", null, 2))));
+  // pot around the stem
+  drawPot(svg, rc, x, seed + 20);
+  // soil peeking out of the pot
+  svg.appendChild(rc.path(
+    `M ${x - 62} ${potTop} Q ${x} ${potTop + 16} ${x + 62} ${potTop} L ${x + 62} ${potTop + 12} ` +
+    `Q ${x} ${potTop + 26} ${x - 62} ${potTop + 12} Z`,
+    opts(seed + 40, "#7a5230", "#a07a4a")));
+}
+// Leader line from a label to the part of the picture it names.
+function leader(svg, rc, x1, y1, x2, y2, seed) {
+  line(svg, rc, x1, y1, x2, y2, opts(seed, "#8a94a6", null, 2));
+  svg.appendChild(rc.circle(x2, y2, 9, opts(seed + 1, "#8a94a6", "#8a94a6", 1.5)));
 }
 
 /* ---------- 2 apple / pear ---------- */
@@ -305,8 +307,19 @@ function buildPicture(spec, seed) {
   const rc = rough.svg(svg);
   ground(svg, rc, seed);
   const x1 = 240, x2 = 660;
+  if (spec.kind === "plant") {
+    // Special case: plant and pot belong together, so they share one drawing.
+    const cx = (x1 + x2) / 2;
+    // Only the middle of the canvas is used, so crop the viewBox to it.
+    svg.setAttribute("viewBox", `${cx - 250} 16 500 292`);
+    drawPottedPlant(svg, rc, cx, seed + 1);
+    leader(svg, rc, cx - 152, 60, cx - 56, 78, seed + 60);
+    text(svg, cx - 196, 66, spec.names[0], "label");
+    leader(svg, rc, cx + 152, 190, cx + 44, 190, seed + 70);
+    text(svg, cx + 196, 196, spec.names[1], "label");
+    return svg;
+  }
   const drawers = {
-    plant: [() => drawPlant(svg,rc,x1,seed+1), () => drawPot(svg,rc,x2,seed+20)],
     fruit: [() => drawApple(svg,rc,x1,seed+1), () => drawPear(svg,rc,x2,seed+10)],
     reading: [() => drawBook(svg,rc,x1,seed+1), () => drawBookmark(svg,rc,x2,seed+10)],
     snack: [() => drawSandwich(svg,rc,x1,seed+1), () => drawDrink(svg,rc,x2,seed+10)],

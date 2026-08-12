@@ -18,7 +18,7 @@ import (
 	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
 
-	_ "learningmaterial/generate/math/number_sequences"
+	_ "learningmaterial/generate/math/ordinal_numbers"
 	_ "learningmaterial/generate/math/price_puzzles"
 	_ "learningmaterial/generate/math/venn_diagrams"
 )
