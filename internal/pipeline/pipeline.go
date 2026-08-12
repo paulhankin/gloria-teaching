@@ -204,6 +204,12 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 			return err
 		}
 	} else {
+		if followUp == "" {
+			// Resuming after a server restart.
+			prompt = "The server restarted while you were working. " +
+				"Check the state of the worktree, finish the work, commit it " +
+				"and summarise what you changed."
+		}
 		p.Logf("#%d: sending a refinement to the agent", it.ID)
 		if err := p.chatContinue(convID, prompt); err != nil {
 			return err
@@ -361,9 +367,53 @@ func (p *Pipeline) chatContinue(convID, prompt string) error {
 }
 
 // waitForTurn blocks until the agent turn ends and returns its last message.
+// It polls `shelley client list` instead of using `read -wait`, which does not
+// reliably return when it attaches to a turn that is already running.
 func (p *Pipeline) waitForTurn(convID string) (string, error) {
-	cmd := exec.Command("shelley", "client", "read", "-wait", convID)
-	out, err := cmd.Output()
+	deadline := time.Now().Add(90 * time.Minute)
+	idle := 0
+	for time.Now().Before(deadline) {
+		time.Sleep(5 * time.Second)
+		working, err := p.working(convID)
+		if err != nil {
+			return "", err
+		}
+		if working {
+			idle = 0
+			continue
+		}
+		// Two idle polls in a row: the turn really has ended (right after
+		// `chat` the conversation is not marked as working yet).
+		idle++
+		if idle >= 2 {
+			return p.lastAgentMessage(convID)
+		}
+	}
+	return "", fmt.Errorf("the agent did not finish within 90 minutes")
+}
+
+// working reports whether the agent is currently working on the conversation.
+func (p *Pipeline) working(convID string) (bool, error) {
+	out, err := exec.Command("shelley", "client", "list", "-limit", "200").Output()
+	if err != nil {
+		return false, fmt.Errorf("shelley client list: %v", err)
+	}
+	for _, line := range strings.Split(string(out), "\n") {
+		var c struct {
+			ID      string `json:"conversation_id"`
+			Working bool   `json:"working"`
+		}
+		if json.Unmarshal([]byte(line), &c) != nil || c.ID != convID {
+			continue
+		}
+		return c.Working, nil
+	}
+	return false, fmt.Errorf("conversation %s not found", convID)
+}
+
+// lastAgentMessage returns the final message of the conversation.
+func (p *Pipeline) lastAgentMessage(convID string) (string, error) {
+	out, err := exec.Command("shelley", "client", "read", convID).Output()
 	if err != nil {
 		return "", fmt.Errorf("shelley client read: %v", err)
 	}
