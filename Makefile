@@ -14,7 +14,7 @@ build:
 	go build -o bin/serve ./cmd/serve
 
 # Serve locally (password from SITE_PASSWORD)
-serve:
+serve: html
 	go run ./cmd/serve -addr :8000 -dir output
 
 clean:

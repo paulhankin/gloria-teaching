@@ -10,9 +10,18 @@ import (
 	"learningmaterial/internal/store"
 )
 
+type Worksheet struct {
+	Subject string `json:"subject"`
+	Name    string `json:"name"`
+	Title   string `json:"title"`
+	Meta    string `json:"meta"`
+}
+
+func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
+
 // Data is everything the front page needs.
 type Data struct {
-	Worksheets []sheet.Worksheet
+	Worksheets []Worksheet
 	Requests   []store.Request // newest first; empty unless Admin
 	Admin      bool
 	// Static marks the offline copy written by cmd/generate: no forms,
@@ -37,7 +46,7 @@ func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
 }
 
 // ChangeRequests returns the open change requests for one worksheet.
-func (d Data) ChangeRequests(w sheet.Worksheet) []store.Request {
+func (d Data) ChangeRequests(w Worksheet) []store.Request {
 	return d.openRequests(store.KindChange, w.Path())
 }
 

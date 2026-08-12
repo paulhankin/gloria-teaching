@@ -22,18 +22,13 @@ import (
 	"time"
 
 	"learningmaterial/internal/pipeline"
-	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
 	"learningmaterial/internal/store"
-
-	_ "learningmaterial/generate/math/answer_checks"
-	_ "learningmaterial/generate/math/ordinal_numbers"
-	_ "learningmaterial/generate/math/price_puzzles"
-	_ "learningmaterial/generate/math/venn_diagrams"
 )
 
 var db *store.DB
 var pipe *pipeline.Pipeline
+var manifestPath string
 
 const cookieName = "lm_auth"
 
@@ -116,7 +111,12 @@ func subtleEq(a, b string) bool {
 
 // index renders the front page with the request UI.
 func index(w http.ResponseWriter, r *http.Request) {
-	d := site.Data{Worksheets: sheet.All(), Admin: db.AdminMode(), Flash: flash(w, r)}
+	worksheets, err := site.ReadManifest(manifestPath)
+	if err != nil {
+		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	d := site.Data{Worksheets: worksheets, Admin: db.AdminMode(), Flash: flash(w, r)}
 	if d.Admin {
 		rs, err := db.All()
 		if err != nil {
@@ -174,7 +174,13 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 	worksheet := r.FormValue("worksheet")
 	if kind == store.KindNew {
 		worksheet = ""
-	} else if kind != store.KindChange || !knownWorksheet(worksheet) {
+	} else if kind != store.KindChange {
+		http.Error(w, "bad request", http.StatusBadRequest)
+		return
+	} else if known, err := knownWorksheet(worksheet); err != nil {
+		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
+		return
+	} else if !known {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
 	}
@@ -289,13 +295,17 @@ func postAdmin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func knownWorksheet(path string) bool {
-	for _, ws := range sheet.All() {
+func knownWorksheet(path string) (bool, error) {
+	worksheets, err := site.ReadManifest(manifestPath)
+	if err != nil {
+		return false, err
+	}
+	for _, ws := range worksheets {
 		if ws.Path() == path {
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func main() {
@@ -305,7 +315,6 @@ func main() {
 	repo := flag.String("repo", ".", "git checkout the pipeline works on")
 	workRoot := flag.String("work", "data/worktrees", "directory for the per-item git worktrees")
 	preview := flag.String("preview", "data/preview", "directory for the per-item preview builds")
-	service := flag.String("service", "", "systemd unit to restart after an approved change")
 	push := flag.Bool("push", true, "push to origin after an approved change")
 	flag.Parse()
 
@@ -333,12 +342,16 @@ func main() {
 		}
 		return a
 	}
+	outputDir := abs(*dir)
+	manifestPath = filepath.Join(outputDir, site.ManifestName)
+	if _, err := site.ReadManifest(manifestPath); err != nil {
+		log.Fatalf("worksheet catalog: %v", err)
+	}
 	pipe = pipeline.New(db, pipeline.Config{
 		Repo:        abs(*repo),
 		WorkRoot:    abs(*workRoot),
 		PreviewRoot: abs(*preview),
-		OutputDir:   abs(*dir),
-		Service:     *service,
+		OutputDir:   outputDir,
 		Push:        *push,
 	})
 	pipe.Start()

@@ -18,6 +18,7 @@ internal/pipeline/            drives work items through the agent
 internal/site/                the front page (worksheet index + request/review UI)
 generate/<subject>/<sheet>/   one worksheet (Go + render.js)
 output/<subject>/<sheet>/     index.html + index.pdf   (generated, not in the repo)
+output/worksheets.json         runtime worksheet catalog (generated atomically)
 data/                         database, worktrees, previews (not in the repo)
 cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    server: site, requests, work item pipeline
@@ -44,7 +45,13 @@ PDFs use `/headless-shell/headless-shell`
 make serve                    # locally, password from SITE_PASSWORD
 ```
 
-- systemd: copy `learningmaterial.service` to `/etc/systemd/system/`, `enable --now`.
+- systemd: run `make && make build`, copy `learningmaterial.service` to
+  `/etc/systemd/system/`, run `sudo systemctl daemon-reload`, then
+  `sudo systemctl enable --now learningmaterial`.
+- For an upgrade that changes server code or its flags, run `make build`, copy
+  the updated unit, run `daemon-reload`, and restart the service.
+- Worksheet publication is dynamic; ordinary worksheet additions and content
+  changes need none of those server deployment steps.
 - Configuration: `/etc/learningmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — not in the repo.
 
 ## Requests and the work item pipeline
@@ -67,14 +74,15 @@ queued -> working -> review -> done (approved: merged + pushed)
 - Whenever an item reaches `review`, the whole site (HTML + PDF) is rendered
   from its worktree into `data/preview/<id>/`, reachable at `/preview/<id>/`
   (admin mode only).
-- Approving rebases onto `main`, fast-forward merges, pushes, regenerates
-  `output/` and rebuilds `bin/serve`; the service is restarted (`-service`)
-  once no other item is being worked on.
+- Approving rebases onto `main`, fast-forward merges, pushes and regenerates
+  `output/`, including an atomic `worksheets.json` catalog. The running server
+  reads that catalog dynamically, so worksheet additions and content changes
+  require no server rebuild or restart.
 - The review UI lives in admin mode on the front page: **Approve & push**,
   **Reject**, **Refine** (free text sent back into the same conversation) and
   **Retry** for failed items, plus a log of recent pipeline events.
 
-Server flags: `-repo`, `-work`, `-preview`, `-db`, `-service`, `-push`.
+Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
 
 ## Adding a worksheet
 

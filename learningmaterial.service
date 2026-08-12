@@ -11,8 +11,7 @@ ExecStart=/home/exedev/learningmaterial/bin/serve -addr :8000 \
   -repo /home/exedev/learningmaterial \
   -db /home/exedev/learningmaterial/data/requests.db \
   -work /home/exedev/learningmaterial/data/worktrees \
-  -preview /home/exedev/learningmaterial/data/preview \
-  -service learningmaterial
+  -preview /home/exedev/learningmaterial/data/preview
 Restart=always
 
 [Install]

@@ -28,7 +28,6 @@ type Config struct {
 	WorkRoot    string // parent directory for the per-item worktrees
 	PreviewRoot string // parent directory for the per-item preview builds
 	OutputDir   string // the directory cmd/serve serves
-	Service     string // systemd unit to restart after a merge ("" = none)
 	Push        bool   // push to origin after a merge
 }
 
@@ -37,10 +36,10 @@ type Pipeline struct {
 	cfg Config
 	db  *store.DB
 
-	mu             sync.Mutex
-	busy           map[string]bool // lane -> a goroutine is working on it
-	restartPending bool
-	log            []string // recent pipeline events, newest last
+	mu        sync.Mutex
+	busy      map[string]bool // lane -> a goroutine is working on it
+	publishMu sync.Mutex      // serializes main merges and output publication
+	log       []string        // recent pipeline events, newest last
 
 	wake chan struct{}
 }
@@ -140,7 +139,6 @@ func (p *Pipeline) schedule() {
 		blocked[it.Lane()] = true
 		p.start(it, "")
 	}
-	p.maybeRestart(items)
 }
 
 // start runs one work item in the background. followUp is a refinement message
@@ -461,17 +459,14 @@ func (p *Pipeline) buildPreview(it store.Request, worktree string) error {
 	return nil
 }
 
-// rebuild regenerates the served output and the server binary.
+// rebuild regenerates the served output. The running server reads the generated
+// manifest dynamically, so publishing worksheet content needs no binary rebuild
+// or service restart.
 func (p *Pipeline) rebuild() error {
 	cmd := exec.Command("go", "run", "./cmd/generate", "-out", p.cfg.OutputDir)
 	cmd.Dir = p.cfg.Repo
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("generate: %v: %s", err, tail(string(out), 800))
-	}
-	build := exec.Command("go", "build", "-o", "bin/serve", "./cmd/serve")
-	build.Dir = p.cfg.Repo
-	if out, err := build.CombinedOutput(); err != nil {
-		return fmt.Errorf("build serve: %v: %s", err, tail(string(out), 800))
 	}
 	return nil
 }
@@ -484,34 +479,9 @@ func tail(s string, n int) string {
 	return s
 }
 
-// maybeRestart restarts the service once nothing is in flight (a restart kills
-// this process, so it must not interrupt another lane).
-func (p *Pipeline) maybeRestart(items []store.Request) {
-	p.mu.Lock()
-	pending := p.restartPending
-	busy := len(p.busy) > 0
-	p.mu.Unlock()
-	if !pending || busy || p.cfg.Service == "" {
-		return
-	}
-	for _, it := range items {
-		if it.Status == store.StatusWorking {
-			return
-		}
-	}
-	p.mu.Lock()
-	p.restartPending = false
-	p.mu.Unlock()
-	p.Logf("restarting %s to pick up the new build", p.cfg.Service)
-	cmd := exec.Command("sudo", "-n", "systemctl", "restart", p.cfg.Service)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		p.Logf("restart failed: %v: %s", err, strings.TrimSpace(string(out)))
-	}
-}
-
 // --- decisions -------------------------------------------------------------
 
-// Approve merges the work into main, pushes it and rebuilds everything.
+// Approve merges the work into main, pushes it and publishes generated output.
 func (p *Pipeline) Approve(id int64) error {
 	it, err := p.db.Get(id)
 	if err != nil {
@@ -537,15 +507,16 @@ func (p *Pipeline) Approve(id int64) error {
 			p.mu.Unlock()
 			p.Kick()
 		}()
+		p.publishMu.Lock()
+		defer p.publishMu.Unlock()
 		if err := p.merge(it); err != nil {
 			p.Logf("#%d merge failed: %v", id, err)
 			p.db.SetStatus(id, store.StatusReview, "merge failed: "+err.Error())
 			return
 		}
 		// Keep the item visible and recoverable until the generated site and
-		// replacement server binary are safely on disk. If this process is
-		// restarted during the build, the item remains in review and approval
-		// can simply be retried (the merge is already up to date).
+		// manifest are safely on disk. If this process is interrupted during
+		// generation, approval can simply be retried (the merge is up to date).
 		p.db.SetStatus(id, store.StatusReview, "merged and pushed; rebuilding the site")
 		p.Logf("#%d approved; rebuilding the site", id)
 		if err := p.rebuild(); err != nil {
@@ -555,9 +526,6 @@ func (p *Pipeline) Approve(id int64) error {
 		}
 		p.db.SetStatus(id, store.StatusDone, "approved, merged, pushed and published")
 		p.removeWorktree(it)
-		p.mu.Lock()
-		p.restartPending = true
-		p.mu.Unlock()
 		p.Logf("#%d done", id)
 	}()
 	return nil
@@ -645,6 +613,8 @@ func (p *Pipeline) Retry(id int64) error {
 // Rebuild regenerates the served site on demand.
 func (p *Pipeline) Rebuild() {
 	go func() {
+		p.publishMu.Lock()
+		defer p.publishMu.Unlock()
 		p.Logf("rebuilding the site")
 		if err := p.rebuild(); err != nil {
 			p.Logf("rebuild failed: %v", err)
