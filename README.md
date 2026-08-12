@@ -1,43 +1,53 @@
 # Lernmaterial
 
-## Venn-Diagramme (Mathe, ~9 Jahre, Deutsch)
+Arbeitsblätter zum Ausdrucken (A4 quer). Alles in Go: ein kleines Framework
+(`internal/sheet`), ein Arbeitsblatt pro Verzeichnis unter `generate/`,
+das Ergebnis landet spiegelbildlich unter `output/`.
 
-- `arbeitsblatt.html` — **fertiges Arbeitsblatt** (selbstenthaltend: Fonts + rough.js eingebettet).
-  A4 quer, 2 Aufgaben pro Seite (je eine Spalte), 4 Aufgabenblätter + Lösungsblatt.
-  Diagramme werden per rough.js handgezeichnet gerendert.
-- Quellen: `content.json` (Aufgabentexte), `diagrams.json` (Diagramm-Daten),
-  `loesungen.json`, `render.js` (Zeichen-Code), `build.py` (Zusammenbau).
-- Neu bauen: `python3 build.py`
-- `gen.html` — Vorschau nur der Diagramme.
-- `venn-diagramme.html` — ältere SVG-Version (Hochformat).
+## Struktur
 
-Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, Ränder „Standard".
+```
+internal/sheet/             Framework: Registry, Doc/HTML-Bau, gemeinsames CSS, Assets
+internal/pdf/               HTML -> PDF via headless Chrome (CDP, eigener WS-Client)
+generate/<fach>/<blatt>/    ein Arbeitsblatt (Go + render.js)
+output/<fach>/<blatt>/      index.html + index.pdf   (generiert, nicht im Repo)
+cmd/generate/               baut alle Blätter + Startseite
+cmd/serve/                  statischer Server mit Passwortschutz
+```
 
-## Zahlenfolgen (Mathe, jünger, Deutsch)
+Aktuell: `generate/mathe/venn_diagramme`, `generate/mathe/zahlenfolgen`,
+`generate/mathe/preisraetsel`.
 
-- `zahlenfolgen.pdf` / `zahlenfolgen.html` — 3 Blätter A4 quer, je 2 Aufgaben (halbe Seite),
-  plus Lösungsblatt. Motive: Raupe, Zug, Schornstein-Rauch, Wäscheleine (Socken), Badewannen-Blasen, Sternenkette.
-  Die Zahlenfolgen sind bewusst UNSORTIERT (zufällige Reihenfolge).
-  Lernziel: „die 7. Zahl" (Ordnungszahlen / Position in einer Folge).
-- Quellen: `build_folgen.py` (Aufgaben + Layout), `render_folgen.js` (Zeichnungen).
-- Neu bauen: `python3 build_folgen.py && python3 topdf.py http://localhost:8000/zahlenfolgen.html zahlenfolgen.pdf`
+## Bauen
 
-## Preisrätsel (Mathe, Deutsch)
+```
+make                          # HTML + PDF für alle Blätter nach output/
+make html                     # nur HTML (schnell, ohne Chrome)
+go run ./cmd/generate venn    # nur passende Blätter (Teilstring im Pfad)
+make build                    # Binaries nach bin/
+```
 
-- `preisraetsel.pdf` / `preisraetsel.html` — 8 Blätter A4 quer, je eine Aufgabe:
-  links Aufgabe, Bild und Rechnungsfeld, rechts Antwortzeilen und
-  „Warum meine Antwort stimmt" (Begründung/Probe), plus Lösungsblatt.
-  Geübt werden Gesamtpreis, Preisunterschied, Hälfte, Doppeltes und Dreifaches.
-- Quellen: `build_preise.py` (Aufgaben + Layout), `render_preise.js` (Zeichnungen).
-- Neu bauen: `python3 build_preise.py && python3 topdf.py http://localhost:8000/preisraetsel.html preisraetsel.pdf`
+Für PDFs wird `/headless-shell/headless-shell` benutzt
+(überschreibbar mit `HEADLESS_SHELL=...`).
 
-## Startseite
+## Ausliefern
 
-- `index.html` — Übersicht mit Links auf die PDFs (`busybox httpd -f -p 8000 -h .`)
+```
+make serve                    # lokal, Passwort aus SITE_PASSWORD
+```
 
-## Server (passwortgeschützt)
-
-- `server/main.go` — statischer Server mit Passwort-Login (HMAC-signiertes Cookie, 1 Jahr).
-- Bauen: `cd server && go build -o ../lernmaterial-server .`
+- systemd: `lernmaterial.service` nach `/etc/systemd/system/`, `enable --now`.
 - Konfiguration: `/etc/lernmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — nicht im Repo.
-- systemd: `lernmaterial.service` (nach `/etc/systemd/system/` kopieren, `enable --now`).
+
+## Neues Arbeitsblatt anlegen
+
+1. `generate/<fach>/<name>/` anlegen, Package benennen.
+2. In `init()` `sheet.Register(sheet.Worksheet{Fach, Name, Titel, Meta, Build})`.
+3. `Build() *sheet.Doc` liefert Titel, zusätzliches CSS und Body.
+   Bausteine: `sheet.Page`, `sheet.SolutionPage`, `sheet.SolutionBox`,
+   `sheet.Lines`, `sheet.NameZeile`; `sheet.BaseCSS` ist immer aktiv.
+4. Zeichnungen: `render.js` per `//go:embed` einbinden, Daten mit `doc.Set("NAME", v)`
+   als JS-Konstante übergeben, `doc.Rough = true` bettet rough.js ein.
+5. Blank-Import in `cmd/generate/main.go` ergänzen.
+
+Die Startseite (`output/index.html`) wird automatisch aus der Registry gebaut.

@@ -1,4 +1,7 @@
-// Kleiner Static-Server mit Passwortschutz (Cookie-Session).
+// Kommando serve liefert das output/-Verzeichnis passwortgeschuetzt aus
+// (Cookie-Session, HMAC-signiert).
+//
+//	go run ./cmd/serve -addr :8000 -dir output
 package main
 
 import (
@@ -98,7 +101,7 @@ func subtleEq(a, b string) bool {
 
 func main() {
 	addr := flag.String("addr", ":8000", "listen address")
-	dir := flag.String("dir", ".", "directory to serve")
+	dir := flag.String("dir", "output", "directory to serve")
 	flag.Parse()
 
 	secret = []byte(os.Getenv("SITE_SECRET"))

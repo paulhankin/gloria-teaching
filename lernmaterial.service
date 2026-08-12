@@ -6,7 +6,7 @@ After=network.target
 User=exedev
 WorkingDirectory=/home/exedev/lernmaterial
 EnvironmentFile=/etc/lernmaterial/env
-ExecStart=/home/exedev/lernmaterial/lernmaterial-server -addr :8000 -dir /home/exedev/lernmaterial
+ExecStart=/home/exedev/lernmaterial/bin/serve -addr :8000 -dir /home/exedev/lernmaterial/output
 Restart=always
 
 [Install]
