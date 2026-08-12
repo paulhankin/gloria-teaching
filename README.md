@@ -22,6 +22,14 @@ Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, R
 - Quellen: `build_folgen.py` (Aufgaben + Layout), `render_folgen.js` (Zeichnungen).
 - Neu bauen: `python3 build_folgen.py && python3 topdf.py http://localhost:8000/zahlenfolgen.html zahlenfolgen.pdf`
 
+## Preisrätsel (Mathe, Deutsch)
+
+- `preisraetsel.pdf` / `preisraetsel.html` — 4 Blätter A4 quer mit je zwei
+  A5-Aufgaben in Spalten, insgesamt 8 bebilderte Preisrätsel, plus Lösungsblatt.
+  Geübt werden Gesamtpreis, Preisunterschied, Hälfte, Doppeltes und Dreifaches.
+- Quellen: `build_preise.py` (Aufgaben + Layout), `render_preise.js` (Zeichnungen).
+- Neu bauen: `python3 build_preise.py && python3 topdf.py http://localhost:8000/preisraetsel.html preisraetsel.pdf`
+
 ## Startseite
 
 - `index.html` — Übersicht mit Links auf die PDFs (`busybox httpd -f -p 8000 -h .`)
