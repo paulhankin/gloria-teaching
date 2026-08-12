@@ -175,6 +175,7 @@ const indexCSS = `
   a { color:var(--link); }
   a.pdf { font-weight:650; white-space:nowrap; }
   .row-actions { text-align:right; white-space:nowrap; }
+  .row-actions a + a { margin-left:12px; }
   details { margin-top:6px; }
   summary { color:var(--link); cursor:pointer; font-size:13px; }
   form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
@@ -307,7 +308,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
       </form>
     </details>
   </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf">Download PDF</a></td>
+  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf">Worksheet PDF</a><a class="pdf" href="{{.Path}}/solutions.pdf">Solutions PDF</a></td>
 </tr>
 {{end}}
 </tbody></table>

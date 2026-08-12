@@ -2,7 +2,7 @@
 //
 // A worksheet lives in generate/<subject>/<name>/ and registers itself via
 // Register(). The generator (cmd/generate) turns it into
-// output/<subject>/<name>/index.html (+ index.pdf).
+// output/<subject>/<name>/index.{html,pdf} and solutions.{html,pdf}.
 package sheet
 
 import (
@@ -57,12 +57,13 @@ func All() []Worksheet {
 
 // Doc is the built content of a worksheet.
 type Doc struct {
-	Title   string         // <title>
-	CSS     string         // extra CSS (BaseCSS is always included)
-	Body    string         // HTML body (usually built with Page(...))
-	Data    map[string]any // emitted as `const NAME = <json>;` in the script
-	Scripts []string       // JS sources (run after the data)
-	Rough   bool           // embed rough.js
+	Title     string         // <title> of the worksheet document
+	CSS       string         // extra CSS (BaseCSS is always included)
+	Body      string         // worksheet HTML body (usually built with Page(...))
+	Solutions string         // solution HTML body (usually built with SolutionPage(...))
+	Data      map[string]any // emitted as `const NAME = <json>;` in the script
+	Scripts   []string       // JS sources (run after the data)
+	Rough     bool           // embed rough.js
 }
 
 // AddScript appends JS source code.
@@ -76,13 +77,20 @@ func (d *Doc) Set(name string, v any) {
 	d.Data[name] = v
 }
 
-// HTML renders the finished, self-contained document.
-func (d *Doc) HTML() string {
+// HTML renders the finished, self-contained worksheet document.
+func (d *Doc) HTML() string { return d.html(d.Title, d.Body) }
+
+// SolutionsHTML renders the solutions as a separate, self-contained document.
+func (d *Doc) SolutionsHTML() string {
+	return d.html(d.Title+" – Lösungen", d.Solutions)
+}
+
+func (d *Doc) html(title, body string) string {
 	var b strings.Builder
 	b.WriteString("<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n<meta charset=\"utf-8\">\n")
 	fmt.Fprintf(&b, "<title>%s</title>\n<style>\n%s\n%s\n</style>\n</head>\n<body>\n",
-		d.Title, Asset("fonts.css"), BaseCSS+d.CSS)
-	b.WriteString(d.Body)
+		title, Asset("fonts.css"), BaseCSS+d.CSS)
+	b.WriteString(body)
 	if d.Rough {
 		fmt.Fprintf(&b, "<script>\n%s\n</script>\n", Asset("rough.js"))
 	}

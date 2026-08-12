@@ -55,23 +55,32 @@ func main() {
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			log.Fatal(err)
 		}
-		html := w.Build().HTML()
-		htmlPath := filepath.Join(dir, "index.html")
-		if err := os.WriteFile(htmlPath, []byte(html), 0o644); err != nil {
-			log.Fatal(err)
+		doc := w.Build()
+		documents := []struct {
+			name string
+			html string
+		}{
+			{name: "index", html: doc.HTML()},
+			{name: "solutions", html: doc.SolutionsHTML()},
 		}
-		fmt.Printf("%-34s %4d KB\n", htmlPath, len(html)/1024)
-
-		if *makePDF {
-			pdfPath := filepath.Join(dir, "index.pdf")
-			err := pdf.Render(htmlPath, pdfPath, pdf.Options{
-				Landscape: !w.Portrait, Wait: *wait,
-			})
-			if err != nil {
-				log.Fatalf("%s: %v", pdfPath, err)
+		for _, document := range documents {
+			htmlPath := filepath.Join(dir, document.name+".html")
+			if err := os.WriteFile(htmlPath, []byte(document.html), 0o644); err != nil {
+				log.Fatal(err)
 			}
-			st, _ := os.Stat(pdfPath)
-			fmt.Printf("%-34s %4d KB\n", pdfPath, st.Size()/1024)
+			fmt.Printf("%-34s %4d KB\n", htmlPath, len(document.html)/1024)
+
+			if *makePDF {
+				pdfPath := filepath.Join(dir, document.name+".pdf")
+				err := pdf.Render(htmlPath, pdfPath, pdf.Options{
+					Landscape: !w.Portrait, Wait: *wait,
+				})
+				if err != nil {
+					log.Fatalf("%s: %v", pdfPath, err)
+				}
+				st, _ := os.Stat(pdfPath)
+				fmt.Printf("%-34s %4d KB\n", pdfPath, st.Size()/1024)
+			}
 		}
 		built = append(built, w)
 	}

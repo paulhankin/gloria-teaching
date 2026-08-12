@@ -74,9 +74,8 @@ func build() *sheet.Doc {
 	for i, task := range logicTasks {
 		body.WriteString(logicPage(i+1, task))
 	}
-	body.WriteString(firstSolutionPage())
-	body.WriteString(logicSolutionPage())
 	d.Body = body.String()
+	d.Solutions = firstSolutionPage() + logicSolutionPage()
 
 	type pictureSpec struct {
 		Kind   string   `json:"kind"`

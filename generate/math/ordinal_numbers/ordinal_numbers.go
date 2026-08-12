@@ -112,8 +112,8 @@ func build() *sheet.Doc {
 		}
 		boxes = append(boxes, sheet.SolutionBox(t.Title+" &ndash; "+t.Name, lines...))
 	}
-	body.WriteString(sheet.SolutionPage(boxes...))
 	d.Body = body.String()
+	d.Solutions = sheet.SolutionPage(boxes...)
 
 	// render.js expects the numbers as strings (for text width).
 	type spec struct {

@@ -7,11 +7,14 @@ import (
 	"learningmaterial/internal/store"
 )
 
-func TestWorksheetIndexIsPDFOnlyTable(t *testing.T) {
+func TestWorksheetIndexLinksWorksheetAndSolutionsPDFs(t *testing.T) {
 	html := Index(Data{Static: true, Worksheets: []Worksheet{{
 		Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "4. Klasse · Lösungen",
 	}}})
-	for _, want := range []string{"<table", "Brüche", "12 Aug 2026", "Download PDF", "math/fractions/index.pdf"} {
+	for _, want := range []string{
+		"<table", "Brüche", "12 Aug 2026", "Worksheet PDF", "Solutions PDF",
+		"math/fractions/index.pdf", "math/fractions/solutions.pdf",
+	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("index is missing %q", want)
 		}

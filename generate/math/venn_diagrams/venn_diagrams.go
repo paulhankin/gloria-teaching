@@ -97,8 +97,8 @@ func build() *sheet.Doc {
 	for _, t := range tasks {
 		boxes = append(boxes, fmt.Sprintf("    <div class=\"solution-box\">%s</div>\n", t.Solution))
 	}
-	body.WriteString(sheet.SolutionPage(boxes...))
 	d.Body = body.String()
+	d.Solutions = sheet.SolutionPage(boxes...)
 
 	diagrams := map[string]diagram{}
 	for _, t := range tasks {

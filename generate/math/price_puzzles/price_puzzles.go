@@ -99,8 +99,8 @@ func build() *sheet.Doc {
 			fmt.Sprintf("      <p class=\"check\">Probe: %d + %d = %d Franken.</p>\n", x, y, x+y),
 		))
 	}
-	body.WriteString(sheet.SolutionPage(boxes...))
 	d.Body = body.String()
+	d.Solutions = sheet.SolutionPage(boxes...)
 
 	type spec struct {
 		Kind  string    `json:"kind"`

@@ -8,8 +8,8 @@
   (Swiss context: Franken).
 - One worksheet = one directory `generate/<subject>/<name>/`, one Go package,
   registered via `sheet.Register` in `init()`.
-- Output always goes to `output/<subject>/<name>/index.{html,pdf}` — mirroring
-  `generate/`. `output/` is generated and not in the repo.
+- Output always goes to `output/<subject>/<name>/index.{html,pdf}` for the
+  worksheet and `solutions.{html,pdf}` for its solutions — mirroring `generate/`.
 - Task data lives in Go structs (`tasks.go`), not in JSON files.
 - Shared layout lives in `internal/sheet` (`BaseCSS`, `Page`, `SolutionPage`,
   ...). Sheet-specific CSS only for sheet-specific things.

@@ -17,7 +17,7 @@ internal/store/               SQLite: requests / work items and settings
 internal/pipeline/            drives work items through the agent
 internal/site/                the front page (worksheet index + request/review UI)
 generate/<subject>/<sheet>/   one worksheet (Go + render.js)
-output/<subject>/<sheet>/     index.html + index.pdf   (generated, not in the repo)
+output/<subject>/<sheet>/     index.html/.pdf + solutions.html/.pdf (generated)
 output/worksheets.json         runtime worksheet catalog (generated atomically)
 data/                         database, worktrees, previews (not in the repo)
 cmd/generate/                 builds all worksheets + the index page
@@ -88,9 +88,11 @@ Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
 
 1. Create `generate/<subject>/<name>/` and name the package.
 2. In `init()` call `sheet.Register(sheet.Worksheet{Subject, Name, Title, Meta, Build})`.
-3. `Build() *sheet.Doc` returns title, extra CSS and body.
-   Building blocks: `sheet.Page`, `sheet.SolutionPage`, `sheet.SolutionBox`,
-   `sheet.Lines`, `sheet.NameLine`; `sheet.BaseCSS` is always applied.
+3. `Build() *sheet.Doc` returns the title, extra CSS, worksheet body and
+   solution body. Put pupil pages in `Doc.Body` and `sheet.SolutionPage(...)` in
+   `Doc.Solutions`; they are emitted as separate documents. Building blocks:
+   `sheet.Page`, `sheet.SolutionPage`, `sheet.SolutionBox`, `sheet.Lines`,
+   `sheet.NameLine`; `sheet.BaseCSS` is always applied.
 4. Drawings: embed `render.js` via `//go:embed`, pass data with
    `doc.Set("NAME", v)` as a JS constant, `doc.Rough = true` embeds rough.js.
 5. Add a blank import in `cmd/generate/main.go`.
