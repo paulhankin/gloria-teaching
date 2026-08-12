@@ -254,12 +254,8 @@ function opts(seed, stroke, fill, sw) {
 }
 function line(svg, rc, x1, y1, x2, y2, o) { svg.appendChild(rc.line(x1, y1, x2, y2, o)); }
 
-function priceTag(svg, rc, x, seed, name) {
-  text(svg, x, 272, name, "label");
-  svg.appendChild(rc.rectangle(x - 52, 284, 104, 48, {
-    ...opts(seed, PINK, "#fff2f7"), roughness: 0.8
-  }));
-  text(svg, x, 317, "? Fr.", "price");
+function labelUnder(svg, x, name) {
+  text(svg, x, 296, name, "label");
 }
 function ground(svg, rc, seed) {
   svg.appendChild(rc.line(50, BASE, 850, BASE,
@@ -289,10 +285,16 @@ function drawPlant(svg, rc, x, seed) {
   // Bluete/Trieb oben
   svg.appendChild(rc.path(`M ${x} ${b-168} Q ${x-22} ${b-196} ${x} ${b-206} Q ${x+22} ${b-196} ${x} ${b-168} Z`,
     opts(seed + 9, "#3f8f3f", "#c6ecab")));
-  // Wurzelballen
-  svg.appendChild(rc.ellipse(x, b - 4, 78, 30, opts(seed + 10, "#7a5230", "#c9a06e")));
-  [[-26, 10], [0, 14], [26, 10]].forEach((r, i) =>
-    line(svg, rc, x + r[0] * 0.6, b - 8, x + r[0], b + r[1], opts(seed + 20 + i, "#7a5230", null, 2.5)));
+  // Wurzeln
+  const roots = [[-44, 22], [-22, 32], [0, 36], [22, 32], [44, 22]];
+  roots.forEach((r, i) => {
+    svg.appendChild(rc.path(
+      `M ${x} ${b-14} Q ${x + r[0] * 0.4} ${b + r[1] * 0.45} ${x + r[0]} ${b + r[1]}`,
+      opts(seed + 20 + i, "#a07a4a", null, 2.5)));
+  });
+  [[-30, 26], [12, 30]].forEach((r, i) =>
+    svg.appendChild(rc.path(`M ${x + r[0] * 0.6} ${b + r[1] * 0.5} q ${r[0] * 0.3} 6 ${r[0] * 0.45} 11`,
+      opts(seed + 30 + i, "#a07a4a", null, 2))));
 }
 
 /* ---------- 2 Apfel / Birne ---------- */
@@ -522,7 +524,7 @@ function drawLight(svg, rc, x, seed) {
 }
 
 function buildPicture(spec, seed) {
-  const svg = el("svg", {xmlns: SVGNS, viewBox: "40 16 820 324", preserveAspectRatio: "xMidYMid meet"});
+  const svg = el("svg", {xmlns: SVGNS, viewBox: "40 16 820 292", preserveAspectRatio: "xMidYMid meet"});
   const style = el("style");
   style.textContent =
     `.label{font:700 30px 'Caveat',cursive;fill:${INK}}` +
@@ -543,12 +545,8 @@ function buildPicture(spec, seed) {
     velo: [() => drawHelmet(svg,rc,x1,seed+1), () => drawLight(svg,rc,x2,seed+10)]
   };
   drawers[spec.typ][0](); drawers[spec.typ][1]();
-  priceTag(svg, rc, x1, seed + 80, spec.namen[0]);
-  priceTag(svg, rc, x2, seed + 81, spec.namen[1]);
-  text(svg, 450, 120, "+", "total");
-  svg.appendChild(rc.rectangle(378, 152, 144, 54,
-    {...opts(seed + 90, GREEN, "#f2fdf6"), roughness: 0.8}));
-  text(svg, 450, 189, `= ${spec.summe} Fr.`, "total");
+  labelUnder(svg, x1, spec.namen[0]);
+  labelUnder(svg, x2, spec.namen[1]);
   return svg;
 }
 
