@@ -177,6 +177,10 @@ const indexCSS = `
   .row-actions { text-align:right; white-space:nowrap; }
   .row-actions a { display:block; }
   .row-actions a + a { margin-top:4px; }
+  .worksheet-main td { border-bottom:0; padding-bottom:5px; }
+  .worksheet-request td { padding-top:0; }
+  .worksheet-request details { width:100%; }
+  .worksheet-request form.ask { max-width:none; }
   details { margin-top:6px; }
   summary { color:var(--link); cursor:pointer; font-size:13px; }
   form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
@@ -223,6 +227,8 @@ const indexCSS = `
     tr { border-bottom:1px solid var(--line); padding:10px 0; }
     td { border:0; padding:3px 4px; }
     .row-actions { text-align:left; margin-top:5px; }
+    .worksheet-main { border-bottom:0; padding-bottom:0; }
+    .worksheet-request { padding-top:0; }
     .active td:first-child { width:auto; margin-bottom:5px; }
   }
 `
@@ -294,23 +300,27 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
 <tbody>
 {{range .Worksheets}}
-<tr>
+<tr{{if not $.Static}} class="worksheet-main"{{end}}>
   <td><div class="title">{{.Title}}</div></td>
   <td class="date">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
   <td class="meta">{{.Meta}}</td>
   {{if not $.Static}}<td>
     {{$rs := $.ChangeRequests .}}
     {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
-    <details><summary>Request an update</summary>
-      <form class="ask" method="POST" action="/requests">
-        <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">
-        <textarea name="body" required placeholder="What should change?"></textarea>
-        <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
-      </form>
-    </details>
   </td>{{end}}
   <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf">Worksheet PDF</a><a class="pdf" href="{{.Path}}/solutions.pdf">Solutions PDF</a></td>
 </tr>
+{{if not $.Static}}
+<tr class="worksheet-request"><td colspan="5">
+  <details><summary>Request an update</summary>
+    <form class="ask" method="POST" action="/requests">
+      <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">
+      <textarea name="body" required placeholder="What should change?"></textarea>
+      <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
+    </form>
+  </details>
+</td></tr>
+{{end}}
 {{end}}
 </tbody></table>
 </section>

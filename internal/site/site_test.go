@@ -24,6 +24,19 @@ func TestWorksheetIndexLinksWorksheetAndSolutionsPDFs(t *testing.T) {
 	}
 }
 
+func TestUpdateRequestFormSpansWorksheetTable(t *testing.T) {
+	html := Index(Data{Worksheets: []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche"}}})
+	for _, want := range []string{
+		`<tr class="worksheet-request"><td colspan="5">`,
+		`.worksheet-request form.ask { max-width:none; }`,
+		`<summary>Request an update</summary>`,
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("full-width update request form is missing %q", want)
+		}
+	}
+}
+
 func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 	html := Index(Data{
 		Worksheets: []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche"}},
