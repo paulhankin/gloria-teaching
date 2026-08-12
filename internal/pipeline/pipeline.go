@@ -542,13 +542,19 @@ func (p *Pipeline) Approve(id int64) error {
 			p.db.SetStatus(id, store.StatusReview, "merge failed: "+err.Error())
 			return
 		}
-		p.db.SetStatus(id, store.StatusDone, "approved, merged and pushed")
-		p.removeWorktree(it)
+		// Keep the item visible and recoverable until the generated site and
+		// replacement server binary are safely on disk. If this process is
+		// restarted during the build, the item remains in review and approval
+		// can simply be retried (the merge is already up to date).
+		p.db.SetStatus(id, store.StatusReview, "merged and pushed; rebuilding the site")
 		p.Logf("#%d approved; rebuilding the site", id)
 		if err := p.rebuild(); err != nil {
 			p.Logf("#%d rebuild failed: %v", id, err)
+			p.db.SetStatus(id, store.StatusReview, "merged and pushed, but rebuild failed: "+err.Error())
 			return
 		}
+		p.db.SetStatus(id, store.StatusDone, "approved, merged, pushed and published")
+		p.removeWorktree(it)
 		p.mu.Lock()
 		p.restartPending = true
 		p.mu.Unlock()

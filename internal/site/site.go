@@ -46,6 +46,19 @@ func (d Data) NewRequests() []store.Request {
 	return d.openRequests(store.KindNew, "")
 }
 
+// CompletedRequests returns finished work items, newest first. Keeping these
+// visible in admin mode makes an approval auditable after the review card is
+// replaced by the published worksheet.
+func (d Data) CompletedRequests() []store.Request {
+	var out []store.Request
+	for _, r := range d.Requests {
+		if r.Status == store.StatusDone || r.Status == store.StatusRejected {
+			out = append(out, r)
+		}
+	}
+	return out
+}
+
 // Busy reports whether anything is queued or being worked on (used to
 // auto-refresh the page).
 func (d Data) Busy() bool {
@@ -128,6 +141,8 @@ const indexCSS = `
   .tag.working { background:#f0a132; }
   .tag.review  { background:#2f9fd0; }
   .tag.failed  { background:#e8548c; }
+  .tag.done    { background:#2e8b57; }
+  .tag.rejected { background:#6b7a8d; }
   .item .note { color:#6b7a8d; font-size:13px; margin:6px 0 0; white-space:pre-wrap; }
   .item .body { margin-top:6px; }
   .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
@@ -156,6 +171,7 @@ const itemTmpl = `
   </div>
   <div class="body">{{.Body}}</div>
   {{if .Note}}<p class="note">{{.Note}}</p>{{end}}
+  {{if or (eq .Status "queued") (eq .Status "working") (eq .Status "review") (eq .Status "failed")}}
   <div class="actions">
     {{if .HasPreview}}
     <a class="prev" href="/preview/{{.ID}}/" target="_blank">Open preview</a>
@@ -171,6 +187,7 @@ const itemTmpl = `
     <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}">
       <button class="no" type="submit">Reject</button></form>
   </div>
+  {{end}}
   {{if or (eq .Status "review") (eq .Status "failed")}}
   <form class="refine" method="POST" action="/work/refine">
     <input type="hidden" name="id" value="{{.ID}}">
@@ -258,6 +275,19 @@ var indexTmpl = template.Must(template.New("index").Parse(itemTmpl + `<!DOCTYPE 
       </form>
     </details>
   </div>
+
+  {{if .Admin}}
+  {{$completed := .CompletedRequests}}
+  {{if $completed}}
+  <div class="card">
+    <h2>Recent completed work</h2>
+    <p class="meta">Approved and rejected requests remain here after a restart.</p>
+    <ul class="reqlist">
+      {{range $completed}}{{template "item" .}}{{end}}
+    </ul>
+  </div>
+  {{end}}
+  {{end}}
 
   <div class="adminbar">
     <span>{{if .Admin}}Admin mode is on — requests are visible.{{else}}Admin mode is off.{{end}}</span>
