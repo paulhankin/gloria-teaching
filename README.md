@@ -24,8 +24,9 @@ Drucken: Chrome → Strg+P → Querformat, „Hintergrundgrafiken" aktivieren, R
 
 ## Preisrätsel (Mathe, Deutsch)
 
-- `preisraetsel.pdf` / `preisraetsel.html` — 4 Blätter A4 quer mit je zwei
-  A5-Aufgaben in Spalten, insgesamt 8 bebilderte Preisrätsel, plus Lösungsblatt.
+- `preisraetsel.pdf` / `preisraetsel.html` — 8 Blätter A4 quer, je eine Aufgabe:
+  links Aufgabe, Bild und Rechnungsfeld, rechts Antwortzeilen und
+  „Warum meine Antwort stimmt" (Begründung/Probe), plus Lösungsblatt.
   Geübt werden Gesamtpreis, Preisunterschied, Hälfte, Doppeltes und Dreifaches.
 - Quellen: `build_preise.py` (Aufgaben + Layout), `render_preise.js` (Zeichnungen).
 - Neu bauen: `python3 build_preise.py && python3 topdf.py http://localhost:8000/preisraetsel.html preisraetsel.pdf`

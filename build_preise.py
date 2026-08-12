@@ -64,22 +64,25 @@ CSS = r"""
           border-bottom: 2.5px solid #e8548c; }
   h1 { margin: 0; color: #e8548c; font: 700 24pt 'Caveat', cursive; }
   .namenszeile { color: #7a869a; font-size: 11pt; }
-  .spalten { display: flex; gap: 7mm; flex: 1 1 auto; min-height: 0; }
-  .spalte { display: flex; flex: 1 1 50%; min-width: 0; }
-  .spalte + .spalte { padding-left: 7mm; border-left: 2px dashed #d8dfe8; }
-  .aufgabe { display: flex; flex-direction: column; width: 100%; min-height: 0; }
-  h2 { margin: 0 0 2mm; color: #e8548c; font: 700 22pt 'Caveat', cursive; }
-  .story { margin: 0 0 3mm; min-height: 14mm; }
+  .spalten { display: flex; gap: 8mm; flex: 1 1 auto; min-height: 0; }
+  .spalte { display: flex; flex-direction: column; flex: 1 1 50%; min-width: 0; }
+  .spalte + .spalte { padding-left: 8mm; border-left: 2px dashed #d8dfe8; }
+  h2 { margin: 0 0 3mm; color: #e8548c; font: 700 24pt 'Caveat', cursive; }
+  h3 { margin: 0 0 2mm; color: #e8548c; font: 700 20pt 'Caveat', cursive; }
+  .story { margin: 0 0 3mm; }
   .bild { flex: 0 0 auto; margin: 0 0 3mm; line-height: 0; }
   .bild svg { display: block; width: 100%; height: auto; }
-  .frage { margin: 0 0 2.5mm; font-weight: 700; }
-  .antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;
-               margin-bottom: 3mm; font-size: 13.5pt; }
-  .antwort { white-space: nowrap; }
-  .linie { display: inline-block; min-width: 24mm; margin-left: 1mm;
+  .frage { margin: 0 0 3mm; font-weight: 700; }
+  .antworten { margin: 0 0 6mm; font-size: 15pt; }
+  .antwort { display: block; margin-bottom: 5mm; white-space: nowrap; }
+  .linie { display: inline-block; min-width: 34mm; margin-left: 2mm;
            border-bottom: 2px dotted #aab5c4; }
-  .rechnung { flex: 1 1 auto; min-height: 24mm; padding: 2mm 3mm; color: #7a869a;
-              font-size: 11pt; border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .kasten { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .rechnung { flex: 1 1 auto; min-height: 40mm; }
+  .begruendung { flex: 1 1 auto; min-height: 55mm; }
+  .schreiblinien { margin-top: 3mm; }
+  .schreiblinien div { height: 9mm; border-bottom: 1.5px dotted #ccd5e0; }
+  .hinweis { margin: 0 0 2mm; color: #7a869a; font-size: 11.5pt; }
   .loesung { height: auto; max-height: none; overflow: visible; }
   .loesung h1 { color: #2e8b57; }
   .lspalten { columns: 2; column-gap: 9mm; }
@@ -93,32 +96,38 @@ CSS = r"""
 NAME = '<span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span>'
 
 
-def aufgabe_html(a, nr):
-    return f"""    <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe {nr} &nbsp; <small>{a['titel']}</small></h2>
-        <p class="story">{a['text']}</p>
-        <div class="bild" data-preis="{a['key']}"></div>
-        <p class="frage">{a['frage']}</p>
-        <div class="antworten">
-          <span class="antwort">{a['namen'][0]}: <span class="linie"></span> Fr.</span>
-          <span class="antwort">{a['namen'][1]}: <span class="linie"></span> Fr.</span>
-        </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+def seite_html(a, nr):
+    return f"""<div class="page">
+  <div class="kopf"><h1>Preisrätsel – Blatt {nr}</h1>{NAME}</div>
+  <div class="spalten">
+    <div class="spalte">
+      <h2>Aufgabe {nr} &nbsp; <small>{a['titel']}</small></h2>
+      <p class="story">{a['text']}</p>
+      <div class="bild" data-preis="{a['key']}"></div>
+      <p class="frage">{a['frage']}</p>
+      <div class="kasten rechnung">Rechnung:</div>
     </div>
+    <div class="spalte">
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">{a['namen'][0]}: <span class="linie"></span> Fr.</span>
+        <span class="antwort">{a['namen'][1]}: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
 """
 
 
-seiten = []
-for i in range(0, len(AUFGABEN), 2):
-    inhalt = "".join(aufgabe_html(a, i + j + 1) for j, a in enumerate(AUFGABEN[i:i + 2]))
-    seiten.append(f"""<div class="page">
-  <div class="kopf"><h1>Preisrätsel – Blatt {i // 2 + 1}</h1>{NAME}</div>
-  <div class="spalten">
-{inhalt}  </div>
-</div>
-""")
+seiten = [seite_html(a, nr) for nr, a in enumerate(AUFGABEN, 1)]
 
 loesungen = []
 for nr, a in enumerate(AUFGABEN, 1):

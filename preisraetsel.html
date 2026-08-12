@@ -23,22 +23,25 @@
           border-bottom: 2.5px solid #e8548c; }
   h1 { margin: 0; color: #e8548c; font: 700 24pt 'Caveat', cursive; }
   .namenszeile { color: #7a869a; font-size: 11pt; }
-  .spalten { display: flex; gap: 7mm; flex: 1 1 auto; min-height: 0; }
-  .spalte { display: flex; flex: 1 1 50%; min-width: 0; }
-  .spalte + .spalte { padding-left: 7mm; border-left: 2px dashed #d8dfe8; }
-  .aufgabe { display: flex; flex-direction: column; width: 100%; min-height: 0; }
-  h2 { margin: 0 0 2mm; color: #e8548c; font: 700 22pt 'Caveat', cursive; }
-  .story { margin: 0 0 3mm; min-height: 14mm; }
+  .spalten { display: flex; gap: 8mm; flex: 1 1 auto; min-height: 0; }
+  .spalte { display: flex; flex-direction: column; flex: 1 1 50%; min-width: 0; }
+  .spalte + .spalte { padding-left: 8mm; border-left: 2px dashed #d8dfe8; }
+  h2 { margin: 0 0 3mm; color: #e8548c; font: 700 24pt 'Caveat', cursive; }
+  h3 { margin: 0 0 2mm; color: #e8548c; font: 700 20pt 'Caveat', cursive; }
+  .story { margin: 0 0 3mm; }
   .bild { flex: 0 0 auto; margin: 0 0 3mm; line-height: 0; }
   .bild svg { display: block; width: 100%; height: auto; }
-  .frage { margin: 0 0 2.5mm; font-weight: 700; }
-  .antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;
-               margin-bottom: 3mm; font-size: 13.5pt; }
-  .antwort { white-space: nowrap; }
-  .linie { display: inline-block; min-width: 24mm; margin-left: 1mm;
+  .frage { margin: 0 0 3mm; font-weight: 700; }
+  .antworten { margin: 0 0 6mm; font-size: 15pt; }
+  .antwort { display: block; margin-bottom: 5mm; white-space: nowrap; }
+  .linie { display: inline-block; min-width: 34mm; margin-left: 2mm;
            border-bottom: 2px dotted #aab5c4; }
-  .rechnung { flex: 1 1 auto; min-height: 24mm; padding: 2mm 3mm; color: #7a869a;
-              font-size: 11pt; border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .kasten { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .rechnung { flex: 1 1 auto; min-height: 40mm; }
+  .begruendung { flex: 1 1 auto; min-height: 55mm; }
+  .schreiblinien { margin-top: 3mm; }
+  .schreiblinien div { height: 9mm; border-bottom: 1.5px dotted #ccd5e0; }
+  .hinweis { margin: 0 0 2mm; color: #7a869a; font-size: 11.5pt; }
   .loesung { height: auto; max-height: none; overflow: visible; }
   .loesung h1 { color: #2e8b57; }
   .lspalten { columns: 2; column-gap: 9mm; }
@@ -55,30 +58,26 @@
   <div class="kopf"><h1>Preisrätsel – Blatt 1</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
   <div class="spalten">
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 1 &nbsp; <small>Pflanze und Topf</small></h2>
-        <p class="story">Eine Pflanze und ihr Topf kosten zusammen <b>11 Franken</b>. Der Topf kostet <b>3 Franken mehr</b> als die Pflanze.</p>
-        <div class="bild" data-preis="p1"></div>
-        <p class="frage">Wie viel kosten die Pflanze und der Topf einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Pflanze: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Topf: <span class="linie"></span> Fr.</span>
-        </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      <h2>Aufgabe 1 &nbsp; <small>Pflanze und Topf</small></h2>
+      <p class="story">Eine Pflanze und ihr Topf kosten zusammen <b>11 Franken</b>. Der Topf kostet <b>3 Franken mehr</b> als die Pflanze.</p>
+      <div class="bild" data-preis="p1"></div>
+      <p class="frage">Wie viel kosten die Pflanze und der Topf einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
     </div>
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 2 &nbsp; <small>Apfel und Birne</small></h2>
-        <p class="story">Ein Apfel und eine Birne kosten zusammen <b>12 Franken</b>. Die Birne kostet <b>doppelt so viel</b> wie der Apfel.</p>
-        <div class="bild" data-preis="p2"></div>
-        <p class="frage">Wie viel kosten der Apfel und die Birne einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Apfel: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Birne: <span class="linie"></span> Fr.</span>
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Pflanze: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Topf: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
         </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      </div>
     </div>
   </div>
 </div>
@@ -86,30 +85,26 @@
   <div class="kopf"><h1>Preisrätsel – Blatt 2</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
   <div class="spalten">
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 3 &nbsp; <small>Buch und Lesezeichen</small></h2>
-        <p class="story">Ein Buch und ein Lesezeichen kosten zusammen <b>14 Franken</b>. Das Buch kostet <b>6 Franken mehr</b> als das Lesezeichen.</p>
-        <div class="bild" data-preis="p3"></div>
-        <p class="frage">Wie viel kosten das Buch und das Lesezeichen einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Buch: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Lesezeichen: <span class="linie"></span> Fr.</span>
-        </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      <h2>Aufgabe 2 &nbsp; <small>Apfel und Birne</small></h2>
+      <p class="story">Ein Apfel und eine Birne kosten zusammen <b>12 Franken</b>. Die Birne kostet <b>doppelt so viel</b> wie der Apfel.</p>
+      <div class="bild" data-preis="p2"></div>
+      <p class="frage">Wie viel kosten der Apfel und die Birne einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
     </div>
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 4 &nbsp; <small>Sandwich und Getränk</small></h2>
-        <p class="story">Ein Sandwich und ein Getränk kosten zusammen <b>15 Franken</b>. Das Getränk kostet <b>halb so viel</b> wie das Sandwich.</p>
-        <div class="bild" data-preis="p4"></div>
-        <p class="frage">Wie viel kosten das Sandwich und das Getränk einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Sandwich: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Getränk: <span class="linie"></span> Fr.</span>
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Apfel: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Birne: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
         </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      </div>
     </div>
   </div>
 </div>
@@ -117,30 +112,26 @@
   <div class="kopf"><h1>Preisrätsel – Blatt 3</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
   <div class="spalten">
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 5 &nbsp; <small>Mütze und Schal</small></h2>
-        <p class="story">Eine Mütze und ein Schal kosten zusammen <b>22 Franken</b>. Der Schal kostet <b>2 Franken mehr</b> als die Mütze.</p>
-        <div class="bild" data-preis="p5"></div>
-        <p class="frage">Wie viel kosten die Mütze und der Schal einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Mütze: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Schal: <span class="linie"></span> Fr.</span>
-        </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      <h2>Aufgabe 3 &nbsp; <small>Buch und Lesezeichen</small></h2>
+      <p class="story">Ein Buch und ein Lesezeichen kosten zusammen <b>14 Franken</b>. Das Buch kostet <b>6 Franken mehr</b> als das Lesezeichen.</p>
+      <div class="bild" data-preis="p3"></div>
+      <p class="frage">Wie viel kosten das Buch und das Lesezeichen einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
     </div>
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 6 &nbsp; <small>Ball und Springseil</small></h2>
-        <p class="story">Ein Ball und ein Springseil kosten zusammen <b>24 Franken</b>. Der Ball kostet <b>dreimal so viel</b> wie das Springseil.</p>
-        <div class="bild" data-preis="p6"></div>
-        <p class="frage">Wie viel kosten der Ball und das Springseil einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Ball: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Springseil: <span class="linie"></span> Fr.</span>
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Buch: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Lesezeichen: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
         </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      </div>
     </div>
   </div>
 </div>
@@ -148,30 +139,134 @@
   <div class="kopf"><h1>Preisrätsel – Blatt 4</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
   <div class="spalten">
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 7 &nbsp; <small>Kuchen und Brot</small></h2>
-        <p class="story">Ein Kuchen und ein Brot kosten zusammen <b>28 Franken</b>. Das Brot kostet <b>4 Franken weniger</b> als der Kuchen.</p>
-        <div class="bild" data-preis="p7"></div>
-        <p class="frage">Wie viel kosten der Kuchen und das Brot einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Kuchen: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Brot: <span class="linie"></span> Fr.</span>
-        </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      <h2>Aufgabe 4 &nbsp; <small>Sandwich und Getränk</small></h2>
+      <p class="story">Ein Sandwich und ein Getränk kosten zusammen <b>15 Franken</b>. Das Getränk kostet <b>halb so viel</b> wie das Sandwich.</p>
+      <div class="bild" data-preis="p4"></div>
+      <p class="frage">Wie viel kosten das Sandwich und das Getränk einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
     </div>
     <div class="spalte">
-      <section class="aufgabe">
-        <h2>Aufgabe 8 &nbsp; <small>Velohelm und Velolicht</small></h2>
-        <p class="story">Ein Velohelm und ein Velolicht kosten zusammen <b>30 Franken</b>. Der Velohelm kostet <b>6 Franken mehr</b> als das Velolicht.</p>
-        <div class="bild" data-preis="p8"></div>
-        <p class="frage">Wie viel kosten der Velohelm und das Velolicht einzeln?</p>
-        <div class="antworten">
-          <span class="antwort">Velohelm: <span class="linie"></span> Fr.</span>
-          <span class="antwort">Velolicht: <span class="linie"></span> Fr.</span>
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Sandwich: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Getränk: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
         </div>
-        <div class="rechnung">Rechnung:</div>
-      </section>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page">
+  <div class="kopf"><h1>Preisrätsel – Blatt 5</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
+  <div class="spalten">
+    <div class="spalte">
+      <h2>Aufgabe 5 &nbsp; <small>Mütze und Schal</small></h2>
+      <p class="story">Eine Mütze und ein Schal kosten zusammen <b>22 Franken</b>. Der Schal kostet <b>2 Franken mehr</b> als die Mütze.</p>
+      <div class="bild" data-preis="p5"></div>
+      <p class="frage">Wie viel kosten die Mütze und der Schal einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
+    </div>
+    <div class="spalte">
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Mütze: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Schal: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page">
+  <div class="kopf"><h1>Preisrätsel – Blatt 6</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
+  <div class="spalten">
+    <div class="spalte">
+      <h2>Aufgabe 6 &nbsp; <small>Ball und Springseil</small></h2>
+      <p class="story">Ein Ball und ein Springseil kosten zusammen <b>24 Franken</b>. Der Ball kostet <b>dreimal so viel</b> wie das Springseil.</p>
+      <div class="bild" data-preis="p6"></div>
+      <p class="frage">Wie viel kosten der Ball und das Springseil einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
+    </div>
+    <div class="spalte">
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Ball: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Springseil: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page">
+  <div class="kopf"><h1>Preisrätsel – Blatt 7</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
+  <div class="spalten">
+    <div class="spalte">
+      <h2>Aufgabe 7 &nbsp; <small>Kuchen und Brot</small></h2>
+      <p class="story">Ein Kuchen und ein Brot kosten zusammen <b>28 Franken</b>. Das Brot kostet <b>4 Franken weniger</b> als der Kuchen.</p>
+      <div class="bild" data-preis="p7"></div>
+      <p class="frage">Wie viel kosten der Kuchen und das Brot einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
+    </div>
+    <div class="spalte">
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Kuchen: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Brot: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<div class="page">
+  <div class="kopf"><h1>Preisrätsel – Blatt 8</h1><span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span></div>
+  <div class="spalten">
+    <div class="spalte">
+      <h2>Aufgabe 8 &nbsp; <small>Velohelm und Velolicht</small></h2>
+      <p class="story">Ein Velohelm und ein Velolicht kosten zusammen <b>30 Franken</b>. Der Velohelm kostet <b>6 Franken mehr</b> als das Velolicht.</p>
+      <div class="bild" data-preis="p8"></div>
+      <p class="frage">Wie viel kosten der Velohelm und das Velolicht einzeln?</p>
+      <div class="kasten rechnung">Rechnung:</div>
+    </div>
+    <div class="spalte">
+      <h3>Meine Antwort</h3>
+      <div class="antworten">
+        <span class="antwort">Velohelm: <span class="linie"></span> Fr.</span>
+        <span class="antwort">Velolicht: <span class="linie"></span> Fr.</span>
+      </div>
+      <h3>Warum meine Antwort stimmt</h3>
+      <div class="kasten begruendung">
+        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
+           Stimmt auch der Unterschied?</p>
+        <div class="schreiblinien">
+          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+        </div>
+      </div>
     </div>
   </div>
 </div>
