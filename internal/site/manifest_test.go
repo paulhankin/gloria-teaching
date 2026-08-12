@@ -8,7 +8,7 @@ import (
 
 func TestManifestRoundTrip(t *testing.T) {
 	path := filepath.Join(t.TempDir(), ManifestName)
-	want := []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche", Meta: "Level 4"}}
+	want := []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "Level 4"}}
 	if err := WriteManifest(path, want); err != nil {
 		t.Fatal(err)
 	}

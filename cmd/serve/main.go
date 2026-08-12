@@ -117,13 +117,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d := site.Data{Worksheets: worksheets, Admin: db.AdminMode(), Flash: flash(w, r)}
+	rs, err := db.All()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	d.Requests = rs
 	if d.Admin {
-		rs, err := db.All()
-		if err != nil {
-			http.Error(w, err.Error(), http.StatusInternalServerError)
-			return
-		}
-		d.Requests = rs
 		d.Log = pipe.Log()
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")

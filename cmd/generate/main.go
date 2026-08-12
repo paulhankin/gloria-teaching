@@ -155,6 +155,7 @@ func siteWorksheets(in []sheet.Worksheet) []site.Worksheet {
 			Subject: w.Subject,
 			Name:    w.Name,
 			Title:   w.Title,
+			Date:    w.Date,
 			Meta:    w.Meta,
 		})
 	}

@@ -37,7 +37,8 @@ func init() {
 		Subject: "math",
 		Name:    "ordinal_numbers",
 		Title:   "Ordinalzahlen",
-		Meta:    "Mathe, jünger · 3 Aufgabenblätter + Lösungen · Ordinalzahlen",
+		Date:    "12 Aug 2026",
+		Meta:    "Jüngere Primarstufe · 3 Aufgabenblätter + Lösungen",
 		Build:   build,
 	})
 }

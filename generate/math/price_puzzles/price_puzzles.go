@@ -48,7 +48,8 @@ func init() {
 		Subject: "math",
 		Name:    "price_puzzles",
 		Title:   "Preisrätsel",
-		Meta:    "Mathe, Deutsch · 8 Aufgabenblätter + Lösungen · Summe, Differenz, Vielfache",
+		Date:    "12 Aug 2026",
+		Meta:    "Mathe und Deutsch · 8 Aufgabenblätter + Lösungen",
 		Build:   build,
 	})
 }

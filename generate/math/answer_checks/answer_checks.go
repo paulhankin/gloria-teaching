@@ -51,7 +51,8 @@ func init() {
 		Subject: "math",
 		Name:    "answer_checks",
 		Title:   "Kann das stimmen?",
-		Meta:    "Mathe, 3./4. Klasse · 9-seitiges Dossier + Lösungen · Antworten prüfen",
+		Date:    "12 Aug 2026",
+		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Antworten prüfen",
 		Build:   build,
 	})
 }

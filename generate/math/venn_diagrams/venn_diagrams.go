@@ -51,7 +51,8 @@ func init() {
 		Subject: "math",
 		Name:    "venn_diagrams",
 		Title:   "Venn-Diagramme",
-		Meta:    "Mathe, ca. 9 Jahre · 4 Aufgabenblätter + Lösungen",
+		Date:    "12 Aug 2026",
+		Meta:    "Ca. 9 Jahre · 4 Aufgabenblätter + Lösungen",
 		Build:   build,
 	})
 }

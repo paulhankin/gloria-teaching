@@ -29,7 +29,8 @@ type Worksheet struct {
 	Subject  string // e.g. "math" -> directory name
 	Name     string // e.g. "venn_diagrams" -> directory name
 	Title    string // display name, e.g. "Venn-Diagramme"
-	Meta     string // short description for the index page
+	Date     string // last content update, e.g. "12 Aug 2026"
+	Meta     string // short factual description for the index page
 	Build    func() *Doc
 	Portrait bool // print the PDF in portrait (default: landscape)
 }

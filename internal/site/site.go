@@ -14,6 +14,7 @@ type Worksheet struct {
 	Subject string `json:"subject"`
 	Name    string `json:"name"`
 	Title   string `json:"title"`
+	Date    string `json:"date"`
 	Meta    string `json:"meta"`
 }
 
@@ -22,7 +23,7 @@ func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
 // Data is everything the front page needs.
 type Data struct {
 	Worksheets []Worksheet
-	Requests   []store.Request // newest first; empty unless Admin
+	Requests   []store.Request // newest first
 	Admin      bool
 	// Static marks the offline copy written by cmd/generate: no forms,
 	// no admin controls (there is no server to talk to).
@@ -33,14 +34,23 @@ type Data struct {
 	Log []string
 }
 
-// Open reports whether the request is still in the pipeline.
 func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
 	var out []store.Request
 	for _, r := range d.Requests {
-		if r.Kind != kind || r.Worksheet != worksheet || !r.Status.Open() {
-			continue
+		if r.Kind == kind && r.Worksheet == worksheet && r.Status.Open() {
+			out = append(out, r)
 		}
-		out = append(out, r)
+	}
+	return out
+}
+
+// ActiveRequests returns all unfinished work, newest first.
+func (d Data) ActiveRequests() []store.Request {
+	var out []store.Request
+	for _, r := range d.Requests {
+		if r.Status.Open() {
+			out = append(out, r)
+		}
 	}
 	return out
 }
@@ -55,9 +65,7 @@ func (d Data) NewRequests() []store.Request {
 	return d.openRequests(store.KindNew, "")
 }
 
-// CompletedRequests returns finished work items, newest first. Keeping these
-// visible in admin mode makes an approval auditable after the review card is
-// replaced by the published worksheet.
+// CompletedRequests returns finished work items, newest first.
 func (d Data) CompletedRequests() []store.Request {
 	var out []store.Request
 	for _, r := range d.Requests {
@@ -66,6 +74,19 @@ func (d Data) CompletedRequests() []store.Request {
 		}
 	}
 	return out
+}
+
+// RequestTitle gives a work item a short, recognisable heading.
+func (d Data) RequestTitle(r store.Request) string {
+	if r.Kind == store.KindNew {
+		return "New worksheet"
+	}
+	for _, w := range d.Worksheets {
+		if w.Path() == r.Worksheet {
+			return w.Title
+		}
+	}
+	return r.Worksheet
 }
 
 // Busy reports whether anything is queued or being worked on (used to
@@ -91,227 +112,235 @@ func Index(d Data) string {
 	return b.String()
 }
 
+func statusLabel(s store.Status) string {
+	switch s {
+	case store.StatusQueued:
+		return "Queued"
+	case store.StatusWorking:
+		return "Work in progress"
+	case store.StatusReview:
+		return "Ready for review"
+	case store.StatusFailed:
+		return "Needs attention"
+	case store.StatusDone:
+		return "Published"
+	case store.StatusRejected:
+		return "Rejected"
+	default:
+		return string(s)
+	}
+}
+
+func statusHelp(s store.Status) string {
+	switch s {
+	case store.StatusQueued:
+		return "Waiting to start"
+	case store.StatusWorking:
+		return "The worksheet is being updated now"
+	case store.StatusReview:
+		return "The update is finished and awaiting approval"
+	case store.StatusFailed:
+		return "The update could not be completed"
+	case store.StatusDone:
+		return "The update is live"
+	case store.StatusRejected:
+		return "The update was not published"
+	default:
+		return ""
+	}
+}
+
 const indexCSS = `
-  :root { --ink:#1f3550; }
-  body { margin:0; padding:40px 20px 60px; background:#fdfcfa; color:var(--ink);
-         font:16px/1.5 system-ui, sans-serif; }
-  .wrap { max-width:720px; margin:0 auto; }
-  h1 { font:700 56px 'Caveat',cursive; margin:0 0 6px; }
-  .sub { color:#6b7a8d; margin:0 0 34px; }
-  .card { border:2px solid var(--ink); border-radius:14px; padding:18px 20px;
-          margin-bottom:22px; background:#fff; }
-  h2 { font:700 34px 'Caveat',cursive; margin:0 0 4px; }
-  .meta { color:#6b7a8d; font-size:14px; margin:0 0 14px; }
-  .links { display:flex; flex-wrap:wrap; gap:10px; }
-  a.btn { display:inline-block; text-decoration:none; padding:8px 16px; border-radius:999px;
-          border:2px solid currentColor; font-weight:600; font-size:15px; }
-  a.pdf { color:#e8548c; }
-  a.html { color:#2f9fd0; }
-  a.btn:hover { background:currentColor; }
-  a.btn:hover span { color:#fff; }
-
-  /* request UI */
-  .requests { margin-top:16px; border-top:2px dashed #dfe5ee; padding-top:12px; }
-  .requests h3 { margin:0 0 8px; font-size:14px; text-transform:uppercase;
-                 letter-spacing:.06em; color:#6b7a8d; }
-  ul.reqlist { list-style:none; margin:0 0 12px; padding:0; }
-  ul.reqlist li { border-left:4px solid #2f9fd0; background:#f6fbfe; border-radius:0 8px 8px 0;
-                  padding:8px 12px; margin-bottom:8px; display:flex; gap:12px;
-                  align-items:flex-start; }
-  ul.reqlist .body { white-space:pre-wrap; flex:1; }
-  ul.reqlist .who { display:block; color:#6b7a8d; font-size:13px; margin-top:4px; }
-  .empty { color:#98a3b3; font-size:14px; margin:0 0 12px; }
-  details.ask summary { cursor:pointer; font-weight:600; color:#2f9fd0; font-size:15px; }
-  form.ask { margin-top:10px; display:flex; flex-direction:column; gap:8px; }
-  form.ask textarea, form.ask input[type=text] {
-    font:15px/1.4 system-ui,sans-serif; padding:8px 10px; border:2px solid #cfd8e3;
-    border-radius:8px; width:100%; box-sizing:border-box; background:#fff; color:inherit; }
-  form.ask textarea { min-height:80px; resize:vertical; }
-  form.ask button { align-self:flex-start; padding:8px 18px; border:0; border-radius:999px;
-    background:#2f9fd0; color:#fff; font-weight:600; font-size:15px; cursor:pointer; }
-  button.del { border:0; background:none; color:#e8548c; cursor:pointer; font-size:13px;
-    font-weight:600; padding:0; }
-  .newcard { border-style:dashed; }
-  .adminbar { display:flex; justify-content:space-between; align-items:center; gap:12px;
-    margin:34px 0 0; color:#6b7a8d; font-size:14px; }
-  .adminbar form { margin:0; }
-  .adminbar button { border:2px solid #6b7a8d; background:none; color:#6b7a8d; cursor:pointer;
-    border-radius:999px; padding:5px 14px; font-size:13px; font-weight:600; }
-  .flash { background:#eafaf1; border:2px solid #bfe3cd; color:#2e8b57; border-radius:10px;
-    padding:10px 14px; margin:0 0 20px; font-size:15px; }
-
-  /* work items */
-  ul.reqlist li { display:block; }
-  .item { border-left-color:#98a3b3; }
-  .item .head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  .tag { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
-    border-radius:999px; padding:3px 10px; color:#fff; background:#98a3b3; }
-  .tag.queued  { background:#98a3b3; }
-  .tag.working { background:#f0a132; }
-  .tag.review  { background:#2f9fd0; }
-  .tag.failed  { background:#e8548c; }
-  .tag.done    { background:#2e8b57; }
-  .tag.rejected { background:#6b7a8d; }
-  .item .note { color:#6b7a8d; font-size:13px; margin:6px 0 0; white-space:pre-wrap; }
-  .item .body { margin-top:6px; }
-  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  :root { --ink:#172033; --muted:#667085; --line:#d8dee8; --link:#175cd3;
+    --queued:#667085; --working:#b54708; --review:#175cd3; --failed:#b42318;
+    --done:#067647; --rejected:#667085; }
+  * { box-sizing:border-box; }
+  body { margin:0; padding:36px 20px 64px; background:#fff; color:var(--ink);
+    font:15px/1.45 system-ui,sans-serif; }
+  .wrap { max-width:1040px; margin:0 auto; }
+  header { display:flex; justify-content:space-between; align-items:baseline; gap:20px;
+    padding-bottom:18px; border-bottom:1px solid var(--line); }
+  h1 { font-size:26px; line-height:1.2; margin:0; }
+  header p { color:var(--muted); margin:0; }
+  h2 { font-size:18px; margin:30px 0 10px; }
+  .count { color:var(--muted); font-weight:400; }
+  .flash { border:1px solid #86c9a8; color:#05603a; padding:10px 12px; margin:18px 0 0; }
+  table { width:100%; border-collapse:collapse; border-top:1px solid var(--ink); }
+  th { color:var(--muted); font-size:12px; text-align:left; text-transform:uppercase;
+    letter-spacing:.04em; font-weight:600; padding:9px 10px; border-bottom:1px solid var(--line); }
+  td { padding:13px 10px; border-bottom:1px solid var(--line); vertical-align:top; }
+  .title { font-weight:650; }
+  .meta, .date, .request-meta { color:var(--muted); font-size:13px; }
+  .date { white-space:nowrap; }
+  a { color:var(--link); }
+  a.pdf { font-weight:650; white-space:nowrap; }
+  .row-actions { text-align:right; white-space:nowrap; }
+  details { margin-top:6px; }
+  summary { color:var(--link); cursor:pointer; font-size:13px; }
+  form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
+  textarea, input[type=text] { width:100%; padding:9px 10px; border:1px solid #98a2b3;
+    border-radius:3px; background:#fff; color:inherit; font:14px/1.4 system-ui,sans-serif; }
+  textarea { min-height:82px; resize:vertical; }
+  button { border:1px solid #344054; border-radius:3px; background:#fff; color:#344054;
+    padding:7px 11px; font-weight:600; cursor:pointer; }
+  form.ask button { justify-self:start; color:#fff; background:#175cd3; border-color:#175cd3; }
+  .status { display:inline-flex; align-items:center; gap:7px; color:var(--queued); font-weight:700; }
+  .status::before { content:""; width:9px; height:9px; background:currentColor; border-radius:50%; }
+  .status.working { color:var(--working); }
+  .status.review { color:var(--review); }
+  .status.failed { color:var(--failed); }
+  .status.done { color:var(--done); }
+  .status.rejected { color:var(--rejected); }
+  .status-help { display:block; margin-top:2px; color:var(--muted); font-size:12px; }
+  .active { border-top:3px solid var(--working); }
+  .active td:first-child { width:190px; }
+  .request-body { margin-top:5px; white-space:pre-wrap; }
+  .request-note { margin:7px 0 0; color:var(--muted); font-size:13px; white-space:pre-wrap; }
+  .actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; align-items:center; }
   .actions form { margin:0; }
-  .actions button { border:0; border-radius:999px; padding:6px 14px; font-size:14px;
-    font-weight:600; color:#fff; cursor:pointer; background:#98a3b3; }
-  .actions button.ok { background:#2e8b57; }
-  .actions button.no { background:#e8548c; }
-  .actions a.prev { font-size:14px; font-weight:600; color:#2f9fd0; text-decoration:none; }
-  form.refine { margin-top:8px; display:flex; gap:8px; }
-  form.refine input[type=text] { flex:1; font:14px/1.4 system-ui,sans-serif; padding:6px 10px;
-    border:2px solid #cfd8e3; border-radius:8px; background:#fff; color:inherit; }
-  form.refine button { border:0; border-radius:999px; padding:6px 14px; font-size:14px;
-    font-weight:600; color:#fff; background:#2f9fd0; cursor:pointer; }
-  pre.log { background:#f4f6f9; border-radius:10px; padding:10px 14px; font-size:12px;
-    color:#6b7a8d; max-height:220px; overflow:auto; margin:10px 0 0; }
+  .actions button.ok { color:#fff; background:var(--done); border-color:var(--done); }
+  .actions button.no { color:var(--failed); border-color:#f0b4ae; }
+  .actions a { font-size:13px; font-weight:600; }
+  form.refine { display:flex; gap:7px; margin-top:8px; }
+  form.refine input { flex:1; }
+  .new-request { margin:18px 0 0; padding:14px 0; border-top:1px solid var(--line);
+    border-bottom:1px solid var(--line); }
+  .new-request h2 { margin:0 0 4px; }
+  .new-request p { color:var(--muted); margin:0 0 6px; }
+  .adminbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:34px;
+    padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
+  .adminbar form { margin:0; }
+  pre.log { background:#f7f8fa; border:1px solid var(--line); padding:10px; font-size:12px;
+    color:var(--muted); max-height:220px; overflow:auto; }
+  @media (max-width:720px) {
+    body { padding:24px 12px 48px; }
+    header { display:block; }
+    header p { margin-top:4px; }
+    table, tbody, tr, td { display:block; }
+    thead { display:none; }
+    tr { border-bottom:1px solid var(--line); padding:10px 0; }
+    td { border:0; padding:3px 4px; }
+    .row-actions { text-align:left; margin-top:5px; }
+    .active td:first-child { width:auto; margin-bottom:5px; }
+  }
 `
 
-// itemTmpl renders one work item with its status and the admin actions.
-const itemTmpl = `
-{{define "item"}}
-<li class="item">
-  <div class="head">
-    <span class="tag {{.Status}}">{{.Status}}</span>
-    <span class="who">#{{.ID}} &middot; {{if .Author}}{{.Author}} &middot; {{end}}{{.CreatedAt.Format "2 Jan 2006, 15:04"}}</span>
-  </div>
-  <div class="body">{{.Body}}</div>
-  {{if .Note}}<p class="note">{{.Note}}</p>{{end}}
-  {{if or (eq .Status "queued") (eq .Status "working") (eq .Status "review") (eq .Status "failed")}}
+const requestActions = `
+{{define "actions"}}
   <div class="actions">
-    {{if .HasPreview}}
-    <a class="prev" href="/preview/{{.ID}}/" target="_blank">Open preview</a>
-    {{end}}
+    {{if .HasPreview}}<a href="/preview/{{.ID}}/" target="_blank">Open preview</a>{{end}}
     {{if eq .Status "review"}}
-    <form method="POST" action="/work/approve"><input type="hidden" name="id" value="{{.ID}}">
-      <button class="ok" type="submit">Approve &amp; push</button></form>
+    <form method="POST" action="/work/approve"><input type="hidden" name="id" value="{{.ID}}"><button class="ok" type="submit">Approve &amp; publish</button></form>
     {{end}}
     {{if eq .Status "failed"}}
-    <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}">
-      <button type="submit">Retry</button></form>
+    <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">Retry</button></form>
     {{end}}
-    <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}">
-      <button class="no" type="submit">Reject</button></form>
+    <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}"><button class="no" type="submit">Reject</button></form>
   </div>
-  {{end}}
   {{if or (eq .Status "review") (eq .Status "failed")}}
   <form class="refine" method="POST" action="/work/refine">
-    <input type="hidden" name="id" value="{{.ID}}">
-    <input type="text" name="body" required placeholder="Request a refinement">
+    <input type="hidden" name="id" value="{{.ID}}"><input type="text" name="body" required placeholder="Describe the refinement">
     <button type="submit">Refine</button>
   </form>
   {{end}}
-</li>
 {{end}}
 `
 
-var indexTmpl = template.Must(template.New("index").Parse(itemTmpl + `<!DOCTYPE html>
+var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
+	"statusLabel": statusLabel,
+	"statusHelp":  statusHelp,
+}).Parse(requestActions + `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{if .Busy}}<meta http-equiv="refresh" content="10">{{end}}
 <title>Learning material</title>
-<style>
-{{.Fonts}}
-` + indexCSS + `
-</style>
+<style>{{.Fonts}}` + indexCSS + `</style>
 </head>
-<body>
-<div class="wrap">
-  <h1>Learning material</h1>
-  <p class="sub">Printable worksheets (A4 landscape).</p>
-{{if .Flash}}  <p class="flash">{{.Flash}}</p>{{end}}
-{{range .Worksheets}}
-  <div class="card">
-    <h2>{{.Title}}</h2>
-    <p class="meta">{{.Meta}}</p>
-    <div class="links">
-      <a class="btn pdf" href="{{.Path}}/index.pdf"><span>Download PDF</span></a>
-      <a class="btn html" href="{{.Path}}/index.html"><span>View in browser</span></a>
-    </div>
-{{if not $.Static}}
-    <div class="requests">
-      {{if $.Admin}}
-      <h3>Change requests</h3>
-      {{$rs := $.ChangeRequests .}}
-      {{if $rs}}
-      <ul class="reqlist">
-        {{range $rs}}{{template "item" .}}{{end}}
-      </ul>
-      {{else}}<p class="empty">No change requests yet.</p>{{end}}
-      {{end}}
-      <details class="ask">
-        <summary>Request a change to this worksheet</summary>
-        <form class="ask" method="POST" action="/requests">
-          <input type="hidden" name="kind" value="change">
-          <input type="hidden" name="worksheet" value="{{.Path}}">
-          <textarea name="body" required placeholder="What should change on this worksheet?"></textarea>
-          <input type="text" name="author" placeholder="Your name (optional)">
-          <button type="submit">Send request</button>
-        </form>
-      </details>
-    </div>
-{{end}}
-  </div>
-{{end}}
+<body><div class="wrap">
+<header><h1>Worksheets</h1><p>PDF worksheets for printing</p></header>
+{{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}
-  <div class="card newcard">
-    <h2>New worksheet</h2>
-    <p class="meta">Missing a topic? Describe the worksheet you would like.</p>
-    {{if .Admin}}
-    <div class="requests" style="border-top:0;padding-top:0">
-      <h3>Requested worksheets</h3>
-      {{$rs := .NewRequests}}
-      {{if $rs}}
-      <ul class="reqlist">
-        {{range $rs}}{{template "item" .}}{{end}}
-      </ul>
-      {{else}}<p class="empty">No worksheet requests yet.</p>{{end}}
-    </div>
-    {{end}}
-    <details class="ask">
-      <summary>Request a new worksheet</summary>
+{{$active := .ActiveRequests}}
+{{if $active}}
+<section aria-labelledby="updates-heading">
+<h2 id="updates-heading">Updates in progress <span class="count">({{len $active}})</span></h2>
+<table class="active">
+<thead><tr><th>State</th><th>Request</th><th>Last update</th></tr></thead>
+<tbody>
+{{range $active}}
+<tr id="request-{{.ID}}">
+  <td><span class="status {{.Status}}">{{statusLabel .Status}}</span><span class="status-help">{{statusHelp .Status}}</span></td>
+  <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>
+    <div class="request-meta">Request #{{.ID}}{{if .Author}} · {{.Author}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
+    {{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}
+    {{if $.Admin}}{{template "actions" .}}{{end}}
+  </td>
+  <td class="date">{{.UpdatedAt.Format "2 Jan 2006, 15:04"}}</td>
+</tr>
+{{end}}
+</tbody></table>
+</section>
+{{end}}
+{{end}}
+
+<section aria-labelledby="worksheets-heading">
+<h2 id="worksheets-heading">Available worksheets <span class="count">({{len .Worksheets}})</span></h2>
+<table class="worksheets">
+<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
+<tbody>
+{{range .Worksheets}}
+<tr>
+  <td><div class="title">{{.Title}}</div></td>
+  <td class="date">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
+  <td class="meta">{{.Meta}}</td>
+  {{if not $.Static}}<td>
+    {{$rs := $.ChangeRequests .}}
+    {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
+    <details><summary>Request an update</summary>
       <form class="ask" method="POST" action="/requests">
-        <input type="hidden" name="kind" value="new">
-        <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
-        <input type="text" name="author" placeholder="Your name (optional)">
-        <button type="submit">Send request</button>
+        <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">
+        <textarea name="body" required placeholder="What should change?"></textarea>
+        <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
       </form>
     </details>
-  </div>
+  </td>{{end}}
+  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf">Download PDF</a></td>
+</tr>
+{{end}}
+</tbody></table>
+</section>
 
-  {{if .Admin}}
-  {{$completed := .CompletedRequests}}
-  {{if $completed}}
-  <div class="card">
-    <h2>Recent completed work</h2>
-    <p class="meta">Approved and rejected requests remain here after a restart.</p>
-    <ul class="reqlist">
-      {{range $completed}}{{template "item" .}}{{end}}
-    </ul>
-  </div>
-  {{end}}
-  {{end}}
+{{if not .Static}}
+<section class="new-request">
+<h2>Request a new worksheet</h2><p>Include the subject, level and type of tasks.</p>
+<details><summary>Open request form</summary>
+<form class="ask" method="POST" action="/requests">
+  <input type="hidden" name="kind" value="new">
+  <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
+  <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
+</form></details>
+</section>
 
-  <div class="adminbar">
-    <span>{{if .Admin}}Admin mode is on — requests are visible.{{else}}Admin mode is off.{{end}}</span>
-    <form method="POST" action="/admin">
-      <input type="hidden" name="admin" value="{{if .Admin}}off{{else}}on{{end}}">
-      <button type="submit">{{if .Admin}}Disable admin mode{{else}}Enable admin mode{{end}}</button>
-    </form>
-    {{if .Admin}}
-    <form method="POST" action="/work/rebuild"><button type="submit">Rebuild site</button></form>
-    {{end}}
-  </div>
-  {{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
+{{if .Admin}}
+{{$completed := .CompletedRequests}}{{if $completed}}
+<section><h2>Recent completed work</h2>
+<table><thead><tr><th>State</th><th>Request</th><th>Date</th></tr></thead><tbody>
+{{range $completed}}<tr><td><span class="status {{.Status}}">{{statusLabel .Status}}</span></td>
+<td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>{{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}</td>
+<td class="date">{{.UpdatedAt.Format "2 Jan 2006, 15:04"}}</td></tr>{{end}}
+</tbody></table></section>
+{{end}}{{end}}
+
+<div class="adminbar">
+<span>{{if .Admin}}Admin controls are on.{{else}}Admin controls are off.{{end}}</span>
+<form method="POST" action="/admin"><input type="hidden" name="admin" value="{{if .Admin}}off{{else}}on{{end}}"><button type="submit">{{if .Admin}}Turn off admin controls{{else}}Turn on admin controls{{end}}</button></form>
+{{if .Admin}}<form method="POST" action="/work/rebuild"><button type="submit">Rebuild PDFs</button></form>{{end}}
+</div>
+{{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
 {{end}}</pre>{{end}}
 {{end}}
-</div>
-</body>
-</html>
+</div></body></html>
 `))
