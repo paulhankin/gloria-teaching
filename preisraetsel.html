@@ -275,14 +275,24 @@ function drawPot(svg, rc, x, seed, tall) {
   svg.appendChild(rc.rectangle(x - 70, top - 20, 140, 22, opts(seed + 1, "#a9542c", "#f7c1a1")));
 }
 function drawPlant(svg, rc, x, seed) {
-  line(svg, rc, x, 130, x, 52, opts(seed, "#3f8f3f"));
-  const leaves = [[-1, 118, -46, 108], [1, 100, 46, 90], [-1, 82, -40, 72], [1, 66, 40, 56]];
+  // freistehende Pflanze OHNE Topf: Stiel bis zum Boden, unten kleiner Wurzelballen
+  const b = BASE;
+  line(svg, rc, x, b - 12, x, b - 168, opts(seed, "#3f8f3f"));
+  const leaves = [[-2, b-44, -52, b-64], [2, b-72, 52, b-92], [-2, b-100, -46, b-120],
+                  [2, b-126, 46, b-144]];
   leaves.forEach((L, i) => {
     const [sx, sy, ex, ey] = [x + L[0], L[1], x + L[2], L[3]];
     svg.appendChild(rc.path(
-      `M ${sx} ${sy} Q ${(sx+ex)/2} ${ey - 26} ${ex} ${ey} Q ${(sx+ex)/2} ${ey + 16} ${sx} ${sy} Z`,
+      `M ${sx} ${sy} Q ${(sx+ex)/2} ${ey - 26} ${ex} ${ey} Q ${(sx+ex)/2} ${ey + 18} ${sx} ${sy} Z`,
       opts(seed + i + 1, "#3f8f3f", "#a8dc87")));
   });
+  // Bluete/Trieb oben
+  svg.appendChild(rc.path(`M ${x} ${b-168} Q ${x-22} ${b-196} ${x} ${b-206} Q ${x+22} ${b-196} ${x} ${b-168} Z`,
+    opts(seed + 9, "#3f8f3f", "#c6ecab")));
+  // Wurzelballen
+  svg.appendChild(rc.ellipse(x, b - 4, 78, 30, opts(seed + 10, "#7a5230", "#c9a06e")));
+  [[-26, 10], [0, 14], [26, 10]].forEach((r, i) =>
+    line(svg, rc, x + r[0] * 0.6, b - 8, x + r[0], b + r[1], opts(seed + 20 + i, "#7a5230", null, 2.5)));
 }
 
 /* ---------- 2 Apfel / Birne ---------- */
@@ -360,11 +370,9 @@ function drawSandwich(svg, rc, x, seed) {
   // Tomate / Kaese
   svg.appendChild(rc.path(`M ${x-W} ${b-54} L ${x+W} ${b-58} L ${x+W} ${b-76} L ${x-W} ${b-72} Z`,
     opts(seed + 2, "#c23a6d", "#f7a8c4")));
-  // obere Toastscheibe mit gewoelbter Kruste
-  svg.appendChild(rc.path(
-    `M ${x-W} ${b-74} L ${x-W} ${b-108} C ${x-W} ${b-152} ${x+W} ${b-152} ${x+W} ${b-108} L ${x+W} ${b-74} Z`,
+  // obere Toastscheibe (flach, wie die untere)
+  svg.appendChild(rc.path(`M ${x-W} ${b-74} L ${x-W} ${b-104} L ${x+W} ${b-104} L ${x+W} ${b-74} Z`,
     opts(seed + 3, "#a97a2e", "#f2d296")));
-  line(svg, rc, x - W, b - 96, x + W, b - 96, opts(seed + 4, "#a97a2e", null, 2.5));
 }
 function drawDrink(svg, rc, x, seed) {
   const t = 96, b = BASE;
@@ -525,8 +533,7 @@ function buildPicture(spec, seed) {
   ground(svg, rc, seed);
   const x1 = 240, x2 = 660;
   const drawers = {
-    pflanze: [() => { drawPot(svg,rc,x1,seed+10); drawPlant(svg,rc,x1,seed+1); },
-              () => drawPot(svg,rc,x2,seed+20)],
+    pflanze: [() => drawPlant(svg,rc,x1,seed+1), () => drawPot(svg,rc,x2,seed+20)],
     obst: [() => drawApple(svg,rc,x1,seed+1), () => drawPear(svg,rc,x2,seed+10)],
     lesen: [() => drawBook(svg,rc,x1,seed+1), () => drawBookmark(svg,rc,x2,seed+10)],
     "znüni": [() => drawSandwich(svg,rc,x1,seed+1), () => drawDrink(svg,rc,x2,seed+10)],
