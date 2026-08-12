@@ -13,10 +13,14 @@ written in German.
 ```
 internal/sheet/               framework: registry, doc/HTML building, shared CSS, assets
 internal/pdf/                 HTML -> PDF via headless Chrome (CDP, own WS client)
+internal/store/               SQLite: requests / work items and settings
+internal/pipeline/            drives work items through the agent
+internal/site/                the front page (worksheet index + request/review UI)
 generate/<subject>/<sheet>/   one worksheet (Go + render.js)
 output/<subject>/<sheet>/     index.html + index.pdf   (generated, not in the repo)
+data/                         database, worktrees, previews (not in the repo)
 cmd/generate/                 builds all worksheets + the index page
-cmd/serve/                    static server with password protection
+cmd/serve/                    server: site, requests, work item pipeline
 ```
 
 Currently: `generate/math/venn_diagrams`, `generate/math/ordinal_numbers`,
@@ -42,6 +46,35 @@ make serve                    # locally, password from SITE_PASSWORD
 
 - systemd: copy `learningmaterial.service` to `/etc/systemd/system/`, `enable --now`.
 - Configuration: `/etc/learningmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — not in the repo.
+
+## Requests and the work item pipeline
+
+A request submitted on the front page becomes a work item that the server
+drives through the Shelley agent (`shelley client`, one conversation per item):
+
+```
+queued -> working -> review -> done (approved: merged + pushed)
+                           \-> rejected (branch and preview thrown away)
+                           \-> refine (back to working, same conversation)
+```
+
+- Each item is developed on its own branch `req-<id>` in its own git worktree
+  under `data/worktrees/`, so items never interfere with each other.
+- Lanes: one lane per worksheet (plus one per new-worksheet request). Items in
+  the same lane run strictly sequentially — a queued item only starts once the
+  previous one has been approved or rejected. Different worksheets run in
+  parallel.
+- Whenever an item reaches `review`, the whole site (HTML + PDF) is rendered
+  from its worktree into `data/preview/<id>/`, reachable at `/preview/<id>/`
+  (admin mode only).
+- Approving rebases onto `main`, fast-forward merges, pushes, regenerates
+  `output/` and rebuilds `bin/serve`; the service is restarted (`-service`)
+  once no other item is being worked on.
+- The review UI lives in admin mode on the front page: **Approve & push**,
+  **Reject**, **Refine** (free text sent back into the same conversation) and
+  **Retry** for failed items, plus a log of recent pipeline events.
+
+Server flags: `-repo`, `-work`, `-preview`, `-db`, `-service`, `-push`.
 
 ## Adding a worksheet
 
