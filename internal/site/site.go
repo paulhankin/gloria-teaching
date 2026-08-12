@@ -20,28 +20,41 @@ type Data struct {
 	Static bool
 	// Flash is an optional confirmation message shown at the top.
 	Flash string
+	// Log holds recent pipeline events (admin only, newest first).
+	Log []string
 }
 
-// ChangeRequests returns the change requests for one worksheet.
+// Open reports whether the request is still in the pipeline.
+func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
+	var out []store.Request
+	for _, r := range d.Requests {
+		if r.Kind != kind || r.Worksheet != worksheet || !r.Status.Open() {
+			continue
+		}
+		out = append(out, r)
+	}
+	return out
+}
+
+// ChangeRequests returns the open change requests for one worksheet.
 func (d Data) ChangeRequests(w sheet.Worksheet) []store.Request {
-	var out []store.Request
-	for _, r := range d.Requests {
-		if r.Kind == store.KindChange && r.Worksheet == w.Path() {
-			out = append(out, r)
-		}
-	}
-	return out
+	return d.openRequests(store.KindChange, w.Path())
 }
 
-// NewRequests returns the requests for new worksheets.
+// NewRequests returns the open requests for new worksheets.
 func (d Data) NewRequests() []store.Request {
-	var out []store.Request
+	return d.openRequests(store.KindNew, "")
+}
+
+// Busy reports whether anything is queued or being worked on (used to
+// auto-refresh the page).
+func (d Data) Busy() bool {
 	for _, r := range d.Requests {
-		if r.Kind == store.KindNew {
-			out = append(out, r)
+		if r.Status == store.StatusQueued || r.Status == store.StatusWorking {
+			return true
 		}
 	}
-	return out
+	return false
 }
 
 // Fonts is the embedded webfont CSS.
@@ -104,13 +117,77 @@ const indexCSS = `
     border-radius:999px; padding:5px 14px; font-size:13px; font-weight:600; }
   .flash { background:#eafaf1; border:2px solid #bfe3cd; color:#2e8b57; border-radius:10px;
     padding:10px 14px; margin:0 0 20px; font-size:15px; }
+
+  /* work items */
+  ul.reqlist li { display:block; }
+  .item { border-left-color:#98a3b3; }
+  .item .head { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .tag { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.06em;
+    border-radius:999px; padding:3px 10px; color:#fff; background:#98a3b3; }
+  .tag.queued  { background:#98a3b3; }
+  .tag.working { background:#f0a132; }
+  .tag.review  { background:#2f9fd0; }
+  .tag.failed  { background:#e8548c; }
+  .item .note { color:#6b7a8d; font-size:13px; margin:6px 0 0; white-space:pre-wrap; }
+  .item .body { margin-top:6px; }
+  .actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; align-items:center; }
+  .actions form { margin:0; }
+  .actions button { border:0; border-radius:999px; padding:6px 14px; font-size:14px;
+    font-weight:600; color:#fff; cursor:pointer; background:#98a3b3; }
+  .actions button.ok { background:#2e8b57; }
+  .actions button.no { background:#e8548c; }
+  .actions a.prev { font-size:14px; font-weight:600; color:#2f9fd0; text-decoration:none; }
+  form.refine { margin-top:8px; display:flex; gap:8px; }
+  form.refine input[type=text] { flex:1; font:14px/1.4 system-ui,sans-serif; padding:6px 10px;
+    border:2px solid #cfd8e3; border-radius:8px; background:#fff; color:inherit; }
+  form.refine button { border:0; border-radius:999px; padding:6px 14px; font-size:14px;
+    font-weight:600; color:#fff; background:#2f9fd0; cursor:pointer; }
+  pre.log { background:#f4f6f9; border-radius:10px; padding:10px 14px; font-size:12px;
+    color:#6b7a8d; max-height:220px; overflow:auto; margin:10px 0 0; }
 `
 
-var indexTmpl = template.Must(template.New("index").Parse(`<!DOCTYPE html>
+// itemTmpl renders one work item with its status and the admin actions.
+const itemTmpl = `
+{{define "item"}}
+<li class="item">
+  <div class="head">
+    <span class="tag {{.Status}}">{{.Status}}</span>
+    <span class="who">#{{.ID}} &middot; {{if .Author}}{{.Author}} &middot; {{end}}{{.CreatedAt.Format "2 Jan 2006, 15:04"}}</span>
+  </div>
+  <div class="body">{{.Body}}</div>
+  {{if .Note}}<p class="note">{{.Note}}</p>{{end}}
+  <div class="actions">
+    {{if .HasPreview}}
+    <a class="prev" href="/preview/{{.ID}}/" target="_blank">Open preview</a>
+    {{end}}
+    {{if eq .Status "review"}}
+    <form method="POST" action="/work/approve"><input type="hidden" name="id" value="{{.ID}}">
+      <button class="ok" type="submit">Approve &amp; push</button></form>
+    {{end}}
+    {{if eq .Status "failed"}}
+    <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}">
+      <button type="submit">Retry</button></form>
+    {{end}}
+    <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}">
+      <button class="no" type="submit">Reject</button></form>
+  </div>
+  {{if or (eq .Status "review") (eq .Status "failed")}}
+  <form class="refine" method="POST" action="/work/refine">
+    <input type="hidden" name="id" value="{{.ID}}">
+    <input type="text" name="body" required placeholder="Request a refinement">
+    <button type="submit">Refine</button>
+  </form>
+  {{end}}
+</li>
+{{end}}
+`
+
+var indexTmpl = template.Must(template.New("index").Parse(itemTmpl + `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+{{if .Busy}}<meta http-equiv="refresh" content="10">{{end}}
 <title>Learning material</title>
 <style>
 {{.Fonts}}
@@ -137,13 +214,7 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!DOCTYPE html>
       {{$rs := $.ChangeRequests .}}
       {{if $rs}}
       <ul class="reqlist">
-        {{range $rs}}
-        <li>
-          <div class="body">{{.Body}}<span class="who">{{if .Author}}{{.Author}} &middot; {{end}}{{.CreatedAt.Format "2 Jan 2006, 15:04"}}</span></div>
-          <form method="POST" action="/requests/delete"><input type="hidden" name="id" value="{{.ID}}">
-            <button class="del" type="submit">Delete</button></form>
-        </li>
-        {{end}}
+        {{range $rs}}{{template "item" .}}{{end}}
       </ul>
       {{else}}<p class="empty">No change requests yet.</p>{{end}}
       {{end}}
@@ -172,13 +243,7 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!DOCTYPE html>
       {{$rs := .NewRequests}}
       {{if $rs}}
       <ul class="reqlist">
-        {{range $rs}}
-        <li>
-          <div class="body">{{.Body}}<span class="who">{{if .Author}}{{.Author}} &middot; {{end}}{{.CreatedAt.Format "2 Jan 2006, 15:04"}}</span></div>
-          <form method="POST" action="/requests/delete"><input type="hidden" name="id" value="{{.ID}}">
-            <button class="del" type="submit">Delete</button></form>
-        </li>
-        {{end}}
+        {{range $rs}}{{template "item" .}}{{end}}
       </ul>
       {{else}}<p class="empty">No worksheet requests yet.</p>{{end}}
     </div>
@@ -200,7 +265,12 @@ var indexTmpl = template.Must(template.New("index").Parse(`<!DOCTYPE html>
       <input type="hidden" name="admin" value="{{if .Admin}}off{{else}}on{{end}}">
       <button type="submit">{{if .Admin}}Disable admin mode{{else}}Enable admin mode{{end}}</button>
     </form>
+    {{if .Admin}}
+    <form method="POST" action="/work/rebuild"><button type="submit">Rebuild site</button></form>
+    {{end}}
   </div>
+  {{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
+{{end}}</pre>{{end}}
 {{end}}
 </div>
 </body>

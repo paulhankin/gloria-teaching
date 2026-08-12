@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -38,7 +39,12 @@ func Render(htmlPath, outPath string, opt Options) error {
 		opt.Wait = 3 * time.Second
 	}
 	if opt.Port == 0 {
-		opt.Port = 9444
+		// A free port, so that concurrent renders do not collide.
+		p, err := freePort()
+		if err != nil {
+			return err
+		}
+		opt.Port = p
 	}
 	abs, err := filepath.Abs(htmlPath)
 	if err != nil {
@@ -148,6 +154,16 @@ func Render(htmlPath, outPath string, opt Options) error {
 		return err
 	}
 	return os.WriteFile(outPath, raw, 0o644)
+}
+
+// freePort asks the kernel for an unused TCP port.
+func freePort() (int, error) {
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		return 0, err
+	}
+	defer l.Close()
+	return l.Addr().(*net.TCPAddr).Port, nil
 }
 
 func waitFor(u string) error {

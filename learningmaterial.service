@@ -6,7 +6,13 @@ After=network.target
 User=exedev
 WorkingDirectory=/home/exedev/learningmaterial
 EnvironmentFile=/etc/learningmaterial/env
-ExecStart=/home/exedev/learningmaterial/bin/serve -addr :8000 -dir /home/exedev/learningmaterial/output
+ExecStart=/home/exedev/learningmaterial/bin/serve -addr :8000 \
+  -dir /home/exedev/learningmaterial/output \
+  -repo /home/exedev/learningmaterial \
+  -db /home/exedev/learningmaterial/data/requests.db \
+  -work /home/exedev/learningmaterial/data/worktrees \
+  -preview /home/exedev/learningmaterial/data/preview \
+  -service learningmaterial
 Restart=always
 
 [Install]

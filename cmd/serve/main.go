@@ -21,6 +21,7 @@ import (
 	"strings"
 	"time"
 
+	"learningmaterial/internal/pipeline"
 	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
 	"learningmaterial/internal/store"
@@ -31,6 +32,7 @@ import (
 )
 
 var db *store.DB
+var pipe *pipeline.Pipeline
 
 const cookieName = "lm_auth"
 
@@ -121,6 +123,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		d.Requests = rs
+		d.Log = pipe.Log()
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
@@ -141,6 +144,16 @@ func flash(w http.ResponseWriter, r *http.Request) string {
 		return "Thanks! Your change request has been saved."
 	case "deleted":
 		return "Request deleted."
+	case "approve":
+		return "Approved: merging, pushing and rebuilding."
+	case "reject":
+		return "Rejected: the change was thrown away."
+	case "refine":
+		return "Refinement sent to the agent."
+	case "retry":
+		return "Restarted."
+	case "rebuild":
+		return "Rebuilding the site."
 	}
 	return ""
 }
@@ -179,24 +192,15 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
+	pipe.Kick()
 	setFlash(w, string(kind))
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 // deleteRequest removes a request (admin mode only).
 func deleteRequest(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "POST only", http.StatusMethodNotAllowed)
-		return
-	}
-	if !db.AdminMode() {
-		http.Error(w, "admin mode is off", http.StatusForbidden)
-		return
-	}
-	r.ParseForm()
-	id, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
-	if err != nil {
-		http.Error(w, "bad id", http.StatusBadRequest)
+	id, ok := adminPost(w, r)
+	if !ok {
 		return
 	}
 	if err := db.Delete(id); err != nil {
@@ -204,6 +208,69 @@ func deleteRequest(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setFlash(w, "deleted")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// adminPost validates a POST with an id field in admin mode.
+func adminPost(w http.ResponseWriter, r *http.Request) (int64, bool) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return 0, false
+	}
+	if !db.AdminMode() {
+		http.Error(w, "admin mode is off", http.StatusForbidden)
+		return 0, false
+	}
+	r.ParseForm()
+	id, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return 0, false
+	}
+	return id, true
+}
+
+// work handles the decisions on a work item: approve, reject, refine, retry.
+func work(w http.ResponseWriter, r *http.Request) {
+	action := strings.TrimPrefix(r.URL.Path, "/work/")
+	if action == "rebuild" {
+		if r.Method != http.MethodPost || !db.AdminMode() {
+			http.Error(w, "forbidden", http.StatusForbidden)
+			return
+		}
+		pipe.Rebuild()
+		setFlash(w, "rebuild")
+		http.Redirect(w, r, "/", http.StatusSeeOther)
+		return
+	}
+	id, ok := adminPost(w, r)
+	if !ok {
+		return
+	}
+	var err error
+	switch action {
+	case "approve":
+		err = pipe.Approve(id)
+	case "reject":
+		err = pipe.Reject(id)
+	case "retry":
+		err = pipe.Retry(id)
+	case "refine":
+		body := strings.TrimSpace(r.FormValue("body"))
+		if body == "" {
+			http.Error(w, "empty refinement", http.StatusBadRequest)
+			return
+		}
+		err = pipe.Refine(id, body)
+	default:
+		http.NotFound(w, r)
+		return
+	}
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	setFlash(w, action)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -234,6 +301,11 @@ func main() {
 	addr := flag.String("addr", ":8000", "listen address")
 	dir := flag.String("dir", "output", "directory to serve")
 	dbPath := flag.String("db", "data/requests.db", "SQLite database with the requests")
+	repo := flag.String("repo", ".", "git checkout the pipeline works on")
+	workRoot := flag.String("work", "data/worktrees", "directory for the per-item git worktrees")
+	preview := flag.String("preview", "data/preview", "directory for the per-item preview builds")
+	service := flag.String("service", "", "systemd unit to restart after an approved change")
+	push := flag.Bool("push", true, "push to origin after an approved change")
 	flag.Parse()
 
 	if err := os.MkdirAll(filepath.Dir(*dbPath), 0o755); err != nil {
@@ -253,17 +325,44 @@ func main() {
 			log.Fatal(err)
 		}
 	}
+	abs := func(p string) string {
+		a, err := filepath.Abs(p)
+		if err != nil {
+			log.Fatal(err)
+		}
+		return a
+	}
+	pipe = pipeline.New(db, pipeline.Config{
+		Repo:        abs(*repo),
+		WorkRoot:    abs(*workRoot),
+		PreviewRoot: abs(*preview),
+		OutputDir:   abs(*dir),
+		Service:     *service,
+		Push:        *push,
+	})
+	pipe.Start()
+
 	files := http.FileServer(http.Dir(*dir))
+	previews := http.StripPrefix("/preview/", http.FileServer(http.Dir(abs(*preview))))
 	mux := http.NewServeMux()
 	mux.HandleFunc("/requests", postRequest)
 	mux.HandleFunc("/requests/delete", deleteRequest)
+	mux.HandleFunc("/work/", work)
 	mux.HandleFunc("/admin", postAdmin)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		switch {
+		case r.URL.Path == "/" || r.URL.Path == "/index.html":
 			index(w, r)
-			return
+		case strings.HasPrefix(r.URL.Path, "/preview/"):
+			if !db.AdminMode() {
+				http.Error(w, "admin mode is off", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Cache-Control", "no-store")
+			previews.ServeHTTP(w, r)
+		default:
+			files.ServeHTTP(w, r)
 		}
-		files.ServeHTTP(w, r)
 	})
 
 	log.Printf("serving %s on %s (db %s)", *dir, *addr, *dbPath)
