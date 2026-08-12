@@ -69,17 +69,17 @@ CSS = r"""
   .spalte + .spalte { padding-left: 7mm; border-left: 2px dashed #d8dfe8; }
   .aufgabe { display: flex; flex-direction: column; width: 100%; min-height: 0; }
   h2 { margin: 0 0 2mm; color: #e8548c; font: 700 22pt 'Caveat', cursive; }
-  .story { margin: 0 0 2mm; min-height: 25mm; }
-  .bild { position: relative; flex: 1 1 auto; min-height: 0; margin: 0 0 2mm; }
-  .bild svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .frage { margin: 0 0 2mm; font-weight: 700; }
+  .story { margin: 0 0 3mm; min-height: 14mm; }
+  .bild { flex: 0 0 auto; margin: 0 0 3mm; line-height: 0; }
+  .bild svg { display: block; width: 100%; height: auto; }
+  .frage { margin: 0 0 2.5mm; font-weight: 700; }
   .antworten { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm;
-               margin-bottom: 2mm; font-size: 13.5pt; }
+               margin-bottom: 3mm; font-size: 13.5pt; }
   .antwort { white-space: nowrap; }
   .linie { display: inline-block; min-width: 24mm; margin-left: 1mm;
            border-bottom: 2px dotted #aab5c4; }
-  .rechnung { height: 13mm; padding: 1.5mm 2mm; color: #7a869a; font-size: 11pt;
-              border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .rechnung { flex: 1 1 auto; min-height: 24mm; padding: 2mm 3mm; color: #7a869a;
+              font-size: 11pt; border: 2px dashed #d8dfe8; border-radius: 8px; }
   .loesung { height: auto; max-height: none; overflow: visible; }
   .loesung h1 { color: #2e8b57; }
   .lspalten { columns: 2; column-gap: 9mm; }
