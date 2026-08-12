@@ -80,8 +80,8 @@ CSS = r"""
   .kasten { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
   .rechnung { flex: 1 1 auto; min-height: 40mm; }
   .begruendung { flex: 1 1 auto; min-height: 55mm; }
-  .schreiblinien { margin-top: 3mm; }
-  .schreiblinien div { height: 9mm; border-bottom: 1.5px dotted #ccd5e0; }
+  .schreiblinien { margin-top: 1mm; }
+  .schreiblinien div { height: 8.7mm; border-bottom: 1.5px dotted #ccd5e0; }
   .hinweis { margin: 0 0 2mm; color: #7a869a; font-size: 11.5pt; }
   .loesung { height: auto; max-height: none; overflow: visible; }
   .loesung h1 { color: #2e8b57; }
@@ -115,10 +115,8 @@ def seite_html(a, nr):
       </div>
       <h3>Warum meine Antwort stimmt</h3>
       <div class="kasten begruendung">
-        <p class="hinweis">Erkläre und prüfe nach: Ergibt es zusammen die richtige Summe?
-           Stimmt auch der Unterschied?</p>
         <div class="schreiblinien">
-          <div></div><div></div><div></div><div></div><div></div><div></div><div></div>
+          {"<div></div>" * 12}
         </div>
       </div>
     </div>
