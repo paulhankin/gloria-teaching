@@ -175,7 +175,8 @@ const indexCSS = `
   a { color:var(--link); }
   a.pdf { font-weight:650; white-space:nowrap; }
   .row-actions { text-align:right; white-space:nowrap; }
-  .row-actions a + a { margin-left:12px; }
+  .row-actions a { display:block; }
+  .row-actions a + a { margin-top:4px; }
   details { margin-top:6px; }
   summary { color:var(--link); cursor:pointer; font-size:13px; }
   form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
