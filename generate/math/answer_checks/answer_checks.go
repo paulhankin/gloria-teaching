@@ -16,43 +16,34 @@ var renderJS string
 const css = `
   body { font-size: 14pt; }
   h2 { margin: 0 0 2mm; color: #e8548c; font: 700 22pt 'Caveat', cursive; }
-  h3 { margin: 0 0 1.5mm; color: #e8548c; font: 700 18pt 'Caveat', cursive; }
-  .intro { margin: 0 0 3mm; color: #596b7f; }
-  .tip { padding: 2mm 3mm; border-left: 4px solid #2f9fd0; background: #f1f9fd;
-         border-radius: 0 8px 8px 0; font-size: 12.5pt; }
-  .task-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm 7mm; flex: 1; }
-  .arithmetic-card { display: grid; grid-template-columns: 34mm 1fr; gap: 4mm;
-                     padding: 3mm 4mm; border: 2px dashed #d8dfe8; border-radius: 10px; }
-  .written { align-self: center; width: 30mm; font: 700 20pt/1.08 'Courier New', monospace;
-             text-align: right; color: #1f3550; }
-  .written .line { border-bottom: 2px solid #1f3550; padding-bottom: 1mm; }
-  .written .claim { padding-top: 1mm; color: #e8548c; }
-  .decision { font-weight: 700; margin-bottom: 2mm; }
-  .workline { display: block; margin: 3.5mm 0; border-bottom: 1.5px dotted #b6c0cf; }
-  .price-columns { display: flex; gap: 7mm; flex: 1; min-height: 0; }
-  .price-card { flex: 1; min-width: 0; display: flex; flex-direction: column;
-                padding: 3mm 4mm; border: 2px dashed #d8dfe8; border-radius: 10px; }
+  h3 { margin: 0 0 1.5mm; color: #e8548c; font: 700 19pt 'Caveat', cursive; }
   .story { margin: 0 0 2mm; }
-  .figure { position: relative; flex: 0 0 42mm; margin: 1mm 0 2mm; }
+  .question-area { flex: 0 0 76mm; min-height: 0; padding: 3mm 4mm;
+                   border: 2px dashed #d8dfe8; border-radius: 10px; }
+  .response-area { flex: 1 1 auto; min-height: 0; margin-top: 5mm; display: flex; gap: 7mm; }
+  .response-box { flex: 1 1 50%; min-width: 0; padding: 3mm 4mm;
+                  border: 2px dashed #d8dfe8; border-radius: 10px; }
+  .response-box h3 { margin-bottom: 2mm; }
+  .written-wrap { height: 100%; display: flex; align-items: center; justify-content: center; gap: 18mm; }
+  .written { width: 42mm; font: 700 28pt/1.12 'Courier New', monospace;
+             text-align: right; color: #1f3550; }
+  .written .line { border-bottom: 2.5px solid #1f3550; padding-bottom: 1mm; }
+  .written .claim { padding-top: 1mm; color: #e8548c; }
+  .decision { font-weight: 700; font-size: 18pt; }
+  .answer-row { margin: 3mm 0; font-size: 16pt; }
+  .answer-row .blank { min-width: 42mm; }
+  .figure { position: relative; height: 43mm; margin: 1mm 0 2mm; }
   .figure svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .answer-row { margin: 1mm 0; }
-  .answer-row .blank { min-width: 27mm; }
-  .check-box { margin-top: auto; padding: 2.5mm 3mm; border: 2px solid #bfe3cd;
-               border-radius: 8px; background: #f5fff9; }
-  .logic-layout { display: grid; grid-template-columns: 3fr 2fr; gap: 7mm; flex: 1; min-height: 0; }
-  .logic-main { display: flex; flex-direction: column; min-width: 0; }
-  .logic-main .figure { flex-basis: 39mm; }
-  .logic-question { margin: 1mm 0 2mm; font-weight: 700; font-size: 16pt; }
-  .strategy { margin-top: auto; }
-  .logic-check { display: flex; flex-direction: column; min-width: 0; }
-  .logic-check .box { flex: 1; }
+  .price-question { display: grid; grid-template-columns: 3fr 2fr; gap: 8mm; height: 100%; }
+  .price-text { min-width: 0; }
+  .logic-question { display: grid; grid-template-columns: 3fr 2fr; gap: 8mm; height: 100%; }
+  .logic-question .figure { height: 47mm; }
+  .question { margin: 2mm 0; font-weight: 700; font-size: 17pt; }
+  .writing-lines { margin-top: 1mm; }
   .check-list { margin: 1mm 0 0; padding-left: 6mm; }
-  .check-list li { margin-bottom: 3mm; }
-  .check-list li::marker { content: "□  "; color: #2e8b57; }
-  .small-note { color: #6a7888; font-size: 11.5pt; }
+  .check-list li { margin-bottom: 1mm; }
+  .check-list li::marker { content: "✓  "; color: #2e8b57; }
   .solution-box .check-list { font-size: 11.5pt; }
-  .solution-box .check-list li { margin-bottom: 1mm; }
-  .solution-box .warning { color: #b05a28; }
 `
 
 func init() {
@@ -60,7 +51,7 @@ func init() {
 		Subject: "math",
 		Name:    "answer_checks",
 		Title:   "Kann das stimmen?",
-		Meta:    "Mathe, 3./4. Klasse · 5-seitiges Dossier + Lösungen · Antworten prüfen",
+		Meta:    "Mathe, 3./4. Klasse · 9-seitiges Dossier + Lösungen · Antworten prüfen",
 		Build:   build,
 	})
 }
@@ -73,8 +64,12 @@ func build() *sheet.Doc {
 	}
 
 	var body strings.Builder
-	body.WriteString(arithmeticPage())
-	body.WriteString(pricePage())
+	for i, task := range arithmeticTasks {
+		body.WriteString(arithmeticPage(i+1, task))
+	}
+	for i, task := range priceTasks {
+		body.WriteString(pricePage(i+1, task))
+	}
 	for i, task := range logicTasks {
 		body.WriteString(logicPage(i+1, task))
 	}
@@ -98,80 +93,84 @@ func build() *sheet.Doc {
 	return d
 }
 
-func arithmeticPage() string {
-	var cards strings.Builder
-	for i, task := range arithmeticTasks {
-		checkHint := "Addiere die beiden unteren Zahlen."
-		if task.Operation == "+" {
-			checkHint = "Subtrahiere von der Summe die zweite Zahl."
-		}
-		fmt.Fprintf(&cards, `    <div class="arithmetic-card">
+func arithmeticPage(number int, task arithmeticTask) string {
+	content := fmt.Sprintf(`  <div class="question-area">
+    <div class="written-wrap">
       <div class="written">
         <div>%d</div><div class="line">%s %d</div><div class="claim">%d</div>
       </div>
       <div>
-        <div class="decision">%d. Kann das stimmen? &nbsp; □ Ja &nbsp; □ Nein</div>
-        <div class="small-note">Probe: %s</div>
-        <span class="workline"></span><span class="workline"></span>
-        <div>Falls nein, richtiges Ergebnis: <span class="blank"></span></div>
-      </div>
-    </div>
-`, task.Top, task.Operation, task.Bottom, task.Claim, i+1, checkHint)
-	}
-	content := fmt.Sprintf(`  <p class="intro"><b>Mathematikerinnen und Mathematiker rechnen nicht nur:</b> Sie prüfen auch, ob ein Ergebnis wirklich stimmen kann.</p>
-  <div class="tip"><b>Gegenrechnung:</b> Bei einer Subtraktion prüfst du mit Addition. Bei einer Addition prüfst du mit Subtraktion.</div>
-  <div style="height:4mm"></div>
-  <div class="task-grid">
-%s  </div>
-`, cards.String())
-	return sheet.Page("Kann das stimmen? &ndash; Warm-up I: Gegenrechnung", content)
-}
-
-func pricePage() string {
-	var cards strings.Builder
-	for i, task := range priceTasks {
-		fmt.Fprintf(&cards, `    <div class="price-card">
-      <h2>Aufgabe %d: %s</h2>
-      <p class="story">%s</p>
-      <div class="figure" data-picture="%s"></div>
-      <p><b>%s</b></p>
-      <div class="answer-row">%s: <span class="blank"></span> Fr.</div>
-      <div class="answer-row">%s: <span class="blank"></span> Fr.</div>
-      <div class="check-box"><b>Meine Probe:</b> Addiere beide Preise. Erhältst du wirklich den Gesamtpreis?<br><span class="workline"></span></div>
-    </div>
-`, i+1, task.Title, task.Story, task.Key, task.Question, task.Names[0], task.Names[1])
-	}
-	return sheet.Page("Kann das stimmen? &ndash; Warm-up II: Preisrätsel", fmt.Sprintf(`  <p class="intro">Löse jedes Rätsel. <b>Die Probe gehört zur Antwort.</b></p>
-  <div class="price-columns">
-%s  </div>
-`, cards.String()))
-}
-
-func logicPage(number int, task logicTask) string {
-	content := fmt.Sprintf(`  <div class="logic-layout">
-    <div class="logic-main">
-      <h2>Knobelaufgabe %d: %s</h2>
-      <p class="story">%s</p>
-      <div class="figure" data-picture="%s"></div>
-      <p class="logic-question">%s</p>
-      <div class="box strategy"><b>Mein Lösungsweg:</b>%s</div>
-    </div>
-    <div class="logic-check">
-      <h3>Stimmt meine Antwort?</h3>
-      <div class="box">
-        <p>Trage deine gefundenen Werte ein. Gehe danach <b>jede Aussage im Text</b> einzeln durch.</p>
-        <ul class="check-list">
-          <li>Alle Werte sind verschieden.</li>
-          <li>Die vorgegebenen Werte kommen genau einmal vor.</li>
-          <li>Jeder Satz im Text passt zu meiner Lösung.</li>
-          <li>Meine Antwort passt zur Frage.</li>
-        </ul>
-        <p><b>Meine Antwort:</b></p>
-        <span class="workline"></span><span class="workline"></span>
+        <h2>Kann das stimmen?</h2>
+        <div class="decision">□ Ja &nbsp;&nbsp;&nbsp; □ Nein</div>
+        <p>Falls nein, wie lautet das richtige Ergebnis?</p>
+        <span class="blank" style="min-width:55mm"></span>
       </div>
     </div>
   </div>
-`, number, task.Title, task.Story, task.Key, task.Question, sheet.Lines(5))
+  <div class="response-area">
+    <div class="response-box">
+      <h3>Wie hast du gerechnet?</h3>
+      %s
+    </div>
+    <div class="response-box">
+      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      %s
+    </div>
+  </div>
+`, task.Top, task.Operation, task.Bottom, task.Claim, sheet.Lines(8), sheet.Lines(8))
+	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Warm-up I, Aufgabe %d/4", number), content)
+}
+
+func pricePage(number int, task priceTask) string {
+	content := fmt.Sprintf(`  <div class="question-area">
+    <div class="price-question">
+      <div class="price-text">
+        <h2>Aufgabe %d: %s</h2>
+        <p class="story">%s</p>
+        <p class="question">%s</p>
+        <div class="answer-row">%s: <span class="blank"></span> Fr.</div>
+        <div class="answer-row">%s: <span class="blank"></span> Fr.</div>
+      </div>
+      <div class="figure" data-picture="%s"></div>
+    </div>
+  </div>
+  <div class="response-area">
+    <div class="response-box">
+      <h3>Wie hast du die Antwort gefunden?</h3>
+      %s
+    </div>
+    <div class="response-box">
+      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      %s
+    </div>
+  </div>
+`, number, task.Title, task.Story, task.Question, task.Names[0], task.Names[1], task.Key, sheet.Lines(8), sheet.Lines(8))
+	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Warm-up II, Aufgabe %d/2", number), content)
+}
+
+func logicPage(number int, task logicTask) string {
+	content := fmt.Sprintf(`  <div class="question-area">
+    <div class="logic-question">
+      <div>
+        <h2>Knobelaufgabe %d: %s</h2>
+        <p class="story">%s</p>
+        <p class="question">%s</p>
+        <p><b>Meine Antwort:</b> <span class="blank" style="min-width:60mm"></span></p>
+      </div>
+      <div class="figure" data-picture="%s"></div>
+    </div>
+  </div>
+  <div class="response-area">
+    <div class="response-box">
+      <h3>Wie hast du die Antwort gefunden?</h3>
+      %s
+    </div>
+    <div class="response-box">
+      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      %s
+    </div>
+  </div>
+`, number, task.Title, task.Story, task.Question, task.Key, sheet.Lines(8), sheet.Lines(8))
 	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Knobeln und prüfen %d/3", number), content)
 }
 
