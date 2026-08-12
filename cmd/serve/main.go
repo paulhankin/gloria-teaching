@@ -26,6 +26,7 @@ import (
 	"learningmaterial/internal/site"
 	"learningmaterial/internal/store"
 
+	_ "learningmaterial/generate/math/answer_checks"
 	_ "learningmaterial/generate/math/ordinal_numbers"
 	_ "learningmaterial/generate/math/price_puzzles"
 	_ "learningmaterial/generate/math/venn_diagrams"

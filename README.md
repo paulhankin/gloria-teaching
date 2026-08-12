@@ -23,8 +23,8 @@ cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    server: site, requests, work item pipeline
 ```
 
-Currently: `generate/math/venn_diagrams`, `generate/math/ordinal_numbers`,
-`generate/math/price_puzzles`.
+Currently: `generate/math/answer_checks`, `generate/math/venn_diagrams`,
+`generate/math/ordinal_numbers`, `generate/math/price_puzzles`.
 
 ## Building
 
