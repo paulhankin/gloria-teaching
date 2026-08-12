@@ -26,11 +26,11 @@ function starPts(cx, cy, R, r) {
   return p;
 }
 
-function buildFolge(spec, seed) {
-  const nums = spec.zahlen;
+function buildSequence(spec, seed) {
+  const nums = spec.numbers;
   const N = nums.length;
-  const t = spec.typ;
-  const W = (t === "schornstein" || t === "badewanne") ? 1450 : (t === "waescheleine" ? 1250 : 900), H = 300;
+  const t = spec.kind;
+  const W = (t === "chimney" || t === "bathtub") ? 1450 : (t === "clothesline" ? 1250 : 900), H = 300;
   const svg = mk("svg", { xmlns: SVGNS, viewBox: `0 0 ${W} ${H}`,
                           preserveAspectRatio: "xMidYMid meet" });
   const st = mk("style", {});
@@ -43,14 +43,14 @@ function buildFolge(spec, seed) {
   const rc = rough.svg(svg);
   const col = (i) => PAL[i % PAL.length];
 
-  if (t === "zug") {
+  if (t === "train") {
     const margin = 30, avail = W - 2 * margin - 150;
     const step = avail / N;
     const wW = Math.min(step * 0.86, 86), wH = 96, baseY = 200;
-    // Gleis
+    // Track
     svg.appendChild(rc.line(12, baseY + 34, W - 12, baseY + 34,
       { roughness: 2.2, seed: seed, stroke: "#8a94a6", strokeWidth: 3 }));
-    // Lok
+    // Locomotive
     const lx = margin;
     svg.appendChild(rc.rectangle(lx, baseY - 90, 122, 90,
       { roughness: 1.5, seed: seed + 1, stroke: INK, strokeWidth: 3,
@@ -76,7 +76,7 @@ function buildFolge(spec, seed) {
     return svg;
   }
 
-  if (t === "waescheleine") {
+  if (t === "clothesline") {
     const margin = 140, step = (W - margin - 30) / N;
     const sw = Math.min(step * 0.44, 56), sh = 176;
     const y0 = 60, sag = 22;
@@ -84,12 +84,12 @@ function buildFolge(spec, seed) {
     let d = `M 70 ${y0}`;
     for (let x = 90; x <= W - 10; x += 20) d += ` L ${x} ${lineY(x)}`;
     svg.appendChild(rc.path(d, { roughness: 1.4, seed: seed, stroke: "#8a94a6", strokeWidth: 3.5 }));
-    // Startpfahl mit Vogel
+    // Starting post with bird
     svg.appendChild(rc.line(70, y0 - 6, 70, y0 + 216,
       { roughness: 1.3, seed: seed + 900, stroke: "#8a5a35", strokeWidth: 7 }));
     svg.appendChild(rc.line(34, y0 + 30, 106, y0 + 30,
       { roughness: 1.3, seed: seed + 901, stroke: "#8a5a35", strokeWidth: 5 }));
-    // Vogel auf dem Pfahl
+    // Bird on the post
     svg.appendChild(rc.ellipse(70, y0 - 34, 54, 40,
       { roughness: 1.3, seed: seed + 902, stroke: INK, strokeWidth: 2.6,
         fill: "#e8548c", fillStyle: "solid" }));
@@ -102,15 +102,15 @@ function buildFolge(spec, seed) {
     eye(rc, svg, 48, y0 - 58, 3);
     for (let i = 0; i < N; i++) {
       const cx = margin + step * (i + 0.5), ly = lineY(cx);
-      // Klammer
+      // Clothes peg
       svg.appendChild(rc.line(cx, ly - 6, cx, ly + 16,
         { roughness: 1.0, seed: seed + i, stroke: INK, strokeWidth: 2.6 }));
-      // Socke: Schaft nach unten, Fuss nach rechts
+      // Sock: shaft pointing down, foot pointing right
       const top = ly + 14, w = sw, h = sh;
       const l = cx - w / 2, r2 = cx + w / 2;
-      const ankle = top + h * 0.54;          // Beginn Ferse
-      const footY = top + h;                 // Sohle
-      const toe = r2 + w * 0.80;             // Zehenspitze
+      const ankle = top + h * 0.54;          // start of the heel
+      const footY = top + h;                 // sole
+      const toe = r2 + w * 0.80;             // tip of the toe
       const sockPath =
         `M ${l} ${top} L ${r2} ${top} L ${r2} ${ankle} ` +
         `Q ${toe} ${ankle + 4} ${toe} ${(ankle + footY) / 2} ` +
@@ -121,36 +121,36 @@ function buildFolge(spec, seed) {
       svg.appendChild(rc.path(sockPath, Object.assign({}, o1,
         { fill: col(i), fillStyle: "hachure", hachureGap: 9, fillWeight: 1,
           hachureAngle: 35 + i * 17 })));
-      // Bündchen
+      // Cuff
       svg.appendChild(rc.line(l, top + 16, r2, top + 16,
         { roughness: 1.2, seed: seed + 90 + i, stroke: col(i), strokeWidth: 2.4 }));
-      // Zahl in den Fuss der Socke (dort ist mehr Platz)
+      // Number in the foot of the sock (more room there)
       txt(svg, (l + toe) / 2 - 2, (ankle + footY) / 2 + 16, nums[i], "n");
     }
     return svg;
   }
 
-  if (t === "schornstein") {
-    // Haus mit Schornstein links, Rauchwolken steigen nach rechts oben
+  if (t === "chimney") {
+    // House with chimney on the left, smoke clouds rising to the upper right
     const hx = 26, hy = 206, hw = 124, hh = 84;
-    // Dach
+    // Roof
     svg.appendChild(rc.polygon([[hx - 12, hy], [hx + hw / 2, hy - 48], [hx + hw + 12, hy]],
       { roughness: 1.5, seed: seed + 1, stroke: "#b5553d", strokeWidth: 3,
         fill: "#b5553d", fillStyle: "hachure", hachureGap: 8, fillWeight: 1 }));
-    // Wand
+    // Wall
     svg.appendChild(rc.rectangle(hx, hy, hw, hh,
       { roughness: 1.5, seed: seed + 2, stroke: INK, strokeWidth: 3,
         fill: "#e8d8b0", fillStyle: "hachure", hachureGap: 10, fillWeight: 1,
         hachureAngle: 80 }));
-    // Fenster
+    // Window
     svg.appendChild(rc.rectangle(hx + 30, hy + 24, 38, 36,
       { roughness: 1.3, seed: seed + 3, stroke: INK, strokeWidth: 2.4 }));
-    // Schornstein
+    // Chimney
     const sx = hx + hw * 0.66, sy = hy - 44;
     svg.appendChild(rc.rectangle(sx, sy - 40, 34, 56,
       { roughness: 1.4, seed: seed + 4, stroke: INK, strokeWidth: 3,
         fill: "#9a8f86", fillStyle: "hachure", hachureGap: 8, fillWeight: 1 }));
-    // Wolken
+    // Clouds
     const startX = sx + 50, startY = sy - 34;
     const stepX = (W - 26 - startX) / N;
     for (let i = 0; i < N; i++) {
@@ -161,7 +161,7 @@ function buildFolge(spec, seed) {
                   stroke: col(i), strokeWidth: 3,
                   fill: col(i), fillStyle: "hachure", hachureGap: 9,
                   fillWeight: 1, hachureAngle: 30 + i * 23 };
-      // Wolke aus 4 ueberlappenden Kreisen (Umriss)
+      // Cloud made of 4 overlapping circles (outline)
       const oo = Object.assign({}, o, { fillStyle: "hachure", hachureGap: 10 });
       svg.appendChild(rc.circle(cx - rr * 0.72, cy + rr * 0.26, rr * 1.10, oo));
       svg.appendChild(rc.circle(cx + rr * 0.74, cy + rr * 0.30, rr * 1.00,
@@ -175,15 +175,15 @@ function buildFolge(spec, seed) {
     return svg;
   }
 
-  if (t === "badewanne") {
-    // Freundliche, frontal gezeichnete Keramikwanne mit viel Schaum.
-    // Die Form lehnt sich an klassische Kinderbuch-Illustrationen an:
-    // breiter Rollrand, bauchiger weisser Wannenkörper und kleine Füsse.
+  if (t === "bathtub") {
+    // Friendly ceramic tub drawn from the front, with lots of foam.
+    // The shape follows classic children's book illustrations:
+    // wide rolled rim, bulging white tub body and small feet.
     const x0 = 30, x1 = 370;
     const rimY = 158, bottomY = 270;
     const mid = (x0 + x1) / 2;
 
-    // Wannenkörper: oben breit, unten sanft gerundet und etwas schmaler.
+    // Tub body: wide at the top, gently rounded and slightly narrower at the bottom.
     svg.appendChild(rc.path(
       `M ${x0 + 12} ${rimY + 10} ` +
       `C ${x0 + 24} ${rimY + 70}, ${x0 + 34} ${bottomY - 4}, ${x0 + 82} ${bottomY} ` +
@@ -192,14 +192,14 @@ function buildFolge(spec, seed) {
       { roughness: 1.25, bowing: 0.8, seed: seed + 1, stroke: INK, strokeWidth: 3.2,
         fill: "#f6f8fa", fillStyle: "solid" }));
 
-    // Dezenter Keramikschatten, damit die weisse Wanne plastischer wirkt.
+    // Subtle ceramic shading so the white tub looks more three-dimensional.
     svg.appendChild(rc.path(
       `M ${x0 + 53} ${rimY + 29} ` +
       `C ${x0 + 69} ${bottomY - 24}, ${x0 + 90} ${bottomY - 15}, ${x0 + 118} ${bottomY - 12} ` +
       `L ${x1 - 92} ${bottomY - 12}`,
       { roughness: 1, seed: seed + 2, stroke: "#dce3e8", strokeWidth: 9 }));
 
-    // Kleine geschwungene Füsse.
+    // Small curved feet.
     [[x0 + 78, -1], [x1 - 78, 1]].forEach(([fx, dir], k) => {
       svg.appendChild(rc.path(
         `M ${fx - 12} ${bottomY - 2} Q ${fx - 9 * dir} ${bottomY + 12} ${fx - 18 * dir} ${bottomY + 24} ` +
@@ -209,7 +209,7 @@ function buildFolge(spec, seed) {
           fill: "#cbd5dc", fillStyle: "solid" }));
     });
 
-    // Hoher, runder Wasserhahn links hinter der Wanne.
+    // Tall, rounded tap on the left behind the tub.
     svg.appendChild(rc.path(
       `M ${x0 + 22} ${rimY - 2} L ${x0 + 22} ${rimY - 70} ` +
       `C ${x0 + 22} ${rimY - 96}, ${x0 + 64} ${rimY - 96}, ${x0 + 64} ${rimY - 70} ` +
@@ -218,7 +218,7 @@ function buildFolge(spec, seed) {
     svg.appendChild(rc.line(x0 + 61, rimY - 51, x0 + 61, rimY - 39,
       { roughness: 0.8, seed: seed + 10, stroke: "#70c8ee", strokeWidth: 2.2 }));
 
-    // Üppige Schaumkrone aus unterschiedlich grossen, überlappenden Blasen.
+    // Lush foam crown made of overlapping bubbles of varying size.
     const foam = [
       [x0 + 15, 150, 31], [x0 + 39, 143, 39], [x0 + 68, 150, 35],
       [x0 + 96, 140, 43], [x0 + 128, 149, 38], [x0 + 158, 137, 48],
@@ -231,14 +231,14 @@ function buildFolge(spec, seed) {
           fill: "#fff", fillStyle: "solid" }));
     });
 
-    // Breiter Rollrand liegt vor Schaum und Wannenkörper.
+    // Wide rolled rim sits in front of the foam and the tub body.
     svg.appendChild(rc.rectangle(x0 - 4, rimY - 1, x1 - x0 + 8, 18,
       { roughness: 1.15, bowing: 0.7, seed: seed + 20, stroke: INK, strokeWidth: 2.8,
         fill: "#f9fbfc", fillStyle: "solid" }));
     svg.appendChild(rc.line(x0 + 18, rimY + 5, x1 - 18, rimY + 5,
       { roughness: 0.8, seed: seed + 21, stroke: "#fff", strokeWidth: 3 }));
 
-    // Kleine gelbe Badeente zwischen den Schaumblasen.
+    // Small yellow rubber duck among the foam bubbles.
     svg.appendChild(rc.ellipse(mid - 8, 143, 54, 31,
       { roughness: 1.15, seed: seed + 30, stroke: "#d69a00", strokeWidth: 2,
         fill: "#ffd51f", fillStyle: "solid" }));
@@ -251,7 +251,7 @@ function buildFolge(spec, seed) {
     svg.appendChild(rc.circle(mid + 13, 119, 3.5,
       { roughness: 0.5, seed: seed + 33, stroke: INK, fill: INK, fillStyle: "solid" }));
 
-    // Nummerierte Seifenblasen steigen von der rechten Schaumkante auf.
+    // Numbered soap bubbles rise from the right edge of the foam.
     const startX = x1 - 60;
     const stepX = (W - 26 - startX) / N;
     for (let i = 0; i < N; i++) {
@@ -270,13 +270,13 @@ function buildFolge(spec, seed) {
     return svg;
   }
 
-  if (t === "sterne") {
+  if (t === "stars") {
     const margin = 60, step = (W - margin - 150) / N;
     const R = Math.min(step * 0.56, 54);
-    // Mond als Start: dicke Sichel mit Gesicht
-    const mx = 72, my = 150, MR = 54;      // Aussenkreis
-    const ix = mx + 32, iy = my - 14, IR = 47;  // ausgestanzter Kreis
-    // Schnittpunkte der beiden Kreise
+    // Moon as the start: thick crescent with a face
+    const mx = 72, my = 150, MR = 54;      // outer circle
+    const ix = mx + 32, iy = my - 14, IR = 47;  // punched-out circle
+    // Intersection points of the two circles
     const dx = ix - mx, dy = iy - my, d = Math.hypot(dx, dy);
     const a = (d * d + MR * MR - IR * IR) / (2 * d);
     const h = Math.sqrt(Math.max(0, MR * MR - a * a));
@@ -289,7 +289,7 @@ function buildFolge(spec, seed) {
       `A ${IR} ${IR} 0 0 1 ${p1[0].toFixed(1)} ${p1[1].toFixed(1)} Z`,
       { roughness: 1.2, bowing: 1, seed: seed, stroke: "#e0a01e", strokeWidth: 3.2,
         fill: "#ffd76a", fillStyle: "solid" }));
-    // Krater (auf dem breiten Teil der Sichel)
+    // Craters (on the wide part of the crescent)
     [[mx - 34, my - 34, 12], [mx - 20, my + 42, 15], [mx - 38, my + 4, 18]]
       .forEach((c, k) => svg.appendChild(rc.circle(c[0], c[1], c[2],
         { roughness: 1.2, seed: seed + 20 + k, stroke: "#e0a01e", strokeWidth: 2,
@@ -306,33 +306,33 @@ function buildFolge(spec, seed) {
     return svg;
   }
 
-  // Kreis-Ketten: raupe / schlange / drache
+  // Circle chains: caterpillar / snake / dragon
   const margin = 54, step = (W - 2 * margin) / (N + 1);
   const r = Math.min(40, step * 0.54);
   const cy = (i) => 158 + 22 * Math.sin(i * 0.85);
   const cx = (i) => margin + step * (i + 0.5);
-  const taper = (i) => (t === "schlange" ? r * (1 - 0.22 * i / N) : r);
+  const taper = (i) => (t === "snake" ? r * (1 - 0.22 * i / N) : r);
 
-  // Schwanz
-  if (t === "schlange" || t === "drache") {
+  // Tail
+  if (t === "snake" || t === "dragon") {
     const xe = cx(N) + r * 1.3, ye = cy(N);
     svg.appendChild(rc.line(cx(N), ye, xe + 28, ye - 26,
       { roughness: 1.6, seed: seed + 3, stroke: INK, strokeWidth: 3 }));
   }
-  // Koerper
+  // Body
   for (let i = 0; i < N; i++) {
     const x = cx(i + 1), y = cy(i + 1), rr = taper(i);
     svg.appendChild(rc.circle(x, y, rr * 2,
       { roughness: 1.6, bowing: 1.3, seed: seed + 70 + i * 5, stroke: col(i),
         strokeWidth: 3.2, fill: col(i), fillStyle: "hachure", hachureGap: 9,
         fillWeight: 1, hachureAngle: 35 + i * 21 }));
-    if (t === "raupe") {
+    if (t === "caterpillar") {
       svg.appendChild(rc.line(x - 8, y + rr - 3, x - 14, y + rr + 20,
         { roughness: 1.4, seed: seed + 200 + i, stroke: INK, strokeWidth: 2.2 }));
       svg.appendChild(rc.line(x + 8, y + rr - 3, x + 14, y + rr + 20,
         { roughness: 1.4, seed: seed + 300 + i, stroke: INK, strokeWidth: 2.2 }));
     }
-    if (t === "drache") {
+    if (t === "dragon") {
       svg.appendChild(rc.polygon(
         [[x - 15, y - rr + 4], [x, y - rr - 26], [x + 15, y - rr + 4]],
         { roughness: 1.4, seed: seed + 400 + i, stroke: "#5eb85e", strokeWidth: 2.6,
@@ -340,17 +340,17 @@ function buildFolge(spec, seed) {
     }
     txt(svg, x, y + 18, nums[i], "n");
   }
-  // Kopf
+  // Head
   const hx = cx(0), hy = cy(0), hr = r * 1.22;
   svg.appendChild(rc.circle(hx, hy, hr * 2,
     { roughness: 1.5, bowing: 1.2, seed: seed + 2, stroke: INK, strokeWidth: 3.4,
-      fill: spec.kopffarbe || "#ffd76a", fillStyle: "solid" }));
+      fill: spec.headColor || "#ffd76a", fillStyle: "solid" }));
   eye(rc, svg, hx - hr * 0.34, hy - hr * 0.22, 5);
   eye(rc, svg, hx + hr * 0.30, hy - hr * 0.26, 5);
   svg.appendChild(rc.arc(hx, hy + hr * 0.10, hr * 0.9, hr * 0.7,
     0.25 * Math.PI, 0.75 * Math.PI, false,
     { roughness: 1.2, seed: seed + 4, stroke: INK, strokeWidth: 2.4 }));
-  if (t === "raupe") {
+  if (t === "caterpillar") {
     [[-0.5, -1], [0.45, -1]].forEach((d, k) => {
       const ax = hx + hr * d[0], ay = hy - hr * 0.86;
       svg.appendChild(rc.line(ax, ay, ax + d[0] * 20, ay - 34,
@@ -360,7 +360,7 @@ function buildFolge(spec, seed) {
           fill: "#e8548c", fillStyle: "solid" }));
     });
   }
-  if (t === "drache") {
+  if (t === "dragon") {
     [[-0.55, -1], [0.4, -1]].forEach((d, k) =>
       svg.appendChild(rc.polygon(
         [[hx + hr * d[0] - 9, hy - hr * 0.72],
@@ -369,7 +369,7 @@ function buildFolge(spec, seed) {
         { roughness: 1.3, seed: seed + 600 + k, stroke: INK, strokeWidth: 2.4,
           fill: "#5eb85e", fillStyle: "solid" })));
   }
-  if (t === "schlange") {
+  if (t === "snake") {
     svg.appendChild(rc.line(hx - hr, hy + 6, hx - hr - 30, hy + 6,
       { roughness: 1.2, seed: seed + 700, stroke: "#d10000", strokeWidth: 2.4 }));
     svg.appendChild(rc.line(hx - hr - 30, hy + 6, hx - hr - 44, hy - 6,
@@ -380,13 +380,13 @@ function buildFolge(spec, seed) {
   return svg;
 }
 
-for (const el of document.querySelectorAll('[data-folge]')) {
-  const key = el.getAttribute('data-folge');
-  const spec = FOLGEN[key];
+for (const el of document.querySelectorAll('[data-sequence]')) {
+  const key = el.getAttribute('data-sequence');
+  const spec = SEQUENCES[key];
   if (!spec) continue;
-  const svg = buildFolge(spec, (key.charCodeAt(1) || 7) * 91 + 13);
+  const svg = buildSequence(spec, (key.charCodeAt(1) || 7) * 91 + 13);
   el.appendChild(svg);
-  // viewBox eng an den Inhalt anpassen (kein Leerraum)
+  // Fit the viewBox tightly to the content (no empty space)
   try {
     const b = svg.getBBox(), p = 8;
     svg.setAttribute('viewBox',

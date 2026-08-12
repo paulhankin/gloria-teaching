@@ -7,8 +7,8 @@ import (
 	"strings"
 )
 
-// BaseCSS ist das gemeinsame Layout aller Arbeitsblaetter:
-// A4 quer, feste Seitenhoehe, Kopfzeile, Loesungsblatt.
+// BaseCSS is the shared layout of every worksheet:
+// A4 landscape, fixed page height, header, solution page.
 const BaseCSS = `
   @page { size: A4 landscape; margin: 10mm 12mm; }
   * { box-sizing: border-box; }
@@ -18,61 +18,61 @@ const BaseCSS = `
           display: flex; flex-direction: column;
           break-after: page; page-break-after: always; }
   .page:last-child { break-after: auto; page-break-after: auto; }
-  .kopf { display: flex; justify-content: space-between; align-items: baseline;
-          flex: 0 0 auto; padding-bottom: 1.5mm; margin-bottom: 3mm;
-          border-bottom: 2.5px solid #e8548c; }
+  .header { display: flex; justify-content: space-between; align-items: baseline;
+            flex: 0 0 auto; padding-bottom: 1.5mm; margin-bottom: 3mm;
+            border-bottom: 2.5px solid #e8548c; }
   h1 { margin: 0; color: #e8548c; font: 700 24pt 'Caveat', cursive; }
-  .namenszeile { color: #7a869a; font-size: 11pt; }
-  .linie { display: inline-block; min-width: 24mm; margin-left: 2mm;
+  .name-line { color: #7a869a; font-size: 11pt; }
+  .blank { display: inline-block; min-width: 24mm; margin-left: 2mm;
            border-bottom: 2px dotted #b6c0cf; }
-  .kasten { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
-  .schreiblinien div { height: 8.7mm; border-bottom: 1.5px dotted #ccd5e0; }
+  .box { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
+  .writing-lines div { height: 8.7mm; border-bottom: 1.5px dotted #ccd5e0; }
 
-  .loesung { height: auto; max-height: none; overflow: visible; }
-  .loesung h1 { color: #2e8b57; }
-  .lspalten { columns: 2; column-gap: 9mm; }
-  .lbox { break-inside: avoid; margin-bottom: 3.5mm; padding: 2.5mm 3.5mm;
+  .solution { height: auto; max-height: none; overflow: visible; }
+  .solution h1 { color: #2e8b57; }
+  .solution-cols { columns: 2; column-gap: 9mm; }
+  .solution-box { break-inside: avoid; margin-bottom: 3.5mm; padding: 2.5mm 3.5mm;
           border: 2.5px solid #bfe3cd; border-radius: 10px; background: #f5fff9; }
-  .lbox h3 { margin: 0 0 1mm; color: #2e8b57; font: 700 18pt 'Caveat', cursive; }
-  .lbox p { margin: 0 0 1mm; font-size: 12pt; }
+  .solution-box h3 { margin: 0 0 1mm; color: #2e8b57; font: 700 18pt 'Caveat', cursive; }
+  .solution-box p { margin: 0 0 1mm; font-size: 12pt; }
 `
 
-// NameZeile ist die Standard-Kopfzeile rechts.
-const NameZeile = `<span class="namenszeile">Name: ____________________ &nbsp; Datum: __________</span>`
+// NameLine is the standard header line on the right (German, for the pupils).
+const NameLine = `<span class="name-line">Name: ____________________ &nbsp; Datum: __________</span>`
 
-// Page baut eine Arbeitsblattseite mit Kopfzeile.
-func Page(titel, inhalt string) string {
-	return page("", titel, NameZeile, inhalt)
+// Page builds a worksheet page with a header.
+func Page(title, content string) string {
+	return page("", title, NameLine, content)
 }
 
-// SolutionPage baut das Loesungsblatt (waechst ueber eine Seite hinaus).
-// Die boxen werden zweispaltig gesetzt.
-func SolutionPage(boxen ...string) string {
-	inner := `  <div class="lspalten">
-` + strings.Join(boxen, "") + `  </div>
+// SolutionPage builds the solution page (may grow beyond one page).
+// The boxes are laid out in two columns.
+func SolutionPage(boxes ...string) string {
+	inner := `  <div class="solution-cols">
+` + strings.Join(boxes, "") + `  </div>
 `
-	return page(" loesung", "L&ouml;sungen &#10003;",
-		`<span class="namenszeile">f&uuml;r Eltern / Lehrperson</span>`, inner)
+	return page(" solution", "L&ouml;sungen &#10003;",
+		`<span class="name-line">f&uuml;r Eltern / Lehrperson</span>`, inner)
 }
 
-// SolutionBox ist ein Kasten auf dem Loesungsblatt.
-func SolutionBox(titel string, zeilen ...string) string {
-	return fmt.Sprintf("    <div class=\"lbox\">\n      <h3>%s</h3>\n%s    </div>\n",
-		titel, strings.Join(zeilen, ""))
+// SolutionBox is a single box on the solution page.
+func SolutionBox(title string, lines ...string) string {
+	return fmt.Sprintf("    <div class=\"solution-box\">\n      <h3>%s</h3>\n%s    </div>\n",
+		title, strings.Join(lines, ""))
 }
 
-func page(cls, titel, rechts, inhalt string) string {
-	return fmt.Sprintf("<div class=\"page%s\">\n  <div class=\"kopf\"><h1>%s</h1>%s</div>\n%s</div>\n",
-		cls, titel, rechts, inhalt)
+func page(cls, title, right, content string) string {
+	return fmt.Sprintf("<div class=\"page%s\">\n  <div class=\"header\"><h1>%s</h1>%s</div>\n%s</div>\n",
+		cls, title, right, content)
 }
 
-// Lines liefert n leere Schreiblinien.
+// Lines returns n empty writing lines.
 func Lines(n int) string {
-	return `<div class="schreiblinien">` + strings.Repeat("<div></div>", n) + `</div>`
+	return `<div class="writing-lines">` + strings.Repeat("<div></div>", n) + `</div>`
 }
 
-// JSON serialisiert v fuer die Einbettung in <script> (ohne HTML-Escaping,
-// aber </script> wird unschaedlich gemacht).
+// JSON serialises v for embedding in <script> (without HTML escaping,
+// but </script> is made harmless).
 func JSON(v any) string {
 	var buf bytes.Buffer
 	enc := json.NewEncoder(&buf)

@@ -1,8 +1,8 @@
 package pdf
 
-// Minimaler WebSocket-Client (RFC 6455), gerade genug fuer das
-// Chrome-DevTools-Protokoll: Textframes, kein Deflate, kein Ping-Handling
-// ausser Pong-Antworten.
+// Minimal WebSocket client (RFC 6455), just enough for the
+// Chrome DevTools Protocol: text frames, no deflate, no ping handling
+// beyond replying with pong.
 
 import (
 	"bufio"
@@ -97,10 +97,10 @@ func (w *wsConn) write(opcode byte, payload []byte) error {
 	return err
 }
 
-// WriteText sendet einen Textframe.
+// WriteText sends a text frame.
 func (w *wsConn) WriteText(s string) error { return w.write(1, []byte(s)) }
 
-// ReadMessage liefert die naechste (ggf. defragmentierte) Text-/Binaernachricht.
+// ReadMessage returns the next (possibly defragmented) text/binary message.
 func (w *wsConn) ReadMessage() ([]byte, error) {
 	var msg []byte
 	for {

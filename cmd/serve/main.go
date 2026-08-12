@@ -1,5 +1,5 @@
-// Kommando serve liefert das output/-Verzeichnis passwortgeschuetzt aus
-// (Cookie-Session, HMAC-signiert).
+// Command serve exposes the output/ directory behind a password
+// (cookie session, HMAC signed).
 //
 //	go run ./cmd/serve -addr :8000 -dir output
 package main
@@ -53,8 +53,8 @@ func validToken(t string) bool {
 	return hmac.Equal([]byte(makeToken(exp)), []byte(t))
 }
 
-const loginPage = `<!DOCTYPE html><html lang="de"><head><meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1"><title>Lernmaterial</title>
+const loginPage = `<!DOCTYPE html><html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1"><title>Learning material</title>
 <style>body{margin:0;height:100vh;display:flex;align-items:center;justify-content:center;
 background:#fdfcfa;color:#1f3550;font:16px/1.5 system-ui,sans-serif}
 form{border:2px solid #1f3550;border-radius:14px;padding:28px 30px;background:#fff;min-width:280px}
@@ -64,9 +64,9 @@ border-radius:8px;margin-bottom:14px}
 button{width:100%;padding:10px;font-size:16px;font-weight:600;color:#fff;background:#2f9fd0;
 border:0;border-radius:999px;cursor:pointer}
 .err{color:#e8548c;font-size:14px;margin:-6px 0 12px}</style></head><body>
-<form method="POST"><h1>Lernmaterial</h1><p>Bitte Passwort eingeben.</p>
-{{ERR}}<input type="password" name="pw" autofocus autocomplete="current-password" placeholder="Passwort">
-<button type="submit">Weiter</button></form></body></html>`
+<form method="POST"><h1>Learning material</h1><p>Please enter the password.</p>
+{{ERR}}<input type="password" name="pw" autofocus autocomplete="current-password" placeholder="Password">
+<button type="submit">Continue</button></form></body></html>`
 
 func auth(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -87,7 +87,7 @@ func auth(next http.Handler) http.Handler {
 				http.Redirect(w, r, r.URL.Path, http.StatusSeeOther)
 				return
 			}
-			errMsg = `<div class="err">Falsches Passwort.</div>`
+			errMsg = `<div class="err">Wrong password.</div>`
 		}
 		w.Header().Set("Cache-Control", "no-store")
 		w.WriteHeader(http.StatusUnauthorized)

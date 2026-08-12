@@ -1,8 +1,8 @@
-// Package sheet ist das Mini-Framework fuer Arbeitsblaetter.
+// Package sheet is the mini framework for worksheets.
 //
-// Ein Arbeitsblatt liegt unter generate/<fach>/<name>/ und meldet sich per
-// Register() an. Der Generator (cmd/generate) baut daraus
-// output/<fach>/<name>/index.html (+ index.pdf).
+// A worksheet lives in generate/<subject>/<name>/ and registers itself via
+// Register(). The generator (cmd/generate) turns it into
+// output/<subject>/<name>/index.html (+ index.pdf).
 package sheet
 
 import (
@@ -15,7 +15,7 @@ import (
 //go:embed assets/fonts.css assets/rough.js
 var assets embed.FS
 
-// Asset liefert eine eingebettete Datei aus internal/sheet/assets.
+// Asset returns an embedded file from internal/sheet/assets.
 func Asset(name string) string {
 	b, err := assets.ReadFile("assets/" + name)
 	if err != nil {
@@ -24,50 +24,50 @@ func Asset(name string) string {
 	return string(b)
 }
 
-// Worksheet beschreibt ein Arbeitsblatt fuer Registry und Startseite.
+// Worksheet describes a worksheet for the registry and the index page.
 type Worksheet struct {
-	Fach     string // z.B. "mathe"  -> Verzeichnisname
-	Name     string // z.B. "venn_diagramme" -> Verzeichnisname
-	Titel    string // Anzeigename, z.B. "Venn-Diagramme"
-	Meta     string // Kurzbeschreibung fuer die Startseite
+	Subject  string // e.g. "math" -> directory name
+	Name     string // e.g. "venn_diagrams" -> directory name
+	Title    string // display name, e.g. "Venn-Diagramme"
+	Meta     string // short description for the index page
 	Build    func() *Doc
-	Portrait bool // PDF im Hochformat drucken (Standard: quer)
+	Portrait bool // print the PDF in portrait (default: landscape)
 }
 
-// Path ist der Ausgabepfad relativ zum output-Verzeichnis.
-func (w Worksheet) Path() string { return w.Fach + "/" + w.Name }
+// Path is the output path relative to the output directory.
+func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
 
 var registry []Worksheet
 
-// Register meldet ein Arbeitsblatt an (aus init() aufrufen).
+// Register adds a worksheet to the registry (call from init()).
 func Register(w Worksheet) {
-	if w.Fach == "" || w.Name == "" || w.Build == nil {
-		panic("sheet.Register: Fach, Name und Build sind Pflicht")
+	if w.Subject == "" || w.Name == "" || w.Build == nil {
+		panic("sheet.Register: Subject, Name and Build are required")
 	}
 	registry = append(registry, w)
 }
 
-// All liefert alle angemeldeten Arbeitsblaetter, sortiert nach Pfad.
+// All returns every registered worksheet, sorted by path.
 func All() []Worksheet {
 	out := append([]Worksheet(nil), registry...)
 	sort.Slice(out, func(i, j int) bool { return out[i].Path() < out[j].Path() })
 	return out
 }
 
-// Doc ist der gebaute Inhalt eines Arbeitsblattes.
+// Doc is the built content of a worksheet.
 type Doc struct {
-	Titel   string         // <title>
-	CSS     string         // zusaetzliches CSS (BaseCSS ist immer dabei)
-	Body    string         // HTML-Rumpf (meist mit Page(...) gebaut)
-	Data    map[string]any // wird als `const NAME = <json>;` ins JS gelegt
-	Scripts []string       // JS-Quelltexte (laufen nach den Daten)
-	Rough   bool           // rough.js einbetten
+	Title   string         // <title>
+	CSS     string         // extra CSS (BaseCSS is always included)
+	Body    string         // HTML body (usually built with Page(...))
+	Data    map[string]any // emitted as `const NAME = <json>;` in the script
+	Scripts []string       // JS sources (run after the data)
+	Rough   bool           // embed rough.js
 }
 
-// AddScript haengt JS-Quelltext an.
+// AddScript appends JS source code.
 func (d *Doc) AddScript(src string) { d.Scripts = append(d.Scripts, src) }
 
-// Set legt einen JS-Konstantennamen mit JSON-Wert an.
+// Set defines a JS constant with a JSON value.
 func (d *Doc) Set(name string, v any) {
 	if d.Data == nil {
 		d.Data = map[string]any{}
@@ -75,12 +75,12 @@ func (d *Doc) Set(name string, v any) {
 	d.Data[name] = v
 }
 
-// HTML rendert das fertige, selbstenthaltende Dokument.
+// HTML renders the finished, self-contained document.
 func (d *Doc) HTML() string {
 	var b strings.Builder
 	b.WriteString("<!DOCTYPE html>\n<html lang=\"de\">\n<head>\n<meta charset=\"utf-8\">\n")
 	fmt.Fprintf(&b, "<title>%s</title>\n<style>\n%s\n%s\n</style>\n</head>\n<body>\n",
-		d.Titel, Asset("fonts.css"), BaseCSS+d.CSS)
+		d.Title, Asset("fonts.css"), BaseCSS+d.CSS)
 	b.WriteString(d.Body)
 	if d.Rough {
 		fmt.Fprintf(&b, "<script>\n%s\n</script>\n", Asset("rough.js"))

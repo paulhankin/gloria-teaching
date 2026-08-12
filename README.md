@@ -1,53 +1,57 @@
-# Lernmaterial
+# Learning material
 
-Arbeitsblätter zum Ausdrucken (A4 quer). Alles in Go: ein kleines Framework
-(`internal/sheet`), ein Arbeitsblatt pro Verzeichnis unter `generate/`,
-das Ergebnis landet spiegelbildlich unter `output/`.
+Printable worksheets (A4 landscape) for German-speaking primary school kids.
+Everything is Go: a small framework (`internal/sheet`), one worksheet per
+directory under `generate/`, and the result lands in a mirrored layout under
+`output/`.
 
-## Struktur
+Code, comments and the website UI are English; the worksheets themselves are
+written in German.
 
-```
-internal/sheet/             Framework: Registry, Doc/HTML-Bau, gemeinsames CSS, Assets
-internal/pdf/               HTML -> PDF via headless Chrome (CDP, eigener WS-Client)
-generate/<fach>/<blatt>/    ein Arbeitsblatt (Go + render.js)
-output/<fach>/<blatt>/      index.html + index.pdf   (generiert, nicht im Repo)
-cmd/generate/               baut alle Blätter + Startseite
-cmd/serve/                  statischer Server mit Passwortschutz
-```
-
-Aktuell: `generate/mathe/venn_diagramme`, `generate/mathe/zahlenfolgen`,
-`generate/mathe/preisraetsel`.
-
-## Bauen
+## Layout
 
 ```
-make                          # HTML + PDF für alle Blätter nach output/
-make html                     # nur HTML (schnell, ohne Chrome)
-go run ./cmd/generate venn    # nur passende Blätter (Teilstring im Pfad)
-make build                    # Binaries nach bin/
+internal/sheet/               framework: registry, doc/HTML building, shared CSS, assets
+internal/pdf/                 HTML -> PDF via headless Chrome (CDP, own WS client)
+generate/<subject>/<sheet>/   one worksheet (Go + render.js)
+output/<subject>/<sheet>/     index.html + index.pdf   (generated, not in the repo)
+cmd/generate/                 builds all worksheets + the index page
+cmd/serve/                    static server with password protection
 ```
 
-Für PDFs wird `/headless-shell/headless-shell` benutzt
-(überschreibbar mit `HEADLESS_SHELL=...`).
+Currently: `generate/math/venn_diagrams`, `generate/math/number_sequences`,
+`generate/math/price_puzzles`.
 
-## Ausliefern
+## Building
 
 ```
-make serve                    # lokal, Passwort aus SITE_PASSWORD
+make                          # HTML + PDF for all worksheets into output/
+make html                     # HTML only (fast, no Chrome)
+go run ./cmd/generate venn    # only matching worksheets (substring of the path)
+make build                    # binaries into bin/
 ```
 
-- systemd: `lernmaterial.service` nach `/etc/systemd/system/`, `enable --now`.
-- Konfiguration: `/etc/lernmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — nicht im Repo.
+PDFs use `/headless-shell/headless-shell`
+(override with `HEADLESS_SHELL=...`).
 
-## Neues Arbeitsblatt anlegen
+## Deploying
 
-1. `generate/<fach>/<name>/` anlegen, Package benennen.
-2. In `init()` `sheet.Register(sheet.Worksheet{Fach, Name, Titel, Meta, Build})`.
-3. `Build() *sheet.Doc` liefert Titel, zusätzliches CSS und Body.
-   Bausteine: `sheet.Page`, `sheet.SolutionPage`, `sheet.SolutionBox`,
-   `sheet.Lines`, `sheet.NameZeile`; `sheet.BaseCSS` ist immer aktiv.
-4. Zeichnungen: `render.js` per `//go:embed` einbinden, Daten mit `doc.Set("NAME", v)`
-   als JS-Konstante übergeben, `doc.Rough = true` bettet rough.js ein.
-5. Blank-Import in `cmd/generate/main.go` ergänzen.
+```
+make serve                    # locally, password from SITE_PASSWORD
+```
 
-Die Startseite (`output/index.html`) wird automatisch aus der Registry gebaut.
+- systemd: copy `learningmaterial.service` to `/etc/systemd/system/`, `enable --now`.
+- Configuration: `/etc/learningmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — not in the repo.
+
+## Adding a worksheet
+
+1. Create `generate/<subject>/<name>/` and name the package.
+2. In `init()` call `sheet.Register(sheet.Worksheet{Subject, Name, Title, Meta, Build})`.
+3. `Build() *sheet.Doc` returns title, extra CSS and body.
+   Building blocks: `sheet.Page`, `sheet.SolutionPage`, `sheet.SolutionBox`,
+   `sheet.Lines`, `sheet.NameLine`; `sheet.BaseCSS` is always applied.
+4. Drawings: embed `render.js` via `//go:embed`, pass data with
+   `doc.Set("NAME", v)` as a JS constant, `doc.Rough = true` embeds rough.js.
+5. Add a blank import in `cmd/generate/main.go`.
+
+The index page (`output/index.html`) is built automatically from the registry.

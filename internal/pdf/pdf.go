@@ -1,4 +1,4 @@
-// Package pdf rendert eine HTML-Datei per headless Chrome (CDP) zu PDF.
+// Package pdf renders an HTML file to PDF using headless Chrome (CDP).
 package pdf
 
 import (
@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-// Chrome ist der Pfad zum headless-shell/Chrome-Binary.
+// Chrome is the path to the headless-shell/Chrome binary.
 var Chrome = envOr("HEADLESS_SHELL", "/headless-shell/headless-shell")
 
 func envOr(k, d string) string {
@@ -25,14 +25,14 @@ func envOr(k, d string) string {
 	return d
 }
 
-// Options steuert den PDF-Export.
+// Options controls the PDF export.
 type Options struct {
 	Landscape bool
-	Wait      time.Duration // Zeit fuers JS-Rendern nach dem Laden
+	Wait      time.Duration // time for JS rendering after load
 	Port      int
 }
 
-// Render laedt htmlPath (lokale Datei) und schreibt das PDF nach outPath.
+// Render loads htmlPath (a local file) and writes the PDF to outPath.
 func Render(htmlPath, outPath string, opt Options) error {
 	if opt.Wait == 0 {
 		opt.Wait = 3 * time.Second
@@ -59,7 +59,7 @@ func Render(htmlPath, outPath string, opt Options) error {
 		"--remote-allow-origins=*", "about:blank")
 	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	if err := cmd.Start(); err != nil {
-		return fmt.Errorf("chrome starten: %w", err)
+		return fmt.Errorf("start chrome: %w", err)
 	}
 	defer func() {
 		syscall.Kill(-cmd.Process.Pid, syscall.SIGKILL)
@@ -74,7 +74,7 @@ func Render(htmlPath, outPath string, opt Options) error {
 	req, _ := http.NewRequest("PUT", base+"/json/new?"+url.QueryEscape(pageURL), nil)
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return fmt.Errorf("neuer Tab: %w", err)
+		return fmt.Errorf("new tab: %w", err)
 	}
 	defer resp.Body.Close()
 	var tgt struct {
@@ -159,5 +159,5 @@ func waitFor(u string) error {
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	return fmt.Errorf("chrome antwortet nicht auf %s", u)
+	return fmt.Errorf("chrome not responding at %s", u)
 }

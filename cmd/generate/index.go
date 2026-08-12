@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"lernmaterial/internal/sheet"
+	"learningmaterial/internal/sheet"
 )
 
 const indexCSS = `
@@ -27,7 +27,7 @@ const indexCSS = `
   a.btn:hover span { color:#fff; }
 `
 
-// indexHTML baut die Startseite mit Links auf alle Arbeitsblaetter.
+// indexHTML builds the index page linking to every worksheet.
 func indexHTML(ws []sheet.Worksheet) string {
 	var cards strings.Builder
 	for _, w := range ws {
@@ -35,18 +35,18 @@ func indexHTML(ws []sheet.Worksheet) string {
     <h2>%s</h2>
     <p class="meta">%s</p>
     <div class="links">
-      <a class="btn pdf" href="%s/index.pdf"><span>PDF herunterladen</span></a>
-      <a class="btn html" href="%s/index.html"><span>Im Browser ansehen</span></a>
+      <a class="btn pdf" href="%s/index.pdf"><span>Download PDF</span></a>
+      <a class="btn html" href="%s/index.html"><span>View in browser</span></a>
     </div>
   </div>
-`, w.Titel, w.Meta, w.Path(), w.Path())
+`, w.Title, w.Meta, w.Path(), w.Path())
 	}
 	return fmt.Sprintf(`<!DOCTYPE html>
-<html lang="de">
+<html lang="en">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Lernmaterial</title>
+<title>Learning material</title>
 <style>
 %s
 %s
@@ -54,8 +54,8 @@ func indexHTML(ws []sheet.Worksheet) string {
 </head>
 <body>
 <div class="wrap">
-  <h1>Lernmaterial</h1>
-  <p class="sub">Arbeitsblätter zum Ausdrucken (A4 quer).</p>
+  <h1>Learning material</h1>
+  <p class="sub">Printable worksheets (A4 landscape).</p>
 %s</div>
 </body>
 </html>

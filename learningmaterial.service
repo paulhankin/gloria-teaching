@@ -1,0 +1,13 @@
+[Unit]
+Description=Learning material static site (password protected)
+After=network.target
+
+[Service]
+User=exedev
+WorkingDirectory=/home/exedev/learningmaterial
+EnvironmentFile=/etc/learningmaterial/env
+ExecStart=/home/exedev/learningmaterial/bin/serve -addr :8000 -dir /home/exedev/learningmaterial/output
+Restart=always
+
+[Install]
+WantedBy=multi-user.target

@@ -1,8 +1,8 @@
-// Kommando generate baut alle Arbeitsblaetter nach output/<fach>/<name>/.
+// Command generate builds every worksheet into output/<subject>/<name>/.
 //
-//	go run ./cmd/generate            # HTML + PDF fuer alle Blaetter
-//	go run ./cmd/generate -pdf=false # nur HTML (schnell)
-//	go run ./cmd/generate venn       # nur passende Blaetter (Teilstring)
+//	go run ./cmd/generate            # HTML + PDF for all worksheets
+//	go run ./cmd/generate -pdf=false # HTML only (fast)
+//	go run ./cmd/generate venn       # only matching worksheets (substring)
 package main
 
 import (
@@ -14,28 +14,28 @@ import (
 	"strings"
 	"time"
 
-	"lernmaterial/internal/pdf"
-	"lernmaterial/internal/sheet"
+	"learningmaterial/internal/pdf"
+	"learningmaterial/internal/sheet"
 
-	_ "lernmaterial/generate/mathe/preisraetsel"
-	_ "lernmaterial/generate/mathe/venn_diagramme"
-	_ "lernmaterial/generate/mathe/zahlenfolgen"
+	_ "learningmaterial/generate/math/number_sequences"
+	_ "learningmaterial/generate/math/price_puzzles"
+	_ "learningmaterial/generate/math/venn_diagrams"
 )
 
 func main() {
-	out := flag.String("out", "output", "Ausgabeverzeichnis")
-	makePDF := flag.Bool("pdf", true, "PDF mit erzeugen")
-	wait := flag.Duration("wait", 4*time.Second, "Wartezeit fuers JS-Rendern vor dem PDF-Export")
+	out := flag.String("out", "output", "output directory")
+	makePDF := flag.Bool("pdf", true, "also produce PDFs")
+	wait := flag.Duration("wait", 4*time.Second, "time to wait for JS rendering before the PDF export")
 	flag.Parse()
 
 	filters := flag.Args()
-	var gebaut []sheet.Worksheet
+	var built []sheet.Worksheet
 
 	for _, w := range sheet.All() {
 		if !matches(w, filters) {
 			continue
 		}
-		dir := filepath.Join(*out, w.Fach, w.Name)
+		dir := filepath.Join(*out, w.Subject, w.Name)
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			log.Fatal(err)
 		}
@@ -57,14 +57,14 @@ func main() {
 			st, _ := os.Stat(pdfPath)
 			fmt.Printf("%-34s %4d KB\n", pdfPath, st.Size()/1024)
 		}
-		gebaut = append(gebaut, w)
+		built = append(built, w)
 	}
 
-	if len(gebaut) == 0 {
-		log.Fatal("kein Arbeitsblatt passt zum Filter")
+	if len(built) == 0 {
+		log.Fatal("no worksheet matches the filter")
 	}
 
-	// Startseite immer ueber alle bekannten Blaetter.
+	// The index page always covers every known worksheet.
 	idx := filepath.Join(*out, "index.html")
 	if err := os.WriteFile(idx, []byte(indexHTML(sheet.All())), 0o644); err != nil {
 		log.Fatal(err)
