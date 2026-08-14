@@ -1,4 +1,4 @@
-// Package answerchecks builds the "Kann das stimmen?" checking dossier.
+// Package answerchecks builds the arithmetic and reasoning checking dossier.
 package answerchecks
 
 import (
@@ -49,7 +49,7 @@ func init() {
 	sheet.Register(sheet.Worksheet{
 		Subject: "math",
 		Name:    "answer_checks",
-		Title:   "Kann das stimmen?",
+		Title:   "Rechnen und prüfen",
 		Date:    "14 Aug 2026",
 		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Aufgaben lösen und selbst prüfen",
 		Build:   build,
@@ -58,7 +58,7 @@ func init() {
 
 func build() *sheet.Doc {
 	d := &sheet.Doc{
-		Title: "Mathe-Dossier: Kann das stimmen?",
+		Title: "Mathe-Dossier: Rechnen und prüfen",
 		CSS:   css,
 		Rough: true,
 	}
@@ -115,7 +115,7 @@ func arithmeticPage(number int, task arithmeticTask) string {
     </div>
   </div>
 `, task.Top, task.Operation, task.Bottom, sheet.Lines(8), sheet.Lines(8))
-	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Lösen und prüfen, Aufgabe %d/4", number), content)
+	return sheet.Page(fmt.Sprintf("Rechnen und prüfen &ndash; Aufgabe %d/4", number), content)
 }
 
 func pricePage(number int, task priceTask) string {
@@ -142,7 +142,7 @@ func pricePage(number int, task priceTask) string {
     </div>
   </div>
 `, number, task.Title, task.Story, task.Question, task.Names[0], task.Names[1], task.Key, sheet.Lines(8), sheet.Lines(8))
-	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Warm-up II, Aufgabe %d/2", number), content)
+	return sheet.Page(fmt.Sprintf("Rechnen und prüfen &ndash; Sachaufgabe %d/2", number), content)
 }
 
 func logicPage(number int, task logicTask) string {
@@ -168,7 +168,7 @@ func logicPage(number int, task logicTask) string {
     </div>
   </div>
 `, number, task.Title, task.Story, task.Question, task.Key, sheet.Lines(8), sheet.Lines(8))
-	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Knobeln und prüfen %d/3", number), content)
+	return sheet.Page(fmt.Sprintf("Rechnen und prüfen &ndash; Knobelaufgabe %d/3", number), content)
 }
 
 func firstSolutionPage() string {
