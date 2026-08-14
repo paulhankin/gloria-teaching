@@ -16,6 +16,7 @@ type Worksheet struct {
 	Title   string `json:"title"`
 	Date    string `json:"date"`
 	Meta    string `json:"meta"`
+	Version string `json:"version,omitempty"`
 }
 
 func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
@@ -308,7 +309,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
     {{$rs := $.ChangeRequests .}}
     {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
   </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf">Worksheet PDF</a><a class="pdf" href="{{.Path}}/solutions.pdf">Solutions PDF</a></td>
+  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{.Path}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
 </tr>
 {{if not $.Static}}
 <tr class="worksheet-request"><td colspan="5">

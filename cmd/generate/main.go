@@ -6,8 +6,11 @@
 package main
 
 import (
+	"crypto/sha256"
+	"encoding/hex"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"path/filepath"
@@ -46,6 +49,7 @@ func main() {
 	defer os.RemoveAll(buildDir)
 
 	var built []sheet.Worksheet
+	versions := make(map[string]string)
 
 	for _, w := range sheet.All() {
 		if !matches(w, filters) {
@@ -83,6 +87,11 @@ func main() {
 			}
 		}
 		built = append(built, w)
+		version, err := worksheetVersion(buildDir, w.Path())
+		if err != nil {
+			log.Fatal(err)
+		}
+		versions[w.Path()] = version
 	}
 
 	if len(built) == 0 {
@@ -92,7 +101,18 @@ func main() {
 	// The index page and manifest always cover every known worksheet. The
 	// server reads the manifest at request time, so worksheet additions and
 	// metadata changes do not require rebuilding the server binary.
-	worksheets := siteWorksheets(sheet.All())
+	all := sheet.All()
+	for _, w := range all {
+		if versions[w.Path()] != "" {
+			continue
+		}
+		version, err := worksheetVersion(target, w.Path())
+		if err != nil && !os.IsNotExist(err) {
+			log.Fatal(err)
+		}
+		versions[w.Path()] = version
+	}
+	worksheets := siteWorksheets(all, versions)
 	idx := filepath.Join(buildDir, "index.html")
 	page := site.Index(site.Data{Worksheets: worksheets, Static: true})
 	if err := os.WriteFile(idx, []byte(page), 0o644); err != nil {
@@ -157,7 +177,7 @@ func publishOutput(buildDir, target string) error {
 	return nil
 }
 
-func siteWorksheets(in []sheet.Worksheet) []site.Worksheet {
+func siteWorksheets(in []sheet.Worksheet, versions map[string]string) []site.Worksheet {
 	out := make([]site.Worksheet, 0, len(in))
 	for _, w := range in {
 		out = append(out, site.Worksheet{
@@ -166,9 +186,43 @@ func siteWorksheets(in []sheet.Worksheet) []site.Worksheet {
 			Title:   w.Title,
 			Date:    w.Date,
 			Meta:    w.Meta,
+			Version: versions[w.Path()],
 		})
 	}
 	return out
+}
+
+// worksheetVersion hashes the generated files that browsers download. PDFs
+// are preferred; HTML is the fallback for fast -pdf=false builds.
+func worksheetVersion(root, worksheetPath string) (string, error) {
+	for _, ext := range []string{"pdf", "html"} {
+		h := sha256.New()
+		complete := true
+		for _, name := range []string{"index", "solutions"} {
+			path := filepath.Join(root, worksheetPath, name+"."+ext)
+			f, err := os.Open(path)
+			if err != nil {
+				if os.IsNotExist(err) {
+					complete = false
+					break
+				}
+				return "", err
+			}
+			_, copyErr := io.Copy(h, f)
+			closeErr := f.Close()
+			if copyErr != nil {
+				return "", copyErr
+			}
+			if closeErr != nil {
+				return "", closeErr
+			}
+			h.Write([]byte{0})
+		}
+		if complete {
+			return hex.EncodeToString(h.Sum(nil))[:12], nil
+		}
+	}
+	return "", os.ErrNotExist
 }
 
 func matches(w sheet.Worksheet, filters []string) bool {

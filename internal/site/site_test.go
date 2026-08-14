@@ -9,11 +9,11 @@ import (
 
 func TestWorksheetIndexLinksWorksheetAndSolutionsPDFs(t *testing.T) {
 	html := Index(Data{Static: true, Worksheets: []Worksheet{{
-		Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "4. Klasse · Lösungen",
+		Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "4. Klasse · Lösungen", Version: "abc123",
 	}}})
 	for _, want := range []string{
 		"<table", "Brüche", "12 Aug 2026", "Worksheet PDF", "Solutions PDF",
-		"math/fractions/index.pdf", "math/fractions/solutions.pdf",
+		"math/fractions/index.pdf?v=abc123", "math/fractions/solutions.pdf?v=abc123",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("index is missing %q", want)
