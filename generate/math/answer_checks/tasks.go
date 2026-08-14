@@ -4,7 +4,6 @@ type arithmeticTask struct {
 	Operation string
 	Top       int
 	Bottom    int
-	Claim     int
 	Correct   int
 }
 
@@ -33,10 +32,10 @@ type logicTask struct {
 
 // Worksheet tasks. Pupil-facing text stays German on purpose.
 var arithmeticTasks = []arithmeticTask{
-	{Operation: "−", Top: 764, Bottom: 328, Claim: 436, Correct: 436},
-	{Operation: "−", Top: 902, Bottom: 457, Claim: 455, Correct: 445},
-	{Operation: "+", Top: 368, Bottom: 247, Claim: 615, Correct: 615},
-	{Operation: "+", Top: 586, Bottom: 179, Claim: 755, Correct: 765},
+	{Operation: "−", Top: 764, Bottom: 328, Correct: 436},
+	{Operation: "−", Top: 902, Bottom: 457, Correct: 445},
+	{Operation: "+", Top: 368, Bottom: 247, Correct: 615},
+	{Operation: "+", Top: 586, Bottom: 179, Correct: 765},
 }
 
 var priceTasks = []priceTask{

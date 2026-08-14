@@ -28,8 +28,7 @@ const css = `
   .written { width: 42mm; font: 700 28pt/1.12 'Courier New', monospace;
              text-align: right; color: #1f3550; }
   .written .line { border-bottom: 2.5px solid #1f3550; padding-bottom: 1mm; }
-  .written .claim { padding-top: 1mm; color: #e8548c; }
-  .decision { font-weight: 700; font-size: 18pt; }
+  .written .answer-blank { min-height: 12mm; }
   .answer-row { margin: 3mm 0; font-size: 16pt; }
   .answer-row .blank { min-width: 42mm; }
   .figure { position: relative; height: 43mm; margin: 1mm 0 2mm; }
@@ -51,8 +50,8 @@ func init() {
 		Subject: "math",
 		Name:    "answer_checks",
 		Title:   "Kann das stimmen?",
-		Date:    "12 Aug 2026",
-		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Antworten prüfen",
+		Date:    "14 Aug 2026",
+		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Aufgaben lösen und selbst prüfen",
 		Build:   build,
 	})
 }
@@ -97,28 +96,26 @@ func arithmeticPage(number int, task arithmeticTask) string {
 	content := fmt.Sprintf(`  <div class="question-area">
     <div class="written-wrap">
       <div class="written">
-        <div>%d</div><div class="line">%s %d</div><div class="claim">%d</div>
+        <div>%d</div><div class="line">%s %d</div><div class="answer-blank">&nbsp;</div>
       </div>
       <div>
-        <h2>Kann das stimmen?</h2>
-        <div class="decision">□ Ja &nbsp;&nbsp;&nbsp; □ Nein</div>
-        <p>Falls nein, wie lautet das richtige Ergebnis?</p>
-        <span class="blank" style="min-width:55mm"></span>
+        <h2>1. Löse die Aufgabe.</h2>
+        <p>Schreibe dein Ergebnis unter den Strich.</p>
       </div>
     </div>
   </div>
   <div class="response-area">
     <div class="response-box">
-      <h3>Wie hast du gerechnet?</h3>
+      <h3>1. Wie hast du gerechnet?</h3>
       %s
     </div>
     <div class="response-box">
-      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      <h3>2. Wie hast du deine Lösung überprüft?</h3>
       %s
     </div>
   </div>
-`, task.Top, task.Operation, task.Bottom, task.Claim, sheet.Lines(8), sheet.Lines(8))
-	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Warm-up I, Aufgabe %d/4", number), content)
+`, task.Top, task.Operation, task.Bottom, sheet.Lines(8), sheet.Lines(8))
+	return sheet.Page(fmt.Sprintf("Kann das stimmen? &ndash; Lösen und prüfen, Aufgabe %d/4", number), content)
 }
 
 func pricePage(number int, task priceTask) string {
@@ -136,11 +133,11 @@ func pricePage(number int, task priceTask) string {
   </div>
   <div class="response-area">
     <div class="response-box">
-      <h3>Wie hast du die Antwort gefunden?</h3>
+      <h3>1. Wie hast du die Antwort gefunden?</h3>
       %s
     </div>
     <div class="response-box">
-      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      <h3>2. Wie hast du deine Lösung überprüft?</h3>
       %s
     </div>
   </div>
@@ -162,11 +159,11 @@ func logicPage(number int, task logicTask) string {
   </div>
   <div class="response-area">
     <div class="response-box">
-      <h3>Wie hast du die Antwort gefunden?</h3>
+      <h3>1. Wie hast du die Antwort gefunden?</h3>
       %s
     </div>
     <div class="response-box">
-      <h3>Wie hast du überprüft, dass die Antwort richtig ist?</h3>
+      <h3>2. Wie hast du deine Lösung überprüft?</h3>
       %s
     </div>
   </div>
@@ -178,33 +175,17 @@ func firstSolutionPage() string {
 	var arithmetic strings.Builder
 	for i, task := range arithmeticTasks {
 		if task.Operation == "−" {
-			status := "Ja"
-			if task.Claim != task.Correct {
-				status = "Nein"
-			}
-			fmt.Fprintf(&arithmetic, "      <p>%d) <b>%s</b>: %d + %d = %d", i+1, status, task.Bottom, task.Claim, task.Bottom+task.Claim)
-			if task.Claim != task.Correct {
-				fmt.Fprintf(&arithmetic, ", nicht %d. Richtig: %d &minus; %d = <b>%d</b>.", task.Top, task.Top, task.Bottom, task.Correct)
-			} else {
-				fmt.Fprintf(&arithmetic, " &#10004;</p>\n")
-				continue
-			}
-			arithmetic.WriteString("</p>\n")
+			fmt.Fprintf(&arithmetic,
+				"      <p>%d) %d &minus; %d = <b>%d</b>. Probe: %d + %d = %d &#10004;</p>\n",
+				i+1, task.Top, task.Bottom, task.Correct, task.Correct, task.Bottom, task.Top)
 		} else {
-			status := "Ja"
-			if task.Claim != task.Correct {
-				status = "Nein"
-			}
-			fmt.Fprintf(&arithmetic, "      <p>%d) <b>%s</b>: %d &minus; %d = %d", i+1, status, task.Claim, task.Bottom, task.Claim-task.Bottom)
-			if task.Claim != task.Correct {
-				fmt.Fprintf(&arithmetic, ", nicht %d. Richtig: %d + %d = <b>%d</b>.</p>\n", task.Top, task.Top, task.Bottom, task.Correct)
-			} else {
-				arithmetic.WriteString(" &#10004;</p>\n")
-			}
+			fmt.Fprintf(&arithmetic,
+				"      <p>%d) %d + %d = <b>%d</b>. Probe: %d &minus; %d = %d &#10004;</p>\n",
+				i+1, task.Top, task.Bottom, task.Correct, task.Correct, task.Bottom, task.Top)
 		}
 	}
 
-	boxes := []string{sheet.SolutionBox("Warm-up I &ndash; Gegenrechnungen", arithmetic.String())}
+	boxes := []string{sheet.SolutionBox("Lösen und prüfen &ndash; Gegenrechnungen", arithmetic.String())}
 	for i, task := range priceTasks {
 		boxes = append(boxes, sheet.SolutionBox(
 			fmt.Sprintf("Warm-up II, Aufgabe %d &ndash; %s", i+1, task.Title),
