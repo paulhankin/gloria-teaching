@@ -1,6 +1,7 @@
 package answerchecks
 
 import (
+	"fmt"
 	"strings"
 	"testing"
 )
@@ -20,7 +21,10 @@ func TestArithmeticQuestionsDoNotRevealAnswersOrShowAnswerCheckPrompt(t *testing
 			}
 		}
 
-		if !strings.Contains(page, `class="answer-blank"`) {
+		if strings.Contains(page, fmt.Sprintf(">%d<", task.Correct)) {
+			t.Errorf("question %d reveals the solution %d", i+1, task.Correct)
+		}
+		if !strings.Contains(page, `<div class="answer-blank"></div>`) {
 			t.Errorf("question %d does not contain an empty answer area", i+1)
 		}
 	}

@@ -96,7 +96,7 @@ func arithmeticPage(number int, task arithmeticTask) string {
 	content := fmt.Sprintf(`  <div class="question-area">
     <div class="written-wrap">
       <div class="written">
-        <div>%d</div><div class="line">%s %d</div><div class="answer-blank">&nbsp;</div>
+        <div>%d</div><div class="line">%s %d</div><div class="answer-blank"></div>
       </div>
       <div>
         <h2>1. Löse die Aufgabe.</h2>
