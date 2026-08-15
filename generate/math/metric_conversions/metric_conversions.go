@@ -26,8 +26,6 @@ const css = `
                   border-bottom: 2px dotted #aeb9c8; vertical-align: baseline; }
   .answer-blank.short { min-width: 10mm; }
   .answer-blank.wide { min-width: 28mm; }
-  .compose-layout { display: grid; grid-template-columns: 1fr 50mm; gap: 6mm; flex: 1 1 auto; min-height: 0; }
-  .compose-layout .figure { height: 100%; margin: 0; }
   .comparison-layout { display: grid; grid-template-columns: 1.2fr .8fr; gap: 8mm; flex: 1 1 auto; min-height: 0; }
   .compare-list { display: grid; grid-template-columns: 1fr 1fr; gap: 2.5mm 7mm; }
   .compare-row { display: grid; grid-template-columns: 1fr 13mm 1fr; align-items: end;
@@ -93,11 +91,8 @@ func composedPage() string {
 		fmt.Fprintf(&exercises, "      <div class=\"exercise\"><span class=\"exercise-number\">%d.</span>%s</div>\n", i+1, task.Prompt)
 	}
 	content := fmt.Sprintf(`  <p class="intro">Zerlege oder bündle die Längen. Achte besonders auf fehlende Stellen: <b>6 m 4 cm = 6 m 0 dm 4 cm</b>.</p>
-  <div class="compose-layout">
-    <div class="exercise-grid">
-%s    </div>
-    <div class="figure" data-figure="measure"></div>
-  </div>
+  <div class="exercise-grid">
+%s  </div>
 `, exercises.String())
 	return sheet.Page("Längen umwandeln &ndash; 2. Zerlegen und zusammensetzen", content)
 }

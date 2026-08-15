@@ -86,25 +86,6 @@ function ladder() {
   return svg;
 }
 
-function measure() {
-  const svg = baseSVG("0 0 240 620");
-  const rc = rough.svg(svg);
-  // Ruler
-  svg.appendChild(rc.rectangle(50, 30, 90, 520, options(1, GOLD, "#fff4c7")));
-  for (let i = 0; i <= 20; i++) {
-    const y = 50 + i * 24;
-    const length = i % 10 === 0 ? 55 : (i % 5 === 0 ? 42 : 28);
-    svg.appendChild(rc.line(50, y, 50 + length, y, options(10 + i, INK, null, i % 5 === 0 ? 2.5 : 1.5)));
-  }
-  label(svg, 95, 588, "messen", "note");
-  // Pencil
-  svg.appendChild(rc.polygon([[166, 92], [202, 92], [202, 475], [184, 528], [166, 475]],
-    options(80, PINK, "#f8c5d8")));
-  svg.appendChild(rc.line(166, 150, 202, 150, options(81, PINK)));
-  label(svg, 184, 65, "?", "unit");
-  return svg;
-}
-
 function compare() {
   const svg = baseSVG("0 0 350 300");
   const rc = rough.svg(svg);
@@ -126,6 +107,5 @@ function compare() {
 document.querySelectorAll("[data-figure]").forEach((host) => {
   const kind = host.dataset.figure;
   if (kind === "ladder") host.appendChild(ladder());
-  if (kind === "measure") host.appendChild(measure());
   if (kind === "compare") host.appendChild(compare());
 });
