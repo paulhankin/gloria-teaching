@@ -113,7 +113,6 @@ func arithmeticPage(number int, task arithmeticTask) string {
       </div>
       <div class="arithmetic-prompt">
         <h2>1. Löse die Aufgabe.</h2>
-        <p>Schreibe dein Ergebnis unter den Strich.</p>
       </div>
     </div>
   </div>
