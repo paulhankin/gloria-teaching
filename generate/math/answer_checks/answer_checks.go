@@ -24,15 +24,21 @@ const css = `
   .response-box { flex: 1 1 50%; min-width: 0; padding: 3mm 4mm;
                   border: 2px dashed #d8dfe8; border-radius: 10px; }
   .response-box h3 { margin-bottom: 2mm; }
-  .written-wrap { height: 100%; display: flex; align-items: center; justify-content: center; gap: 18mm; }
-  .written { width: 45mm; padding: 2.5mm; font: 700 28pt/1.12 'Courier New', monospace;
-             text-align: right; color: #1f3550;
-             background-color: #fbfdff;
-             background-image: linear-gradient(to right, rgba(122, 190, 230, .42) 1px, transparent 1px),
-                               linear-gradient(to bottom, rgba(122, 190, 230, .42) 1px, transparent 1px);
-             background-size: 5mm 5mm; }
-  .written .line { border-bottom: 2.5px solid #1f3550; padding-bottom: 1mm; }
-  .written .answer-blank { min-height: 12mm; }
+  .written-wrap { height: 100%; display: grid; grid-template-columns: 84mm 1fr; gap: 14mm;
+                  align-items: center; padding: 0 14mm; }
+  .arithmetic-question-area { padding: 0; border: 0; border-radius: 0;
+                              background-color: #fbfdff;
+                              background-image: linear-gradient(to right, rgba(122, 190, 230, .42) 1px, transparent 1px),
+                                                linear-gradient(to bottom, rgba(122, 190, 230, .42) 1px, transparent 1px);
+                              background-size: 7mm 7mm; }
+  .written { position: relative; align-self: start; justify-self: center; width: 28mm; height: 21mm;
+             margin-top: 28mm; font: 700 18pt/7mm 'Courier New', monospace; color: #1f3550; }
+  .calculation-row { display: grid; grid-template-columns: repeat(4, 7mm); height: 7mm; }
+  .calculation-row span { display: flex; align-items: center; justify-content: center; height: 7mm; }
+  .calculation-line { position: absolute; z-index: 1; top: 14mm; left: 0; width: 28mm;
+                      border-top: 2.5px solid #1f3550; }
+  .written .answer-blank { height: 7mm; }
+  .arithmetic-prompt { padding: 3.5mm 7mm; background: rgba(255, 255, 255, .88); }
   .answer-row { margin: 3mm 0; font-size: 16pt; }
   .answer-row .blank { min-width: 42mm; }
   .figure { position: relative; height: 43mm; margin: 1mm 0 2mm; }
@@ -97,12 +103,15 @@ func build() *sheet.Doc {
 }
 
 func arithmeticPage(number int, task arithmeticTask) string {
-	content := fmt.Sprintf(`  <div class="question-area">
+	content := fmt.Sprintf(`  <div class="question-area arithmetic-question-area">
     <div class="written-wrap">
-      <div class="written">
-        <div>%d</div><div class="line">%s %d</div><div class="answer-blank"></div>
+      <div class="written" aria-label="%d %s %d">
+        %s
+        %s
+        <div class="calculation-line" aria-hidden="true"></div>
+        <div class="answer-blank"></div>
       </div>
-      <div>
+      <div class="arithmetic-prompt">
         <h2>1. Löse die Aufgabe.</h2>
         <p>Schreibe dein Ergebnis unter den Strich.</p>
       </div>
@@ -118,8 +127,13 @@ func arithmeticPage(number int, task arithmeticTask) string {
       %s
     </div>
   </div>
-`, task.Top, task.Operation, task.Bottom, sheet.Lines(8), sheet.Lines(8))
+`, task.Top, task.Operation, task.Bottom, arithmeticRow("", task.Top), arithmeticRow(task.Operation, task.Bottom), sheet.Lines(8), sheet.Lines(8))
 	return sheet.Page(fmt.Sprintf("Rechnen und prüfen &ndash; Aufgabe %d/4", number), content)
+}
+
+func arithmeticRow(operation string, value int) string {
+	return fmt.Sprintf(`<div class="calculation-row"><span>%s</span><span>%d</span><span>%d</span><span>%d</span></div>`,
+		operation, value/100, value/10%10, value%10)
 }
 
 func pricePage(number int, task priceTask) string {
