@@ -68,9 +68,9 @@ var comparisons = []comparison{
 }
 
 var orderings = []ordering{
-	{Values: "90 cm · 1 m · 8 dm · 950 mm", Answer: "8 dm < 90 cm < 950 mm < 1 m"},
-	{Values: "2 km · 1750 m · 1 km 900 m · 21 000 dm", Answer: "1750 m < 1 km 900 m < 2 km < 21 000 dm"},
-	{Values: "4 m 5 cm · 390 cm · 41 dm · 3999 mm", Answer: "390 cm < 3999 mm < 4 m 5 cm < 41 dm"},
+	{Values: "8 dm &lt; 90 cm &lt; 950 mm &lt; 1 m", Answer: "8 dm < 90 cm < 950 mm < 1 m"},
+	{Values: "1750 m &lt; 1 km 900 m &lt; 2 km &lt; 21 000 dm", Answer: "1750 m < 1 km 900 m < 2 km < 21 000 dm"},
+	{Values: "390 cm &lt; 3999 mm &lt; 4 m 5 cm &lt; 41 dm", Answer: "390 cm < 3999 mm < 4 m 5 cm < 41 dm"},
 }
 
 var wordProblems = []wordProblem{
