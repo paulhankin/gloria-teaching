@@ -24,9 +24,9 @@ cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    server: site, requests, work item pipeline
 ```
 
-Currently: `generate/math/answer_checks`, `generate/math/metric_conversions`,
-`generate/math/venn_diagrams`, `generate/math/ordinal_numbers`, and
-`generate/math/price_puzzles`.
+Currently: `generate/math/answer_checks`, `generate/math/least_common_multiple`,
+`generate/math/metric_conversions`, `generate/math/venn_diagrams`,
+`generate/math/ordinal_numbers`, and `generate/math/price_puzzles`.
 
 ## Building
 

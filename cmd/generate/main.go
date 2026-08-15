@@ -23,6 +23,7 @@ import (
 	"learningmaterial/internal/site"
 
 	_ "learningmaterial/generate/math/answer_checks"
+	_ "learningmaterial/generate/math/least_common_multiple"
 	_ "learningmaterial/generate/math/metric_conversions"
 	_ "learningmaterial/generate/math/ordinal_numbers"
 	_ "learningmaterial/generate/math/price_puzzles"
