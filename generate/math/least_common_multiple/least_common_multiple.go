@@ -76,7 +76,7 @@ func sequencePage() string {
 		fmt.Fprintf(&rows, `      <div class="sequence"><span class="sequence-number">%d.</span><b>%s</b> %s</div>
 `, i+1, task.Start, task.Missing)
 	}
-	content := fmt.Sprintf(`  <p class="intro"><b>Vielfache</b> entstehen, wenn du eine Zahl mit 1, 2, 3, 4, … multiplizierst. Zum Beispiel: Die Vielfachen von 3 sind 3, 6, 9, 12, …</p>
+	content := fmt.Sprintf(`  <p class="intro"><b>Vielfache</b> entstehen, wenn du eine Zahl mit 1, 2, 3, 4, … multiplizierst. Zum Beispiel: Vielfache von 3 sind 3, 6, 9, 12, …</p>
   <div class="starter-layout">
     <div>
       <div class="tip"><b>Auftrag:</b> Finde den Abstand und setze jede Vielfachreihe fort.</div>
