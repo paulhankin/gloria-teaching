@@ -26,7 +26,6 @@ const css = `
   .clock svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .answers { width: 100%; text-align: center; line-height: 1.8; white-space: nowrap; }
   .answers .blank { min-width: 21mm; margin-left: 1mm; }
-  .word-blank { display: inline-block; min-width: 19mm; border-bottom: 2px dotted #b6c0cf; }
   .drawing-prompt { margin: 0; color: #1f3550; font-weight: 700; font-size: 15pt; }
   .draw-note { margin: 0; color: #7a869a; font-size: 10.5pt; }
   .later-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 9mm;
@@ -87,7 +86,7 @@ func readingPage() string {
 		fmt.Fprintf(&tasks, `    <div class="clock-task">
       <span class="task-number">%d.</span>
       <div class="clock" data-clock="%s"></div>
-      <div class="answers"><span class="blank"></span> Uhr<br>halb <span class="word-blank"></span></div>
+      <div class="answers"><span class="blank"></span> Uhr</div>
     </div>
 `, i+1, task.Key)
 	}
