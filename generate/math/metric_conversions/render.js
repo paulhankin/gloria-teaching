@@ -1,8 +1,6 @@
 const SVG_NS = "http://www.w3.org/2000/svg";
 const INK = "#1f3550";
 const PINK = "#e8548c";
-const BLUE = "#2f9fd0";
-const GOLD = "#e0a01e";
 const GREEN = "#5eb85e";
 
 function node(tag, attrs = {}) {
@@ -86,26 +84,6 @@ function ladder() {
   return svg;
 }
 
-function compare() {
-  const svg = baseSVG("0 0 350 300");
-  const rc = rough.svg(svg);
-  // Balance scale
-  svg.appendChild(rc.line(175, 62, 175, 230, options(1, INK, null, 5)));
-  svg.appendChild(rc.line(92, 235, 258, 235, options(2, INK, null, 5)));
-  svg.appendChild(rc.line(65, 93, 285, 93, options(3, BLUE, null, 5)));
-  svg.appendChild(rc.circle(175, 93, 18, options(4, INK, "#fff")));
-  [[65, "<"], [285, ">"]].forEach(([x, sign], index) => {
-    svg.appendChild(rc.line(x, 93, x - 42, 174, options(10 + index, INK)));
-    svg.appendChild(rc.line(x, 93, x + 42, 174, options(12 + index, INK)));
-    svg.appendChild(rc.path(`M ${x-48} 174 Q ${x} 202 ${x+48} 174`, options(14 + index, GOLD)));
-    label(svg, x, 168, sign, "unit");
-  });
-  label(svg, 175, 285, "erst umwandeln, dann vergleichen", "small");
-  return svg;
-}
-
 document.querySelectorAll("[data-figure]").forEach((host) => {
-  const kind = host.dataset.figure;
-  if (kind === "ladder") host.appendChild(ladder());
-  if (kind === "compare") host.appendChild(compare());
+  if (host.dataset.figure === "ladder") host.appendChild(ladder());
 });

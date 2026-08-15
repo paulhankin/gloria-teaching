@@ -34,8 +34,6 @@ const css = `
   .ordering { margin: 0 0 3mm; padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; }
   .ordering p { margin: 0 0 1.5mm; }
   .order-line { height: 8mm; border-bottom: 1.5px dotted #aeb9c8; }
-  .side-figure { position: relative; flex: 1 1 auto; min-height: 35mm; }
-  .side-figure svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm 7mm; flex: 1 1 auto; min-height: 0; }
   .story-card { display: flex; flex-direction: column; min-height: 0; padding: 3mm;
                 border: 2px dashed #d8dfe8; border-radius: 10px; }
@@ -117,8 +115,7 @@ func comparisonPage() string {
 %s      </div>
     </div>
     <div style="display:flex;flex-direction:column;min-height:0">
-%s      <div class="side-figure" data-figure="compare"></div>
-    </div>
+%s    </div>
   </div>
 `, rows.String(), orders.String())
 	return sheet.Page("Längen umwandeln &ndash; 3. Vergleichen und ordnen", content)
