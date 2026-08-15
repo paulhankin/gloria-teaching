@@ -127,7 +127,7 @@ func arithmeticPage(number int, task arithmeticTask) string {
       %s
     </div>
     <div class="response-box">
-      <h3>2. Wie hast du deine Rechnung überprüft?</h3>
+      <h3>3. Wie hast du deine Rechnung überprüft?</h3>
       %s
     </div>
   </div>
@@ -159,7 +159,7 @@ func pricePage(number int, task priceTask) string {
       %s
     </div>
     <div class="response-box">
-      <h3>2. Wie hast du deine Rechnung überprüft?</h3>
+      <h3>3. Wie hast du deine Rechnung überprüft?</h3>
       %s
     </div>
   </div>
@@ -185,7 +185,7 @@ func logicPage(number int, task logicTask) string {
       %s
     </div>
     <div class="response-box">
-      <h3>2. Wie hast du deine Rechnung überprüft?</h3>
+      <h3>3. Wie hast du deine Rechnung überprüft?</h3>
       %s
     </div>
   </div>
