@@ -123,7 +123,7 @@ func arithmeticPage(number int, task arithmeticTask) string {
   </div>
   <div class="response-area">
     <div class="response-box arithmetic-check-box">
-      <h3>1. Überprüfe deine Rechnung:</h3>
+      <h3>2. Überprüfe deine Rechnung:</h3>
       %s
     </div>
     <div class="response-box">
