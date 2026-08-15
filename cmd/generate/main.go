@@ -26,6 +26,7 @@ import (
 	_ "learningmaterial/generate/math/half_hour_times"
 	_ "learningmaterial/generate/math/least_common_multiple"
 	_ "learningmaterial/generate/math/metric_conversions"
+	_ "learningmaterial/generate/math/negative_numbers"
 	_ "learningmaterial/generate/math/ordinal_numbers"
 	_ "learningmaterial/generate/math/price_puzzles"
 	_ "learningmaterial/generate/math/venn_diagrams"
