@@ -23,6 +23,7 @@ import (
 	"learningmaterial/internal/site"
 
 	_ "learningmaterial/generate/math/answer_checks"
+	_ "learningmaterial/generate/math/metric_conversions"
 	_ "learningmaterial/generate/math/ordinal_numbers"
 	_ "learningmaterial/generate/math/price_puzzles"
 	_ "learningmaterial/generate/math/venn_diagrams"
