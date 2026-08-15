@@ -81,7 +81,7 @@ func conversionPage() string {
 	for i, task := range directConversions {
 		fmt.Fprintf(&exercises, "    <div class=\"exercise\"><span class=\"exercise-number\">%d.</span>%s</div>\n", i+1, task.Prompt)
 	}
-	content := fmt.Sprintf(`  <p class="intro">Nutze die Längentreppe. Zwischen m, dm, cm und mm bedeutet ein Schritt nach rechts <b>× 10</b>, ein Schritt nach links <b>÷ 10</b>. Zwischen km und m rechnest du mit <b>1000</b>.</p>
+	content := fmt.Sprintf(`  <p class="intro">Nutze die Längentreppe. Zwischen m, dm, cm und mm bedeutet ein Schritt nach rechts <b>· 10</b>, ein Schritt nach links <b>: 10</b>. Zwischen km und m rechnest du mit <b>1000</b>.</p>
   <div class="figure" data-figure="ladder"></div>
   <div class="exercise-grid">
 %s  </div>

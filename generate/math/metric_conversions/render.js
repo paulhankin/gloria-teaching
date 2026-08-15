@@ -60,8 +60,8 @@ function drawConnector(svg, rc, from, to, factor, seed) {
   // the open gap, so neither the line nor the head crosses a box.
   drawArrow(svg, rc, fromRight, forwardY1, toLeft, forwardY2, seed, GREEN);
   drawArrow(svg, rc, toLeft, reverseY1, fromRight, reverseY2, seed + 10, PINK);
-  label(svg, middleX, (forwardY1 + forwardY2) / 2 - 10, `× ${factor}`, "factor");
-  label(svg, middleX, (reverseY1 + reverseY2) / 2 + 18, `÷ ${factor}`, "factor");
+  label(svg, middleX, (forwardY1 + forwardY2) / 2 - 10, `· ${factor}`, "factor");
+  label(svg, middleX, (reverseY1 + reverseY2) / 2 + 18, `: ${factor}`, "factor");
 }
 
 function ladder() {
