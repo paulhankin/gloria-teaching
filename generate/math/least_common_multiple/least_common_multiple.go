@@ -20,23 +20,23 @@ const css = `
   .tip { padding: 2mm 3mm; border-left: 4px solid #e0a01e; background: #fff9e8; border-radius: 5px; }
   .figure { position: relative; min-height: 0; }
   .figure svg { position: absolute; inset: 0; width: 100%; height: 100%; }
-  .starter-layout { display: grid; grid-template-columns: 1.35fr .65fr; gap: 8mm; flex: 1; min-height: 0; }
+  .starter-layout { display: flex; flex-direction: column; gap: 4mm; flex: 1; min-height: 0; }
   .sequence-list { display: grid; gap: 3mm; margin-top: 3mm; }
   .sequence { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 8px; font-size: 16pt; }
   .sequence-number { display: inline-block; width: 8mm; color: #7a869a; }
-  .starter-figure { height: 100%; }
+  .starter-figure { flex: 1; min-height: 36mm; }
   .listing-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm 7mm; flex: 1; min-height: 0; }
   .listing-card { padding: 2.5mm 3mm; border: 2px dashed #d8dfe8; border-radius: 9px; }
   .multiple-row { display: grid; grid-template-columns: 18mm 1fr; align-items: end; margin: 2mm 0; }
   .write-line { height: 7mm; border-bottom: 1.5px dotted #aeb9c8; }
   .lcm-row { margin-top: 2.5mm; padding-top: 1.5mm; border-top: 1px solid #e4e9ef; font-weight: 700; }
   .answer-box { display: inline-block; width: 18mm; height: 7mm; border: 2px dashed #e0a01e; border-radius: 5px; vertical-align: middle; }
-  .practice-layout { display: grid; grid-template-columns: 1fr 60mm; gap: 7mm; flex: 1; min-height: 0; }
+  .practice-layout { display: flex; flex-direction: column; gap: 4mm; flex: 1; min-height: 0; }
   .practice-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4mm; align-content: start; }
   .practice-card { padding: 3mm; text-align: center; border: 2px dashed #d8dfe8; border-radius: 9px; font-size: 16pt; }
   .practice-card .answer-box { margin-left: 2mm; }
   .strategy { margin-top: 5mm; padding: 3mm; border: 2px solid #bfe3cd; border-radius: 9px; background: #f5fff9; }
-  .practice-figure { height: 100%; }
+  .practice-figure { flex: 1; min-height: 42mm; }
   .story-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 5mm 7mm; flex: 1; min-height: 0; }
   .story-card { display: flex; flex-direction: column; min-height: 0; padding: 3mm; border: 2px dashed #d8dfe8; border-radius: 10px; }
   .story-card p { margin: 0 0 1.5mm; }
