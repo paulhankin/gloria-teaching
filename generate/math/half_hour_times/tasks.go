@@ -6,8 +6,9 @@ type clockTime struct {
 }
 
 type clockTask struct {
-	Key  string
-	Time clockTime
+	Key           string
+	Time          clockTime
+	ExampleAnswer string
 }
 
 type drawingTask struct {
@@ -23,7 +24,7 @@ type laterTask struct {
 
 // Worksheet tasks. Pupil-facing text stays German on purpose.
 var readingTasks = []clockTask{
-	{Key: "read-1", Time: clockTime{Hour: 1, Minute: 30}},
+	{Key: "read-1", Time: clockTime{Hour: 1, Minute: 30}, ExampleAnswer: "13:30"},
 	{Key: "read-2", Time: clockTime{Hour: 4, Minute: 30}},
 	{Key: "read-3", Time: clockTime{Hour: 7, Minute: 30}},
 	{Key: "read-4", Time: clockTime{Hour: 10, Minute: 30}},

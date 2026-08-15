@@ -83,12 +83,16 @@ func build() *sheet.Doc {
 func readingPage() string {
 	var tasks strings.Builder
 	for i, task := range readingTasks {
+		answer := `<span class="blank"></span>`
+		if task.ExampleAnswer != "" {
+			answer = task.ExampleAnswer
+		}
 		fmt.Fprintf(&tasks, `    <div class="clock-task">
       <span class="task-number">%d.</span>
       <div class="clock" data-clock="%s"></div>
-      <div class="answers"><span class="blank"></span> Uhr</div>
+      <div class="answers">%s Uhr</div>
     </div>
-`, i+1, task.Key)
+`, i+1, task.Key, answer)
 	}
 	content := fmt.Sprintf(`  <p class="tip"><b>Merke:</b> Bei einer halben Stunde zeigt der lange Minutenzeiger auf die <b>6</b>. Der kurze Stundenzeiger steht genau zwischen zwei Zahlen.</p>
   <div class="clock-grid">
