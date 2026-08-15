@@ -17,8 +17,6 @@ const css = `
   h2 { margin: 0 0 1.5mm; color: #e8548c; font: 700 21pt 'Caveat', cursive; }
   h3 { margin: 0 0 1mm; color: #e8548c; font: 700 17pt 'Caveat', cursive; }
   .intro { margin: 0 0 2mm; }
-  .tip { margin: 1mm 0 0; padding: 1.5mm 3mm; border-left: 4px solid #e0a01e;
-         background: #fff9e8; font-size: 12.5pt; }
   .figure { position: relative; flex: 0 0 51mm; min-height: 0; margin: 0 0 3mm; }
   .figure svg { position: absolute; inset: 0; width: 100%; height: 100%; }
   .exercise-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 2.3mm 10mm; }
@@ -95,7 +93,6 @@ func composedPage() string {
 		fmt.Fprintf(&exercises, "      <div class=\"exercise\"><span class=\"exercise-number\">%d.</span>%s</div>\n", i+1, task.Prompt)
 	}
 	content := fmt.Sprintf(`  <p class="intro">Zerlege oder bündle die Längen. Achte besonders auf fehlende Stellen: <b>6 m 4 cm = 6 m 0 dm 4 cm</b>.</p>
-  <div class="tip"><b>Merke:</b> 10 mm = 1 cm &nbsp;·&nbsp; 10 cm = 1 dm &nbsp;·&nbsp; 10 dm = 1 m &nbsp;·&nbsp; 1000 m = 1 km</div>
   <div class="compose-layout">
     <div class="exercise-grid">
 %s    </div>
