@@ -24,6 +24,11 @@ const css = `
   .response-box { flex: 1 1 50%; min-width: 0; padding: 3mm 4mm;
                   border: 2px dashed #d8dfe8; border-radius: 10px; }
   .response-box h3 { margin-bottom: 2mm; }
+  .arithmetic-check-box { background-color: #fbfdff;
+                          background-image: linear-gradient(to right, rgba(122, 190, 230, .42) 1px, transparent 1px),
+                                            linear-gradient(to bottom, rgba(122, 190, 230, .42) 1px, transparent 1px);
+                          background-size: 7mm 7mm; }
+  .arithmetic-check-box .writing-lines div { border-bottom: 0; }
   .written-wrap { height: 100%; display: grid; grid-template-columns: 84mm 1fr; gap: 14mm;
                   align-items: center; padding: 0 14mm; }
   .arithmetic-question-area { padding: 0; border: 0; border-radius: 0;
@@ -117,7 +122,7 @@ func arithmeticPage(number int, task arithmeticTask) string {
     </div>
   </div>
   <div class="response-area">
-    <div class="response-box">
+    <div class="response-box arithmetic-check-box">
       <h3>1. Überprüfe deine Rechnung:</h3>
       %s
     </div>

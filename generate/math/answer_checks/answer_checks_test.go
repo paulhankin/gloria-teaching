@@ -30,6 +30,9 @@ func TestArithmeticQuestionsDoNotRevealAnswersOrShowAnswerCheckPrompt(t *testing
 		if !strings.Contains(page, `class="question-area arithmetic-question-area"`) {
 			t.Errorf("question %d does not use the full question-area grid", i+1)
 		}
+		if !strings.Contains(page, `class="response-box arithmetic-check-box"`) {
+			t.Errorf("question %d does not use a grid for checking the calculation", i+1)
+		}
 
 		for _, row := range []string{
 			arithmeticRow("", task.Top),
