@@ -25,8 +25,12 @@ const css = `
                   border: 2px dashed #d8dfe8; border-radius: 10px; }
   .response-box h3 { margin-bottom: 2mm; }
   .written-wrap { height: 100%; display: flex; align-items: center; justify-content: center; gap: 18mm; }
-  .written { width: 42mm; font: 700 28pt/1.12 'Courier New', monospace;
-             text-align: right; color: #1f3550; }
+  .written { width: 45mm; padding: 2.5mm; font: 700 28pt/1.12 'Courier New', monospace;
+             text-align: right; color: #1f3550;
+             background-color: #fbfdff;
+             background-image: linear-gradient(to right, rgba(122, 190, 230, .42) 1px, transparent 1px),
+                               linear-gradient(to bottom, rgba(122, 190, 230, .42) 1px, transparent 1px);
+             background-size: 5mm 5mm; }
   .written .line { border-bottom: 2.5px solid #1f3550; padding-bottom: 1mm; }
   .written .answer-blank { min-height: 12mm; }
   .answer-row { margin: 3mm 0; font-size: 16pt; }
@@ -50,7 +54,7 @@ func init() {
 		Subject: "math",
 		Name:    "answer_checks",
 		Title:   "Rechnen und prüfen",
-		Date:    "14 Aug 2026",
+		Date:    "15 Aug 2026",
 		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Aufgaben lösen und selbst prüfen",
 		Build:   build,
 	})
