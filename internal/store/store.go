@@ -412,6 +412,28 @@ func (db *DB) scanUser(query string, arg any) (User, error) {
 	return u, nil
 }
 
+// Users returns all accounts ordered by email address.
+func (db *DB) Users() ([]User, error) {
+	rows, err := db.sql.Query(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users ORDER BY email COLLATE NOCASE`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var users []User
+	for rows.Next() {
+		var u User
+		var verified, created, updated int64
+		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &verified, &created, &updated); err != nil {
+			return nil, err
+		}
+		u.Verified = verified != 0
+		u.CreatedAt = time.Unix(created, 0)
+		u.UpdatedAt = time.Unix(updated, 0)
+		users = append(users, u)
+	}
+	return users, rows.Err()
+}
+
 // MarkUserVerified marks an account's email address as verified.
 func (db *DB) MarkUserVerified(id int64) error {
 	now := time.Now().Unix()

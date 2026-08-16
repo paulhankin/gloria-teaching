@@ -34,6 +34,8 @@ const (
 type contextKey string
 
 const emailContextKey contextKey = "account-email"
+const actorEmailContextKey contextKey = "account-actor-email"
+const adminContextKey contextKey = "account-admin"
 
 // Mailer sends account emails.
 type Mailer interface {
@@ -75,16 +77,21 @@ type Manager struct {
 	db      *store.DB
 	secret  []byte
 	allowed map[string]bool
+	admins  map[string]bool
 	mailer  Mailer
 	baseURL string
 }
 
-func New(db *store.DB, secret []byte, allowed []string, mailer Mailer, baseURL string) *Manager {
+func New(db *store.DB, secret []byte, allowed, admins []string, mailer Mailer, baseURL string) *Manager {
 	a := make(map[string]bool, len(allowed))
 	for _, email := range allowed {
 		a[normalizeEmail(email)] = true
 	}
-	return &Manager{db: db, secret: secret, allowed: a, mailer: mailer, baseURL: strings.TrimRight(baseURL, "/")}
+	adminSet := make(map[string]bool, len(admins))
+	for _, email := range admins {
+		adminSet[normalizeEmail(email)] = true
+	}
+	return &Manager{db: db, secret: secret, allowed: a, admins: adminSet, mailer: mailer, baseURL: strings.TrimRight(baseURL, "/")}
 }
 
 // Register installs public account-management routes.
@@ -92,6 +99,7 @@ func (m *Manager) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/account/create", m.create)
 	mux.HandleFunc("/account/sign-in", m.signIn)
 	mux.HandleFunc("/account/sign-out", m.signOut)
+	mux.HandleFunc("/account/impersonate", m.impersonate)
 	mux.HandleFunc("/account/verify", m.verify)
 	mux.HandleFunc("/account/forgot-password", m.forgotPassword)
 	mux.HandleFunc("/account/reset-password", m.resetPassword)
@@ -100,21 +108,35 @@ func (m *Manager) Register(mux *http.ServeMux) {
 // RequireAccess permits only signed-in accounts on the allowlist.
 func (m *Manager) RequireAccess(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		email, ok := m.sessionEmail(r)
-		if !ok || !m.allowed[email] {
+		actor, email, ok := m.sessionIdentity(r)
+		if !ok || !m.allowed[actor] {
 			nextURL := r.URL.RequestURI()
 			http.Redirect(w, r, "/account/sign-in?next="+url.QueryEscape(nextURL), http.StatusSeeOther)
 			return
 		}
 		ctx := context.WithValue(r.Context(), emailContextKey, email)
+		ctx = context.WithValue(ctx, actorEmailContextKey, actor)
+		ctx = context.WithValue(ctx, adminContextKey, m.admins[actor])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
 
-// Email returns the signed-in email address from a protected request.
+// Email returns the effective account email from a protected request.
 func Email(r *http.Request) string {
 	email, _ := r.Context().Value(emailContextKey).(string)
 	return email
+}
+
+// ActorEmail returns the account that originally signed in.
+func ActorEmail(r *http.Request) string {
+	email, _ := r.Context().Value(actorEmailContextKey).(string)
+	return email
+}
+
+// IsAdmin reports whether the signed-in account may impersonate users.
+func IsAdmin(r *http.Request) bool {
+	admin, _ := r.Context().Value(adminContextKey).(bool)
+	return admin
 }
 
 func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
@@ -200,7 +222,7 @@ func (m *Manager) signIn(w http.ResponseWriter, r *http.Request) {
 		m.render(w, pageData{Page: "message", Title: "Check your email", Message: message})
 		return
 	}
-	m.setSession(w, email)
+	m.setSession(w, email, email)
 	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
@@ -211,6 +233,33 @@ func (m *Manager) signOut(w http.ResponseWriter, r *http.Request) {
 	}
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: "", Path: "/", MaxAge: -1, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 	http.Redirect(w, r, "/account/sign-in", http.StatusSeeOther)
+}
+
+func (m *Manager) impersonate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	actor, _, ok := m.sessionIdentity(r)
+	if !ok || !m.allowed[actor] || !m.admins[actor] {
+		http.Error(w, "forbidden", http.StatusForbidden)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	target := normalizeEmail(r.FormValue("email"))
+	if target == "" {
+		target = actor
+	}
+	user, err := m.db.UserByEmail(target)
+	if err != nil {
+		http.Error(w, "user not found", http.StatusBadRequest)
+		return
+	}
+	m.setSession(w, actor, normalizeEmail(user.Email))
+	http.Redirect(w, r, safeNext(r.FormValue("next")), http.StatusSeeOther)
 }
 
 func (m *Manager) verify(w http.ResponseWriter, r *http.Request) {
@@ -346,43 +395,53 @@ func decodeToken(s string) ([]byte, error) {
 	return b, nil
 }
 
-func (m *Manager) setSession(w http.ResponseWriter, email string) {
+func (m *Manager) setSession(w http.ResponseWriter, actor, email string) {
 	exp := time.Now().Add(30 * 24 * time.Hour).Unix()
-	payload := email + "\n" + strconv.FormatInt(exp, 10)
+	payload := normalizeEmail(actor) + "\n" + normalizeEmail(email) + "\n" + strconv.FormatInt(exp, 10)
 	mac := hmac.New(sha256.New, m.secret)
 	mac.Write([]byte(payload))
 	value := base64.RawURLEncoding.EncodeToString([]byte(payload)) + "." + hex.EncodeToString(mac.Sum(nil))
 	http.SetCookie(w, &http.Cookie{Name: cookieName, Value: value, Path: "/", Expires: time.Unix(exp, 0), MaxAge: 30 * 24 * 60 * 60, HttpOnly: true, Secure: true, SameSite: http.SameSiteLaxMode})
 }
 
-func (m *Manager) sessionEmail(r *http.Request) (string, bool) {
+func (m *Manager) sessionIdentity(r *http.Request) (actor, email string, ok bool) {
 	cookie, err := r.Cookie(cookieName)
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
 	parts := strings.SplitN(cookie.Value, ".", 2)
 	if len(parts) != 2 {
-		return "", false
+		return "", "", false
 	}
 	payload, err := base64.RawURLEncoding.DecodeString(parts[0])
 	if err != nil {
-		return "", false
+		return "", "", false
 	}
 	mac := hmac.New(sha256.New, m.secret)
 	mac.Write(payload)
 	want, err := hex.DecodeString(parts[1])
 	if err != nil || !hmac.Equal(mac.Sum(nil), want) {
-		return "", false
+		return "", "", false
 	}
-	fields := strings.SplitN(string(payload), "\n", 2)
-	if len(fields) != 2 {
-		return "", false
+	fields := strings.Split(string(payload), "\n")
+	var expText string
+	switch len(fields) {
+	case 2: // Sessions issued before impersonation support.
+		actor, email, expText = fields[0], fields[0], fields[1]
+	case 3:
+		actor, email, expText = fields[0], fields[1], fields[2]
+	default:
+		return "", "", false
 	}
-	exp, err := strconv.ParseInt(fields[1], 10, 64)
+	exp, err := strconv.ParseInt(expText, 10, 64)
 	if err != nil || time.Now().Unix() > exp {
-		return "", false
+		return "", "", false
 	}
-	return normalizeEmail(fields[0]), true
+	actor, email = normalizeEmail(actor), normalizeEmail(email)
+	if actor == "" || email == "" {
+		return "", "", false
+	}
+	return actor, email, true
 }
 
 func normalizeEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }

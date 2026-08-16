@@ -64,6 +64,23 @@ func TestSignedInUserHasSignOutControl(t *testing.T) {
 	}
 }
 
+func TestAdminCanSwitchUsersAndStopImpersonating(t *testing.T) {
+	html := Index(Data{
+		User:           "teacher@example.com",
+		Actor:          "admin@example.com",
+		CanImpersonate: true,
+		Users:          []string{"admin@example.com", "teacher@example.com"},
+	})
+	for _, want := range []string{
+		"Viewing as teacher@example.com", `/account/impersonate`, "admin@example.com",
+		"teacher@example.com", "View as", "Stop impersonating",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("impersonation controls are missing %q", want)
+		}
+	}
+}
+
 func TestCompletedRequests(t *testing.T) {
 	d := Data{Requests: []store.Request{
 		{ID: 4, Status: store.StatusDone},

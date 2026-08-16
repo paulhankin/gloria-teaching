@@ -35,8 +35,14 @@ type Data struct {
 	// Static marks the offline copy written by cmd/generate: no forms,
 	// no admin controls (there is no server to talk to).
 	Static bool
-	// User is the signed-in account email on the live site.
+	// User is the effective account email on the live site.
 	User string
+	// Actor is the account that signed in; it differs from User while impersonating.
+	Actor string
+	// CanImpersonate enables the admin-only account switcher.
+	CanImpersonate bool
+	// Users lists account emails available to the account switcher.
+	Users []string
 	// Flash is an optional confirmation message shown at the top.
 	Flash string
 	// Log holds recent pipeline events (admin only, newest first).
@@ -109,6 +115,11 @@ func (d Data) Busy() bool {
 	return false
 }
 
+// Impersonating reports whether an administrator is viewing the site as another user.
+func (d Data) Impersonating() bool {
+	return d.Actor != "" && !strings.EqualFold(d.Actor, d.User)
+}
+
 // Fonts is the embedded webfont CSS.
 func (d Data) Fonts() template.CSS { return template.CSS(sheet.Asset("fonts.css")) }
 
@@ -171,9 +182,11 @@ const indexCSS = `
     padding-bottom:18px; border-bottom:1px solid var(--line); }
   h1 { font-size:26px; line-height:1.2; margin:0; }
   header p { color:var(--muted); margin:4px 0 0; }
-  .account { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px; }
+  .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
-  .account button { padding:5px 9px; }
+  .account button, .account select { padding:5px 9px; }
+  .account select { border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; }
+  .impersonation { color:#b54708; font-weight:650; }
   h2 { font-size:18px; margin:30px 0 10px; }
   .count { color:var(--muted); font-weight:400; }
   .flash { border:1px solid #86c9a8; color:#05603a; padding:10px 12px; margin:18px 0 0; }
@@ -291,7 +304,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body><div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account"><span>{{.User}}</span><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><select name="email" aria-label="View site as user">{{range .Users}}<option value="{{.}}"{{if eq . $.User}} selected{{end}}>{{.}}</option>{{end}}</select><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="email" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}

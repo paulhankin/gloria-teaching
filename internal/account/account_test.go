@@ -31,7 +31,7 @@ func testServer(t *testing.T, allowed ...string) (*httptest.Server, *fakeMailer)
 	}
 	t.Cleanup(func() { db.Close() })
 	mailer := &fakeMailer{}
-	manager := New(db, []byte("a sufficiently long test secret"), allowed, mailer, "")
+	manager := New(db, []byte("a sufficiently long test secret"), allowed, allowed, mailer, "")
 	mux := http.NewServeMux()
 	manager.Register(mux)
 	mux.Handle("/", manager.RequireAccess(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -133,6 +133,56 @@ func TestAccountOutsideAllowlistCannotAccessSite(t *testing.T) {
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "not currently allowed") {
 		t.Fatalf("sign-in response = %s", body)
+	}
+}
+
+func TestAdminCanImpersonateAnyUser(t *testing.T) {
+	db, err := store.Open(filepath.Join(t.TempDir(), "accounts.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, email := range []string{"admin@example.com", "outside-allowlist@example.com"} {
+		if _, err := db.CreateUser(email, []byte("unused")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	manager := New(db, []byte("a sufficiently long test secret"), []string{"admin@example.com"}, []string{"admin@example.com"}, nil, "")
+
+	session := httptest.NewRecorder()
+	manager.setSession(session, "admin@example.com", "admin@example.com")
+	req := httptest.NewRequest(http.MethodPost, "/account/impersonate", strings.NewReader(url.Values{
+		"email": {"outside-allowlist@example.com"},
+	}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(session.Result().Cookies()[0])
+	resp := httptest.NewRecorder()
+	manager.impersonate(resp, req)
+	if resp.Code != http.StatusSeeOther {
+		t.Fatalf("impersonate status = %d, body %s", resp.Code, resp.Body.String())
+	}
+
+	protected := manager.RequireAccess(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Write([]byte(ActorEmail(r) + " as " + Email(r)))
+	}))
+	req = httptest.NewRequest(http.MethodGet, "/", nil)
+	req.AddCookie(resp.Result().Cookies()[0])
+	view := httptest.NewRecorder()
+	protected.ServeHTTP(view, req)
+	if got := view.Body.String(); got != "admin@example.com as outside-allowlist@example.com" {
+		t.Fatalf("identity = %q", got)
+	}
+
+	nonAdminManager := New(db, []byte("a sufficiently long test secret"), []string{"admin@example.com", "outside-allowlist@example.com"}, []string{"admin@example.com"}, nil, "")
+	session = httptest.NewRecorder()
+	nonAdminManager.setSession(session, "outside-allowlist@example.com", "outside-allowlist@example.com")
+	req = httptest.NewRequest(http.MethodPost, "/account/impersonate", strings.NewReader(url.Values{"email": {"admin@example.com"}}.Encode()))
+	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+	req.AddCookie(session.Result().Cookies()[0])
+	resp = httptest.NewRecorder()
+	nonAdminManager.impersonate(resp, req)
+	if resp.Code != http.StatusForbidden {
+		t.Fatalf("non-admin impersonate status = %d", resp.Code)
 	}
 }
 

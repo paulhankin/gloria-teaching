@@ -34,14 +34,20 @@ func siteBaseURL() string {
 	return "https://gloria-teaching.exe.xyz"
 }
 
+func adminEmails() []string {
+	return []string{"paul.hankin@pobox.com", "g.n.hankin@gmail.com"}
+}
+
 func allowedEmails() []string {
 	value := os.Getenv("SITE_ALLOWED_EMAILS")
 	if value == "" {
 		value = "paul.hankin@pobox.com,g.n.hankin@gmail.com"
 	}
+	seen := make(map[string]bool)
 	var emails []string
-	for _, email := range strings.Split(value, ",") {
-		if email = strings.TrimSpace(email); email != "" {
+	for _, email := range append(strings.Split(value, ","), adminEmails()...) {
+		if email = strings.ToLower(strings.TrimSpace(email)); email != "" && !seen[email] {
+			seen[email] = true
 			emails = append(emails, email)
 		}
 	}
@@ -60,7 +66,24 @@ func index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "worksheet access: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-	d := site.Data{Worksheets: worksheets, Admin: db.AdminMode(), Flash: flash(w, r), User: account.Email(r)}
+	d := site.Data{
+		Worksheets:     worksheets,
+		Admin:          db.AdminMode(),
+		Flash:          flash(w, r),
+		User:           account.Email(r),
+		Actor:          account.ActorEmail(r),
+		CanImpersonate: account.IsAdmin(r),
+	}
+	if d.CanImpersonate {
+		users, err := db.Users()
+		if err != nil {
+			http.Error(w, "users: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		for _, user := range users {
+			d.Users = append(d.Users, user.Email)
+		}
+	}
 	rs, err := db.All()
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
@@ -450,7 +473,7 @@ func main() {
 		}
 	})
 
-	accounts := account.New(db, secret, allowedEmails(), account.GatewayMailer{}, siteBaseURL())
+	accounts := account.New(db, secret, allowedEmails(), adminEmails(), account.GatewayMailer{}, siteBaseURL())
 	public := http.NewServeMux()
 	accounts.Register(public)
 	public.Handle("/", accounts.RequireAccess(mux))
