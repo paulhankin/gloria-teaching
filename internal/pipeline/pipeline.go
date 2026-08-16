@@ -291,8 +291,12 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	}
 	b.WriteString(it.Body)
 	b.WriteString("\n\n")
-	if it.Author != "" {
-		fmt.Fprintf(&b, "Requested by: %s\n\n", it.Author)
+	requester := it.Requester
+	if requester == "" {
+		requester = it.Author
+	}
+	if requester != "" {
+		fmt.Fprintf(&b, "Requested by: %s\n\n", requester)
 	}
 	b.WriteString("Implement it. Then run `gofmt -l -w .`, `go build ./...` and `make html`, " +
 		"and commit everything on the current branch with a good commit message. " +

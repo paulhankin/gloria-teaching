@@ -37,6 +37,23 @@ func TestUpdateRequestFormSpansWorksheetTable(t *testing.T) {
 	}
 }
 
+func TestRequestFormsUseSignedInIdentity(t *testing.T) {
+	html := Index(Data{
+		User:       "teacher@example.com",
+		Worksheets: []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche"}},
+		Requests: []store.Request{{
+			ID: 7, Kind: store.KindChange, Worksheet: "math/fractions", Requester: "teacher@example.com",
+			Status: store.StatusQueued, Body: "Add another task",
+		}},
+	})
+	if strings.Contains(html, `name="author"`) || strings.Contains(html, "Your name (optional)") {
+		t.Fatal("request forms still ask the signed-in user for a name")
+	}
+	if !strings.Contains(html, "Request #7 · teacher@example.com") {
+		t.Fatal("request metadata does not use the signed-in identity")
+	}
+}
+
 func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 	html := Index(Data{
 		Worksheets: []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche"}},

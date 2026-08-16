@@ -4,8 +4,21 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"learningmaterial/internal/store"
 )
+
+func TestPromptUsesAuthenticatedRequester(t *testing.T) {
+	p := &Pipeline{}
+	got := p.prompt(store.Request{
+		Kind: store.KindNew, Body: "Make a worksheet", Requester: "teacher@example.com", Author: "Old name",
+	}, "")
+	if !strings.Contains(got, "Requested by: teacher@example.com") || strings.Contains(got, "Requested by: Old name") {
+		t.Fatalf("prompt requester attribution = %q", got)
+	}
+}
 
 func TestRevisionsUsesWorksheetGitHistory(t *testing.T) {
 	repo := t.TempDir()

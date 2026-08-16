@@ -173,7 +173,6 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 	req := store.Request{
 		Kind:      kind,
 		Worksheet: worksheet,
-		Author:    strings.TrimSpace(r.FormValue("author")),
 		Requester: account.Email(r),
 		Body:      body,
 	}

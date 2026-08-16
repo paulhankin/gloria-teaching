@@ -331,7 +331,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <tr id="request-{{.ID}}">
   <td><span class="status {{.Status}}">{{statusLabel .Status}}</span><span class="status-help">{{statusHelp .Status}}</span></td>
   <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>
-    <div class="request-meta">Request #{{.ID}}{{if .Author}} · {{.Author}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
+    <div class="request-meta">Request #{{.ID}}{{if .Requester}} · {{.Requester}}{{else if .Author}} · {{.Author}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
     {{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}
     {{if $.Admin}}{{template "actions" .}}{{end}}
   </td>
@@ -395,7 +395,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
     <form class="ask" method="POST" action="/requests">
       <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">
       <textarea name="body" required placeholder="What should change?"></textarea>
-      <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
+      <button type="submit">Send request</button>
     </form>
   </details>
 </td></tr>
@@ -411,7 +411,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <form class="ask" method="POST" action="/requests">
   <input type="hidden" name="kind" value="new">
   <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
-  <input type="text" name="author" placeholder="Your name (optional)"><button type="submit">Send request</button>
+  <button type="submit">Send request</button>
 </form></details>
 </section>
 
