@@ -184,8 +184,8 @@ const indexCSS = `
   header p { color:var(--muted); margin:4px 0 0; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
-  .account button, .account select { padding:5px 9px; }
-  .account select { border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; }
+  .account button, .account .impersonate-email { padding:5px 9px; }
+  .account .impersonate-email { width:230px; border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; font:inherit; }
   .impersonation { color:#b54708; font-weight:650; }
   h2 { font-size:18px; margin:30px 0 10px; }
   .count { color:var(--muted); font-weight:400; }
@@ -304,7 +304,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body><div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><select name="email" aria-label="View site as user">{{range .Users}}<option value="{{.}}"{{if eq . $.User}} selected{{end}}>{{.}}</option>{{end}}</select><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="email" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-email" type="email" name="email" list="impersonation-users" required placeholder="User email" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="email" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}
