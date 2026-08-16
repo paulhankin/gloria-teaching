@@ -24,6 +24,7 @@ import (
 var db *store.DB
 var pipe *pipeline.Pipeline
 var manifestPath string
+var outputRoot string
 
 const existingWorksheetOwner = "g.n.hankin@gmail.com"
 
@@ -416,14 +417,110 @@ func worksheetShareDelete(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func canServeWorksheet(path, owner string) bool {
+func publicWorksheets(manifest []site.Worksheet, username, ownerEmail string) ([]site.Worksheet, error) {
+	owned, err := ownedWorksheets(manifest, ownerEmail)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]site.Worksheet, 0, len(owned))
+	for _, ws := range owned {
+		if ws.Username == username && ws.Visibility == store.VisibilityPublic {
+			out = append(out, ws)
+		}
+	}
+	return out, nil
+}
+
+func worksheetForUser(manifest []site.Worksheet, username, name string) (site.Worksheet, bool) {
+	for _, ws := range manifest {
+		if ws.Username == username && ws.Name == name {
+			return ws, true
+		}
+	}
+	return site.Worksheet{}, false
+}
+
+func worksheetRoutes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "GET only", http.StatusMethodNotAllowed)
+		return
+	}
+	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
+	if len(parts) == 3 && parts[0] == "worksheets" && parts[2] == "index" {
+		publicWorksheetIndex(w, r, parts[1])
+		return
+	}
+	if len(parts) == 4 && parts[0] == "worksheets" && parts[2] == "sheet" {
+		serveWorksheet(w, r, parts[1], parts[3])
+		return
+	}
+	http.NotFound(w, r)
+}
+
+func publicWorksheetIndex(w http.ResponseWriter, r *http.Request, username string) {
+	owner, err := db.UserByUsername(username)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	manifest, err := site.ReadManifest(manifestPath)
+	if err != nil {
+		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	worksheets, err := publicWorksheets(manifest, owner.Username, owner.Email)
+	if err != nil {
+		http.Error(w, "worksheet access: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
+	io.WriteString(w, site.PublicIndex(site.PublicData{
+		OwnerUsername: owner.Username, ViewerUsername: account.Username(r), Worksheets: worksheets,
+	}))
+}
+
+func serveWorksheet(w http.ResponseWriter, r *http.Request, username, name string) {
+	owner, err := db.UserByUsername(username)
+	if err != nil {
+		http.NotFound(w, r)
+		return
+	}
+	manifest, err := site.ReadManifest(manifestPath)
+	if err != nil {
+		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	ws, ok := worksheetForUser(manifest, owner.Username, name)
+	if !ok {
+		http.NotFound(w, r)
+		return
+	}
+	access, err := db.WorksheetByPath(ws.Path())
+	if err != nil || !strings.EqualFold(access.OwnerEmail, owner.Email) {
+		http.NotFound(w, r)
+		return
+	}
+	allowed, err := db.CanViewWorksheet(ws.Path(), account.Email(r))
+	if err != nil {
+		http.Error(w, "worksheet access: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !allowed {
+		http.NotFound(w, r)
+		return
+	}
+	http.ServeFile(w, r, filepath.Join(outputRoot, ws.Path(), "index.html"))
+}
+
+func canServeWorksheet(path, viewerEmail string) bool {
 	path = strings.TrimPrefix(path, "/")
 	parts := strings.Split(path, "/")
 	if len(parts) < 3 {
 		return true
 	}
-	ws, err := db.WorksheetByPath(parts[0] + "/" + parts[1])
-	return err == nil && strings.EqualFold(ws.OwnerEmail, owner)
+	allowed, err := db.CanViewWorksheet(parts[0]+"/"+parts[1], viewerEmail)
+	return err == nil && allowed
 }
 
 func main() {
@@ -461,6 +558,7 @@ func main() {
 		return a
 	}
 	outputDir := abs(*dir)
+	outputRoot = outputDir
 	manifestPath = filepath.Join(outputDir, site.ManifestName)
 	manifest, err := site.ReadManifest(manifestPath)
 	if err != nil {
@@ -491,6 +589,7 @@ func main() {
 	mux.HandleFunc("/worksheets/revert", worksheetRevert)
 	mux.HandleFunc("/worksheets/shares", worksheetShare)
 	mux.HandleFunc("/worksheets/shares/delete", worksheetShareDelete)
+	mux.HandleFunc("/worksheets/", worksheetRoutes)
 	mux.HandleFunc("/work/", work)
 	mux.HandleFunc("/admin", postAdmin)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {

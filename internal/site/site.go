@@ -317,7 +317,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body><div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}
@@ -389,7 +389,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
         <button type="submit">Share</button>
       </form>
       {{if .Shares}}<ul class="share-list">{{range .Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">Remove</button></form></li>{{end}}</ul>{{end}}
-      {{else}}<span class="meta">Public discovery is not available yet.</span>{{end}}
+      {{else}}<span class="meta">Listed on <a href="/worksheets/{{$.User}}/index">your public page</a>.</span>{{end}}
     </div>
   </details>
   <details><summary>Request an update</summary>

@@ -166,10 +166,36 @@ func TestPublicWorksheetDoesNotShowShareForm(t *testing.T) {
 		Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com",
 		Visibility: store.VisibilityPublic,
 	}}})
-	if !strings.Contains(html, "Public · owner: owner@example.com") || !strings.Contains(html, "Public discovery is not available yet.") {
+	if !strings.Contains(html, "Public · owner: owner@example.com") || !strings.Contains(html, "your public page") {
 		t.Fatal("public worksheet state is missing")
 	}
 	if strings.Contains(html, `class="share-form"`) {
 		t.Fatal("public worksheet exposes private sharing form")
+	}
+}
+
+func TestPublicIndexLinksPublishedWorksheets(t *testing.T) {
+	html := PublicIndex(PublicData{
+		OwnerUsername:  "teacher",
+		ViewerUsername: "friend",
+		Worksheets: []Worksheet{{
+			Subject: "math", Name: "fractions", Title: "Brüche", Date: "16 Aug 2026",
+			Meta: "4. Klasse", Version: "abc123",
+		}},
+	})
+	for _, want := range []string{
+		"teacher's worksheets", "friend", "/worksheets/teacher/sheet/fractions",
+		"/math/fractions/index.pdf?v=abc123", "/math/fractions/solutions.pdf?v=abc123",
+	} {
+		if !strings.Contains(html, want) {
+			t.Errorf("public index is missing %q", want)
+		}
+	}
+}
+
+func TestPublicIndexEmptyState(t *testing.T) {
+	html := PublicIndex(PublicData{OwnerUsername: "teacher", ViewerUsername: "friend"})
+	if !strings.Contains(html, "no published worksheets") {
+		t.Fatal("public index has no empty state")
 	}
 }

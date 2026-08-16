@@ -156,3 +156,41 @@ func TestMigrateAssignsExistingUsernames(t *testing.T) {
 		t.Fatal("duplicate username was accepted")
 	}
 }
+
+func TestCanViewWorksheet(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	if err := db.EnsureWorksheets([]string{"math/private", "math/public"}, "owner@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetWorksheetShare("math/private", "owner@example.com", "friend@example.com", PermissionView); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.SetWorksheetVisibility("math/public", "owner@example.com", VisibilityPublic); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		path, email string
+		want        bool
+	}{
+		{"math/private", "owner@example.com", true},
+		{"math/private", "OWNER@example.com", true},
+		{"math/private", "friend@example.com", true},
+		{"math/private", "stranger@example.com", false},
+		{"math/public", "stranger@example.com", true},
+		{"math/missing", "owner@example.com", false},
+	}
+	for _, tt := range tests {
+		got, err := db.CanViewWorksheet(tt.path, tt.email)
+		if err != nil {
+			t.Errorf("CanViewWorksheet(%q, %q): %v", tt.path, tt.email, err)
+		} else if got != tt.want {
+			t.Errorf("CanViewWorksheet(%q, %q) = %v, want %v", tt.path, tt.email, got, tt.want)
+		}
+	}
+}

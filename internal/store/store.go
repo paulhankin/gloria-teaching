@@ -90,8 +90,7 @@ type AuthToken struct {
 	ExpiresAt time.Time
 }
 
-// Visibility controls whether a worksheet is private or public. Public and
-// shared worksheets are recorded now, but are not exposed to other users yet.
+// Visibility controls whether a worksheet is private or public.
 type Visibility string
 
 const (
@@ -628,6 +627,28 @@ func (db *DB) WorksheetsOwnedBy(email string) ([]WorksheetAccess, error) {
 		out = append(out, ws)
 	}
 	return out, rows.Err()
+}
+
+// CanViewWorksheet reports whether an account may view a worksheet. Owners,
+// users with an explicit share, and all signed-in users for public worksheets
+// have access.
+func (db *DB) CanViewWorksheet(path, email string) (bool, error) {
+	var allowed bool
+	err := db.sql.QueryRow(`
+		SELECT EXISTS (
+			SELECT 1
+			FROM worksheets w
+			WHERE w.worksheet = ?
+			  AND (
+				w.owner_email = ?
+				OR w.visibility = 'public'
+				OR EXISTS (
+					SELECT 1 FROM worksheet_shares s
+					WHERE s.worksheet = w.worksheet AND s.email = ?
+				)
+			)
+		)`, path, email, email).Scan(&allowed)
+	return allowed, err
 }
 
 // SetWorksheetVisibility changes a worksheet owned by owner to private or public.
