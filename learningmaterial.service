@@ -1,5 +1,5 @@
 [Unit]
-Description=Learning material static site (password protected)
+Description=Learning material site (account protected)
 After=network.target
 
 [Service]

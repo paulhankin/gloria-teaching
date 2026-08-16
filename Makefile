@@ -13,7 +13,7 @@ build:
 	go build -o bin/generate ./cmd/generate
 	go build -o bin/serve ./cmd/serve
 
-# Serve locally (password from SITE_PASSWORD)
+# Serve locally with account sign-in
 serve: html
 	go run ./cmd/serve -addr :8000 -dir output
 

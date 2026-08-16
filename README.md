@@ -43,7 +43,7 @@ PDFs use `/headless-shell/headless-shell`
 ## Deploying
 
 ```
-make serve                    # locally, password from SITE_PASSWORD
+make serve                    # locally, using account sign-in
 ```
 
 - systemd: run `make && make build`, copy `learningmaterial.service` to
@@ -53,7 +53,11 @@ make serve                    # locally, password from SITE_PASSWORD
   the updated unit, run `daemon-reload`, and restart the service.
 - Worksheet publication is dynamic; ordinary worksheet additions and content
   changes need none of those server deployment steps.
-- Configuration: `/etc/learningmaterial/env` (`SITE_PASSWORD`, `SITE_SECRET`) — not in the repo.
+- Configuration: `/etc/learningmaterial/env` (`SITE_SECRET`; optional comma-separated
+  `SITE_ALLOWED_EMAILS`, defaulting to `paul.hankin@pobox.com,g.n.hankin@gmail.com`;
+  optional `SITE_BASE_URL` for links in account emails) — not in the repo.
+- Accounts use an email address as the username. New allowlisted accounts must confirm
+  their email before signing in; password-reset links are also sent by email.
 
 ## Requests and the work item pipeline
 

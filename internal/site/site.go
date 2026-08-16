@@ -29,6 +29,8 @@ type Data struct {
 	// Static marks the offline copy written by cmd/generate: no forms,
 	// no admin controls (there is no server to talk to).
 	Static bool
+	// User is the signed-in account email on the live site.
+	User string
 	// Flash is an optional confirmation message shown at the top.
 	Flash string
 	// Log holds recent pipeline events (admin only, newest first).
@@ -162,7 +164,10 @@ const indexCSS = `
   header { display:flex; justify-content:space-between; align-items:baseline; gap:20px;
     padding-bottom:18px; border-bottom:1px solid var(--line); }
   h1 { font-size:26px; line-height:1.2; margin:0; }
-  header p { color:var(--muted); margin:0; }
+  header p { color:var(--muted); margin:4px 0 0; }
+  .account { display:flex; align-items:center; gap:10px; color:var(--muted); font-size:13px; }
+  .account form { margin:0; }
+  .account button { padding:5px 9px; }
   h2 { font-size:18px; margin:30px 0 10px; }
   .count { color:var(--muted); font-weight:400; }
   .flash { border:1px solid #86c9a8; color:#05603a; padding:10px 12px; margin:18px 0 0; }
@@ -222,6 +227,7 @@ const indexCSS = `
   @media (max-width:720px) {
     body { padding:24px 12px 48px; }
     header { display:block; }
+    .account { margin-top:10px; }
     header p { margin-top:4px; }
     table, tbody, tr, td { display:block; }
     thead { display:none; }
@@ -268,7 +274,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body><div class="wrap">
-<header><h1>Worksheets</h1><p>PDF worksheets for printing</p></header>
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account"><span>{{.User}}</span><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}

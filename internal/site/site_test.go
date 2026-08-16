@@ -55,6 +55,15 @@ func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 	}
 }
 
+func TestSignedInUserHasSignOutControl(t *testing.T) {
+	html := Index(Data{User: "paul.hankin@pobox.com"})
+	for _, want := range []string{"paul.hankin@pobox.com", `/account/sign-out`, "Sign out"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("signed-in header is missing %q", want)
+		}
+	}
+}
+
 func TestCompletedRequests(t *testing.T) {
 	d := Data{Requests: []store.Request{
 		{ID: 4, Status: store.StatusDone},

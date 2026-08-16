@@ -71,7 +71,24 @@ func (r Request) Lane() string {
 	return fmt.Sprintf("new:%d", r.ID)
 }
 
-// DB is the request database.
+// User is an account that can authenticate with an email address and password.
+type User struct {
+	ID           int64
+	Email        string
+	PasswordHash []byte
+	Verified     bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+// AuthToken is a one-time email verification or password-reset token.
+type AuthToken struct {
+	UserID    int64
+	Purpose   string
+	ExpiresAt time.Time
+}
+
+// DB is the request and account database.
 type DB struct{ sql *sql.DB }
 
 // Open opens (and migrates) the database at path.
@@ -111,7 +128,23 @@ CREATE INDEX IF NOT EXISTS requests_worksheet ON requests(worksheet);
 CREATE TABLE IF NOT EXISTS settings (
   key   TEXT PRIMARY KEY,
   value TEXT NOT NULL
-);`
+);
+CREATE TABLE IF NOT EXISTS users (
+  id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  email         TEXT NOT NULL COLLATE NOCASE UNIQUE,
+  password_hash BLOB NOT NULL,
+  verified_at   INTEGER NOT NULL DEFAULT 0,
+  created_at    INTEGER NOT NULL,
+  updated_at    INTEGER NOT NULL
+);
+CREATE TABLE IF NOT EXISTS auth_tokens (
+  token_hash BLOB PRIMARY KEY,
+  user_id    INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+  purpose    TEXT NOT NULL,
+  expires_at INTEGER NOT NULL,
+  created_at INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS auth_tokens_user ON auth_tokens(user_id, purpose);`
 	if _, err := d.Exec(schema); err != nil {
 		return err
 	}
@@ -281,4 +314,116 @@ func (db *DB) SetAdminMode(on bool) error {
 		v = "on"
 	}
 	return db.SetSetting("admin_mode", v)
+}
+
+// CreateUser creates an unverified account.
+func (db *DB) CreateUser(email string, passwordHash []byte) (User, error) {
+	now := time.Now().Unix()
+	res, err := db.sql.Exec(
+		`INSERT INTO users (email, password_hash, created_at, updated_at) VALUES (?,?,?,?)`,
+		email, passwordHash, now, now)
+	if err != nil {
+		return User{}, err
+	}
+	id, err := res.LastInsertId()
+	if err != nil {
+		return User{}, err
+	}
+	return db.UserByID(id)
+}
+
+// UserByID returns an account by ID.
+func (db *DB) UserByID(id int64) (User, error) {
+	return db.scanUser(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users WHERE id = ?`, id)
+}
+
+// UserByEmail returns an account by its case-insensitive email address.
+func (db *DB) UserByEmail(email string) (User, error) {
+	return db.scanUser(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users WHERE email = ?`, email)
+}
+
+func (db *DB) scanUser(query string, arg any) (User, error) {
+	var u User
+	var verified, created, updated int64
+	err := db.sql.QueryRow(query, arg).Scan(
+		&u.ID, &u.Email, &u.PasswordHash, &verified, &created, &updated)
+	if err != nil {
+		return User{}, err
+	}
+	u.Verified = verified != 0
+	u.CreatedAt = time.Unix(created, 0)
+	u.UpdatedAt = time.Unix(updated, 0)
+	return u, nil
+}
+
+// MarkUserVerified marks an account's email address as verified.
+func (db *DB) MarkUserVerified(id int64) error {
+	now := time.Now().Unix()
+	_, err := db.sql.Exec(
+		`UPDATE users SET verified_at = CASE WHEN verified_at = 0 THEN ? ELSE verified_at END, updated_at = ? WHERE id = ?`,
+		now, now, id)
+	return err
+}
+
+// SetUserPassword changes an account password.
+func (db *DB) SetUserPassword(id int64, passwordHash []byte) error {
+	_, err := db.sql.Exec(`UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`,
+		passwordHash, time.Now().Unix(), id)
+	return err
+}
+
+// PutAuthToken replaces a user's token for one purpose.
+func (db *DB) PutAuthToken(userID int64, purpose string, tokenHash []byte, expiresAt time.Time) error {
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM auth_tokens WHERE user_id = ? AND purpose = ?`, userID, purpose); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(
+		`INSERT INTO auth_tokens (token_hash, user_id, purpose, expires_at, created_at) VALUES (?,?,?,?,?)`,
+		tokenHash, userID, purpose, expiresAt.Unix(), time.Now().Unix()); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// ConsumeAuthToken removes and returns a valid one-time token.
+func (db *DB) ConsumeAuthToken(tokenHash []byte, purpose string) (AuthToken, error) {
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return AuthToken{}, err
+	}
+	defer tx.Rollback()
+	var t AuthToken
+	var expires int64
+	err = tx.QueryRow(
+		`SELECT user_id, purpose, expires_at FROM auth_tokens WHERE token_hash = ? AND purpose = ?`,
+		tokenHash, purpose).Scan(&t.UserID, &t.Purpose, &expires)
+	if err != nil {
+		return AuthToken{}, err
+	}
+	if time.Now().Unix() > expires {
+		_, _ = tx.Exec(`DELETE FROM auth_tokens WHERE token_hash = ?`, tokenHash)
+		if err := tx.Commit(); err != nil {
+			return AuthToken{}, err
+		}
+		return AuthToken{}, sql.ErrNoRows
+	}
+	if _, err := tx.Exec(`DELETE FROM auth_tokens WHERE token_hash = ?`, tokenHash); err != nil {
+		return AuthToken{}, err
+	}
+	if err := tx.Commit(); err != nil {
+		return AuthToken{}, err
+	}
+	t.ExpiresAt = time.Unix(expires, 0)
+	return t, nil
+}
+
+// DeleteExpiredAuthTokens removes stale verification and reset links.
+func (db *DB) DeleteExpiredAuthTokens() error {
+	_, err := db.sql.Exec(`DELETE FROM auth_tokens WHERE expires_at < ?`, time.Now().Unix())
+	return err
 }
