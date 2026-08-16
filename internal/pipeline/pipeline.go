@@ -32,6 +32,51 @@ type Config struct {
 	PreviewRoot            string // parent directory for the per-item preview builds
 	OutputDir              string // the directory cmd/serve serves
 	Push                   bool   // push main and worksheet repository changes after publication
+
+	// Sandbox enables the bubblewrap-sandboxed execution model: each request
+	// gets standalone repository clones below SandboxRoot instead of linked
+	// worktrees of the live repositories.
+	Sandbox     bool
+	SandboxRoot string // parent directory for the per-request sandboxes
+	Limits      SandboxLimits
+}
+
+// SandboxLimits bounds the resource consumption of one request sandbox. The
+// zero value is normalized by New to conservative defaults.
+type SandboxLimits struct {
+	MemoryMax         string        // cgroup memory limit, e.g. "4G"
+	TasksMax          int           // cgroup process/thread limit
+	CPUQuota          string        // cgroup CPU quota, e.g. "200%"
+	RuntimeMax        time.Duration // maximum wall time of one agent run
+	GracefulStop      time.Duration // time before a stopping sandbox is killed
+	WorkspaceMaxBytes int64         // maximum size of one request sandbox directory
+	MaxSandboxes      int           // global limit of concurrently active sandboxes
+}
+
+// withDefaults fills zero Limit fields with conservative defaults.
+func (l SandboxLimits) withDefaults() SandboxLimits {
+	if l.MemoryMax == "" {
+		l.MemoryMax = "4G"
+	}
+	if l.TasksMax <= 0 {
+		l.TasksMax = 512
+	}
+	if l.CPUQuota == "" {
+		l.CPUQuota = "200%"
+	}
+	if l.RuntimeMax <= 0 {
+		l.RuntimeMax = 90 * time.Minute
+	}
+	if l.GracefulStop <= 0 {
+		l.GracefulStop = 20 * time.Second
+	}
+	if l.WorkspaceMaxBytes <= 0 {
+		l.WorkspaceMaxBytes = 2 << 30 // 2 GiB
+	}
+	if l.MaxSandboxes <= 0 {
+		l.MaxSandboxes = 2
+	}
+	return l
 }
 
 // Pipeline runs the work items.
@@ -54,6 +99,7 @@ func New(db *store.DB, cfg Config) *Pipeline {
 	if cfg.WorksheetRoot == "" {
 		cfg.WorksheetRoot = "/users"
 	}
+	cfg.Limits = cfg.Limits.withDefaults()
 	return &Pipeline{cfg: cfg, db: db, busy: map[string]bool{}, wake: make(chan struct{}, 1)}
 }
 
@@ -190,7 +236,7 @@ func (p *Pipeline) start(it store.Request, followUp string) {
 	}()
 }
 
-// run does the actual work for one item: worktree, agent, commit, preview.
+// run does the actual work for one item: workspace, agent, commit, preview.
 func (p *Pipeline) run(it store.Request, followUp string) error {
 	cur, err := p.db.Get(it.ID)
 	if err != nil {
@@ -213,35 +259,76 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		}
 	}
 
-	worktree := it.Worktree
+	// workspace is the directory the agent works in (a linked worktree of the
+	// live repository in legacy mode, a standalone clone in sandbox mode);
+	// the requester's worksheet repository sits at generate/<username> below
+	// it in both modes. changed decides whether the agent produced commits.
+	workspace := it.Worktree
 	branch := it.Branch
-	if worktree == "" {
-		branch = fmt.Sprintf("req-%d", it.ID)
-		worktree = filepath.Join(p.cfg.WorkRoot, branch)
-		if err := p.addWorkspace(username, branch, worktree); err != nil {
+	var changed func() (bool, error)
+	var paths sandboxPaths
+	var meta sandboxMetadata
+
+	if p.cfg.Sandbox {
+		paths, err = sandboxPathsFor(p.cfg.SandboxRoot, it.ID, username)
+		if err != nil {
 			return err
 		}
-		if err := p.db.SetRun(it.ID, "", branch, worktree); err != nil {
+		if workspace == "" {
+			branch = fmt.Sprintf("req-%d", it.ID)
+			if err := p.createSandboxDirs(paths); err != nil {
+				return err
+			}
+			if _, _, err := p.createClones(username, branch, paths); err != nil {
+				return err
+			}
+			workspace = paths.Workspace
+			if err := p.db.SetRun(it.ID, "", branch, workspace); err != nil {
+				return err
+			}
+		}
+		meta, err = readMetadata(paths)
+		if err != nil {
 			return err
 		}
+		changed = func() (bool, error) { return p.cloneAhead(paths, meta) }
+	} else {
+		if workspace == "" {
+			branch = fmt.Sprintf("req-%d", it.ID)
+			workspace = filepath.Join(p.cfg.WorkRoot, branch)
+			if err := p.addWorkspace(username, branch, workspace); err != nil {
+				return err
+			}
+			if err := p.db.SetRun(it.ID, "", branch, workspace); err != nil {
+				return err
+			}
+		}
+		changed = func() (bool, error) { return p.hasCommits(branch, username) }
 	}
 
 	convID := it.ConvID
 	prompt := p.prompt(it, followUp)
 	if convID == "" {
-		p.Logf("#%d: starting the agent in %s", it.ID, worktree)
-		convID, err = p.chatNew(worktree, prompt)
+		p.Logf("#%d: starting the agent in %s", it.ID, workspace)
+		convID, err = p.chatNew(workspace, prompt)
 		if err != nil {
 			return err
 		}
-		if err := p.db.SetRun(it.ID, convID, branch, worktree); err != nil {
+		if err := p.db.SetRun(it.ID, convID, branch, workspace); err != nil {
 			return err
+		}
+		if p.cfg.Sandbox {
+			meta.ConversationID = convID
+			meta.Phase = phaseAgentRunning
+			if err := writeMetadata(paths, meta); err != nil {
+				return err
+			}
 		}
 	} else {
 		if followUp == "" {
 			// Resuming after a server restart.
 			prompt = "The server restarted while you were working. " +
-				"Check the state of the worktree, finish the work, commit it " +
+				"Check the state of the workspace, finish the work, commit it " +
 				"and summarise what you changed."
 		}
 		p.Logf("#%d: sending a refinement to the agent", it.ID)
@@ -254,20 +341,25 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 	if err != nil {
 		return err
 	}
+	if p.cfg.Sandbox {
+		if err := setPhase(paths, phaseAgentFinished); err != nil {
+			p.Logf("#%d: record sandbox phase: %v", it.ID, err)
+		}
+	}
 
-	if err := p.commitLeftovers(worktree, username, it); err != nil {
+	if err := p.commitLeftovers(workspace, username, it); err != nil {
 		return err
 	}
-	changed, err := p.hasCommits(branch, username)
+	didChange, err := changed()
 	if err != nil {
 		return err
 	}
-	if !changed {
+	if !didChange {
 		return fmt.Errorf("the agent did not commit anything: %s", firstLine(summary))
 	}
 
 	p.Logf("#%d: validating the generated worksheet", it.ID)
-	if err := p.buildPreview(it, worktree); err != nil {
+	if err := p.buildPreview(it, workspace); err != nil {
 		return fmt.Errorf("worksheet build: %w", err)
 	}
 	p.db.SetPreview(it.ID, true)
@@ -739,7 +831,7 @@ func (p *Pipeline) publish(it store.Request, summary string) error {
 		summary = "published automatically"
 	}
 	p.db.SetStatus(it.ID, store.StatusDone, summary)
-	p.removeWorktree(it)
+	p.cleanupWorkspace(it)
 	p.Logf("#%d published automatically", it.ID)
 	return nil
 }
@@ -958,7 +1050,7 @@ func (p *Pipeline) Reject(id int64) error {
 	if busy {
 		return fmt.Errorf("request #%d is busy", id)
 	}
-	p.removeWorktree(it)
+	p.cleanupWorkspace(it)
 	p.db.SetStatus(id, store.StatusRejected, "rejected")
 	p.Logf("#%d rejected", id)
 	p.Kick()
@@ -1001,7 +1093,7 @@ func (p *Pipeline) Retry(id int64) error {
 	if it.HasPreview && it.Branch != "" && it.Worktree != "" {
 		return p.publishAsync(it)
 	}
-	p.removeWorktree(it)
+	p.cleanupWorkspace(it)
 	if err := p.db.SetRun(id, "", "", ""); err != nil {
 		return err
 	}

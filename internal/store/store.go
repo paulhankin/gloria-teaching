@@ -57,7 +57,7 @@ type Request struct {
 	Status     Status
 	ConvID     string // shelley conversation driving this item
 	Branch     string // git branch with the work
-	Worktree   string // git worktree directory (absolute)
+	Worktree   string // agent workspace directory (worktree or sandbox workspace, absolute)
 	Note       string // last status message (agent summary or error)
 	HasPreview bool   // preview build available under data/preview/<id>
 	UpdatedAt  time.Time

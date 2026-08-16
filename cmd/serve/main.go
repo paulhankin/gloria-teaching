@@ -542,6 +542,8 @@ func main() {
 	workRoot := flag.String("work", "data/worktrees", "directory for the per-item git worktrees")
 	usersRoot := flag.String("users", "/users", "directory containing local per-user worksheet repositories")
 	preview := flag.String("preview", "data/preview", "directory for the per-item preview builds")
+	sandbox := flag.Bool("sandbox", false, "run agent work in per-request sandboxes with standalone repository clones")
+	sandboxRoot := flag.String("sandboxes", "data/sandboxes", "parent directory for the per-request sandboxes")
 	push := flag.Bool("push", true, "push to origin after an approved change")
 	flag.Parse()
 
@@ -590,6 +592,8 @@ func main() {
 		PreviewRoot:   abs(*preview),
 		OutputDir:     outputDir,
 		Push:          *push,
+		Sandbox:       *sandbox,
+		SandboxRoot:   abs(*sandboxRoot),
 	})
 	pipe.Start()
 
