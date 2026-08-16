@@ -12,9 +12,10 @@ type clockTask struct {
 }
 
 type drawingTask struct {
-	Key    string
-	Prompt string
-	Time   clockTime
+	Key     string
+	Prompt  string
+	Time    clockTime
+	Example bool
 }
 
 type laterTask struct {
@@ -35,7 +36,7 @@ var readingTasks = []clockTask{
 }
 
 var drawingTasks = []drawingTask{
-	{Key: "draw-1", Prompt: "halb eins", Time: clockTime{Hour: 12, Minute: 30}},
+	{Key: "draw-1", Prompt: "halb eins", Time: clockTime{Hour: 12, Minute: 30}, Example: true},
 	{Key: "draw-2", Prompt: "halb vier", Time: clockTime{Hour: 3, Minute: 30}},
 	{Key: "draw-3", Prompt: "halb sieben", Time: clockTime{Hour: 6, Minute: 30}},
 	{Key: "draw-4", Prompt: "halb zehn", Time: clockTime{Hour: 9, Minute: 30}},

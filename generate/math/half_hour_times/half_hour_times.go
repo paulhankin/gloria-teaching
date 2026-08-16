@@ -104,13 +104,19 @@ func readingPage() string {
 func drawingPage() string {
 	var tasks strings.Builder
 	for i, task := range drawingTasks {
+		blankAttribute := ` data-blank="true"`
+		note := "Zeichne beide Zeiger ein."
+		if task.Example {
+			blankAttribute = ""
+			note = "Beispiel"
+		}
 		fmt.Fprintf(&tasks, `    <div class="clock-task">
       <span class="task-number">%d.</span>
       <p class="drawing-prompt">%s</p>
-      <div class="clock" data-clock="%s" data-blank="true"></div>
-      <p class="draw-note">Zeichne beide Zeiger ein.</p>
+      <div class="clock" data-clock="%s"%s></div>
+      <p class="draw-note">%s</p>
     </div>
-`, i+1, task.Prompt, task.Key)
+`, i+1, task.Prompt, task.Key, blankAttribute, note)
 	}
 	content := fmt.Sprintf(`  <p class="tip"><b>Tipp:</b> Zeichne zuerst den langen Minutenzeiger zur <b>6</b>. Setze danach den kurzen Stundenzeiger auf die Hälfte zwischen den beiden passenden Zahlen.</p>
   <div class="clock-grid">
