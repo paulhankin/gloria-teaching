@@ -1,6 +1,7 @@
 package account
 
 import (
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/httptest"
@@ -35,7 +36,7 @@ func testServer(t *testing.T, allowed ...string) (*httptest.Server, *fakeMailer)
 	mux := http.NewServeMux()
 	manager.Register(mux)
 	mux.Handle("/", manager.RequireAccess(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte("welcome " + Email(r)))
+		w.Write([]byte("welcome " + Username(r) + " " + Email(r)))
 	})))
 	server := httptest.NewServer(mux)
 	t.Cleanup(server.Close)
@@ -80,7 +81,7 @@ func TestAllowedAccountCreationVerificationAndSignIn(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"allowed@example.com"}, "password": {"long-enough-password"},
+		"username": {"allowed-user"}, "email": {"allowed@example.com"}, "password": {"long-enough-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "Check your email") {
 		t.Fatalf("create response = %s", body)
@@ -100,7 +101,7 @@ func TestAllowedAccountCreationVerificationAndSignIn(t *testing.T) {
 	// httptest is HTTP while production is HTTPS, so preserve the Secure cookie manually.
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }
 	resp = postForm(t, client, server.URL+"/account/sign-in", url.Values{
-		"email": {"allowed@example.com"}, "password": {"long-enough-password"}, "next": {"/private"},
+		"identity": {"allowed-user"}, "password": {"long-enough-password"}, "next": {"/private"},
 	})
 	if resp.StatusCode != http.StatusSeeOther || len(resp.Cookies()) == 0 {
 		t.Fatalf("sign-in status/cookies = %d / %#v", resp.StatusCode, resp.Cookies())
@@ -111,7 +112,7 @@ func TestAllowedAccountCreationVerificationAndSignIn(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if body := responseText(t, resp); body != "welcome allowed@example.com" {
+	if body := responseText(t, resp); body != "welcome allowed-user allowed@example.com" {
 		t.Fatalf("protected response = %q", body)
 	}
 }
@@ -120,7 +121,7 @@ func TestAccountOutsideAllowlistCannotAccessSite(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"other@example.com"}, "password": {"long-enough-password"},
+		"username": {"other-user"}, "email": {"other@example.com"}, "password": {"long-enough-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "access to the site has not been granted") {
 		t.Fatalf("create response = %s", body)
@@ -129,7 +130,7 @@ func TestAccountOutsideAllowlistCannotAccessSite(t *testing.T) {
 		t.Fatalf("unexpected mail = %#v", mailer.messages)
 	}
 	resp = postForm(t, client, server.URL+"/account/sign-in", url.Values{
-		"email": {"other@example.com"}, "password": {"long-enough-password"},
+		"identity": {"other@example.com"}, "password": {"long-enough-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "not currently allowed") {
 		t.Fatalf("sign-in response = %s", body)
@@ -142,8 +143,8 @@ func TestAdminCanImpersonateAnyUser(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer db.Close()
-	for _, email := range []string{"admin@example.com", "outside-allowlist@example.com"} {
-		if _, err := db.CreateUser(email, []byte("unused")); err != nil {
+	for i, email := range []string{"admin@example.com", "outside-allowlist@example.com"} {
+		if _, err := db.CreateUser(fmt.Sprintf("user-%d", i+1), email, []byte("unused")); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -152,7 +153,7 @@ func TestAdminCanImpersonateAnyUser(t *testing.T) {
 	session := httptest.NewRecorder()
 	manager.setSession(session, "admin@example.com", "admin@example.com")
 	req := httptest.NewRequest(http.MethodPost, "/account/impersonate", strings.NewReader(url.Values{
-		"email": {"outside-allowlist@example.com"},
+		"username": {"user-2"},
 	}.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(session.Result().Cookies()[0])
@@ -163,20 +164,20 @@ func TestAdminCanImpersonateAnyUser(t *testing.T) {
 	}
 
 	protected := manager.RequireAccess(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		w.Write([]byte(ActorEmail(r) + " as " + Email(r)))
+		w.Write([]byte(ActorUsername(r) + " as " + Username(r)))
 	}))
 	req = httptest.NewRequest(http.MethodGet, "/", nil)
 	req.AddCookie(resp.Result().Cookies()[0])
 	view := httptest.NewRecorder()
 	protected.ServeHTTP(view, req)
-	if got := view.Body.String(); got != "admin@example.com as outside-allowlist@example.com" {
+	if got := view.Body.String(); got != "user-1 as user-2" {
 		t.Fatalf("identity = %q", got)
 	}
 
 	nonAdminManager := New(db, []byte("a sufficiently long test secret"), []string{"admin@example.com", "outside-allowlist@example.com"}, []string{"admin@example.com"}, nil, "")
 	session = httptest.NewRecorder()
 	nonAdminManager.setSession(session, "outside-allowlist@example.com", "outside-allowlist@example.com")
-	req = httptest.NewRequest(http.MethodPost, "/account/impersonate", strings.NewReader(url.Values{"email": {"admin@example.com"}}.Encode()))
+	req = httptest.NewRequest(http.MethodPost, "/account/impersonate", strings.NewReader(url.Values{"username": {"user-1"}}.Encode()))
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	req.AddCookie(session.Result().Cookies()[0])
 	resp = httptest.NewRecorder()
@@ -190,7 +191,7 @@ func TestPasswordReset(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"allowed@example.com"}, "password": {"long-enough-password"},
+		"username": {"allowed-user"}, "email": {"allowed@example.com"}, "password": {"long-enough-password"},
 	})
 	responseText(t, resp)
 	verifyToken := tokenFromMail(t, mailer.messages[0].body)
@@ -209,9 +210,22 @@ func TestPasswordReset(t *testing.T) {
 
 	client.CheckRedirect = func(req *http.Request, via []*http.Request) error { return http.ErrUseLastResponse }
 	resp = postForm(t, client, server.URL+"/account/sign-in", url.Values{
-		"email": {"allowed@example.com"}, "password": {"replacement-password"},
+		"identity": {"allowed@example.com"}, "password": {"replacement-password"},
 	})
 	if resp.StatusCode != http.StatusSeeOther {
 		t.Fatalf("new password sign-in status = %d, body %s", resp.StatusCode, responseText(t, resp))
+	}
+}
+
+func TestUsernameValidation(t *testing.T) {
+	for _, username := range []string{"paulhankin", "gloria-hankin2", "élève-٢", "学生-3"} {
+		if err := validUsername(username); err != nil {
+			t.Errorf("validUsername(%q) = %v", username, err)
+		}
+	}
+	for _, username := range []string{"", "PaulHankin", "has space", "under_score", "emoji-🙂", "---"} {
+		if err := validUsername(username); err == nil {
+			t.Errorf("validUsername(%q) succeeded", username)
+		}
 	}
 }

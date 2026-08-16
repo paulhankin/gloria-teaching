@@ -1,4 +1,4 @@
-// Package account provides email/password accounts for the website.
+// Package account provides username/email/password accounts for the website.
 package account
 
 import (
@@ -19,6 +19,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"unicode"
 
 	"golang.org/x/crypto/bcrypt"
 
@@ -35,6 +36,8 @@ type contextKey string
 
 const emailContextKey contextKey = "account-email"
 const actorEmailContextKey contextKey = "account-actor-email"
+const usernameContextKey contextKey = "account-username"
+const actorUsernameContextKey contextKey = "account-actor-username"
 const adminContextKey contextKey = "account-admin"
 
 // Mailer sends account emails.
@@ -114,8 +117,23 @@ func (m *Manager) RequireAccess(next http.Handler) http.Handler {
 			http.Redirect(w, r, "/account/sign-in?next="+url.QueryEscape(nextURL), http.StatusSeeOther)
 			return
 		}
+		user, err := m.db.UserByEmail(email)
+		if err != nil {
+			http.Redirect(w, r, "/account/sign-in", http.StatusSeeOther)
+			return
+		}
+		actorUser := user
+		if actor != email {
+			actorUser, err = m.db.UserByEmail(actor)
+			if err != nil {
+				http.Redirect(w, r, "/account/sign-in", http.StatusSeeOther)
+				return
+			}
+		}
 		ctx := context.WithValue(r.Context(), emailContextKey, email)
 		ctx = context.WithValue(ctx, actorEmailContextKey, actor)
+		ctx = context.WithValue(ctx, usernameContextKey, user.Username)
+		ctx = context.WithValue(ctx, actorUsernameContextKey, actorUser.Username)
 		ctx = context.WithValue(ctx, adminContextKey, m.admins[actor])
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
@@ -127,10 +145,22 @@ func Email(r *http.Request) string {
 	return email
 }
 
+// Username returns the effective account username from a protected request.
+func Username(r *http.Request) string {
+	username, _ := r.Context().Value(usernameContextKey).(string)
+	return username
+}
+
 // ActorEmail returns the account that originally signed in.
 func ActorEmail(r *http.Request) string {
 	email, _ := r.Context().Value(actorEmailContextKey).(string)
 	return email
+}
+
+// ActorUsername returns the username of the account that originally signed in.
+func ActorUsername(r *http.Request) string {
+	username, _ := r.Context().Value(actorUsernameContextKey).(string)
+	return username
 }
 
 // IsAdmin reports whether the signed-in account may impersonate users.
@@ -152,14 +182,23 @@ func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
+	username := strings.TrimSpace(r.FormValue("username"))
 	email := normalizeEmail(r.FormValue("email"))
 	password := r.FormValue("password")
+	data := pageData{Page: "create", Username: username, Email: email}
+	if err := validUsername(username); err != nil {
+		data.Error = err.Error()
+		m.render(w, data)
+		return
+	}
 	if !validEmail(email) {
-		m.render(w, pageData{Page: "create", Email: email, Error: "Enter a valid email address."})
+		data.Error = "Enter a valid email address."
+		m.render(w, data)
 		return
 	}
 	if err := validPassword(password); err != nil {
-		m.render(w, pageData{Page: "create", Email: email, Error: err.Error()})
+		data.Error = err.Error()
+		m.render(w, data)
 		return
 	}
 	hash, err := bcrypt.GenerateFromPassword([]byte(password), bcrypt.DefaultCost)
@@ -167,10 +206,16 @@ func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "could not create account", http.StatusInternalServerError)
 		return
 	}
-	user, err := m.db.CreateUser(email, hash)
+	user, err := m.db.CreateUser(username, email, hash)
 	if err != nil {
+		if _, lookupErr := m.db.UserByUsername(username); lookupErr == nil {
+			data.Error = "That username is already taken."
+			m.render(w, data)
+			return
+		}
 		if _, lookupErr := m.db.UserByEmail(email); lookupErr == nil {
-			m.render(w, pageData{Page: "create", Email: email, Error: "An account with that email address already exists."})
+			data.Error = "An account with that email address already exists."
+			m.render(w, data)
 			return
 		}
 		http.Error(w, "could not create account", http.StatusInternalServerError)
@@ -203,12 +248,16 @@ func (m *Manager) signIn(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	next = safeNext(r.FormValue("next"))
-	email := normalizeEmail(r.FormValue("email"))
-	user, err := m.db.UserByEmail(email)
+	identity := strings.TrimSpace(r.FormValue("identity"))
+	user, err := m.db.UserByEmail(normalizeEmail(identity))
+	if err != nil {
+		user, err = m.db.UserByUsername(identity)
+	}
 	if err != nil || bcrypt.CompareHashAndPassword(user.PasswordHash, []byte(r.FormValue("password"))) != nil {
-		m.render(w, pageData{Page: "sign-in", Email: email, Next: next, Error: "Email address or password is incorrect."})
+		m.render(w, pageData{Page: "sign-in", Identity: identity, Next: next, Error: "Username, email address or password is incorrect."})
 		return
 	}
+	email := normalizeEmail(user.Email)
 	if !m.allowed[email] {
 		m.render(w, pageData{Page: "message", Title: "Access not granted", Message: "Your account exists, but it is not currently allowed to access this site."})
 		return
@@ -249,11 +298,14 @@ func (m *Manager) impersonate(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "bad form", http.StatusBadRequest)
 		return
 	}
-	target := normalizeEmail(r.FormValue("email"))
+	target := strings.TrimSpace(r.FormValue("username"))
+	var user store.User
+	var err error
 	if target == "" {
-		target = actor
+		user, err = m.db.UserByEmail(actor)
+	} else {
+		user, err = m.db.UserByUsername(target)
 	}
-	user, err := m.db.UserByEmail(target)
 	if err != nil {
 		http.Error(w, "user not found", http.StatusBadRequest)
 		return
@@ -446,6 +498,32 @@ func (m *Manager) sessionIdentity(r *http.Request) (actor, email string, ok bool
 
 func normalizeEmail(s string) string { return strings.ToLower(strings.TrimSpace(s)) }
 
+func validUsername(username string) error {
+	if username == "" {
+		return errors.New("Choose a username.")
+	}
+	if len([]rune(username)) > 32 {
+		return errors.New("Use no more than 32 characters for your username.")
+	}
+	if username != strings.ToLower(username) {
+		return errors.New("Use lower-case letters for your username.")
+	}
+	hasLetterOrNumber := false
+	for _, r := range username {
+		if unicode.IsLetter(r) || unicode.IsNumber(r) {
+			hasLetterOrNumber = true
+			continue
+		}
+		if r != '-' {
+			return errors.New("Use only lower-case letters, numbers and hyphens for your username.")
+		}
+	}
+	if !hasLetterOrNumber {
+		return errors.New("Your username must include a letter or number.")
+	}
+	return nil
+}
+
 func validEmail(s string) bool {
 	addr, err := mail.ParseAddress(s)
 	return err == nil && addr.Address == s && strings.Contains(s, "@") && len(s) <= 254
@@ -485,13 +563,15 @@ func requestBaseURL(r *http.Request) string {
 }
 
 type pageData struct {
-	Page    string
-	Title   string
-	Message string
-	Error   string
-	Email   string
-	Next    string
-	Token   string
+	Page     string
+	Title    string
+	Message  string
+	Error    string
+	Username string
+	Identity string
+	Email    string
+	Next     string
+	Token    string
 }
 
 func (m *Manager) render(w http.ResponseWriter, data pageData) {
@@ -509,11 +589,11 @@ var pageTemplate = template.Must(template.New("account").Parse(`<!DOCTYPE html>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;background:#f7f8fa;color:#172033;font:15px/1.45 system-ui,sans-serif}.card{width:min(100%,420px);background:#fff;border:1px solid #d8dee8;border-radius:12px;padding:28px;box-shadow:0 8px 30px #17203312}h1{font-size:24px;margin:0 0 7px}p{color:#667085;margin:0 0 20px}label{display:block;font-weight:650;margin:13px 0 5px}input{width:100%;padding:10px 11px;border:1px solid #98a2b3;border-radius:5px;font:inherit}button{width:100%;margin-top:20px;padding:10px;border:1px solid #175cd3;border-radius:5px;background:#175cd3;color:#fff;font:inherit;font-weight:700;cursor:pointer}.error{padding:10px 12px;border:1px solid #f0b4ae;background:#fff6f5;color:#b42318;border-radius:5px;margin:14px 0}.links{display:flex;justify-content:space-between;gap:12px;margin-top:18px;font-size:14px}.links a,.single-link a{color:#175cd3}.single-link{margin-top:20px}
 </style></head><body><main class="card">
 {{if eq .Page "create"}}
-<h1>Create account</h1><p>Your email address is your username.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
-<form method="post"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required value="{{.Email}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required><button type="submit">Create account</button></form><div class="single-link"><a href="/account/sign-in">Already have an account? Sign in</a></div>
+<h1>Create account</h1><p>Choose a unique username. It may contain lower-case letters from any language, numbers and hyphens.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+<form method="post"><label for="username">Username</label><input id="username" name="username" autocomplete="username" maxlength="32" required value="{{.Username}}"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required value="{{.Email}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required><button type="submit">Create account</button></form><div class="single-link"><a href="/account/sign-in">Already have an account? Sign in</a></div>
 {{else if eq .Page "sign-in"}}
-<h1>Sign in</h1><p>Use your email address and password.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
-<form method="post"><input type="hidden" name="next" value="{{.Next}}"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required autofocus value="{{.Email}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form><div class="links"><a href="/account/create">Create account</a><a href="/account/forgot-password">Forgot password?</a></div>
+<h1>Sign in</h1><p>Use your username or email address and password.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
+<form method="post"><input type="hidden" name="next" value="{{.Next}}"><label for="identity">Username or email address</label><input id="identity" name="identity" autocomplete="username" required autofocus value="{{.Identity}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form><div class="links"><a href="/account/create">Create account</a><a href="/account/forgot-password">Forgot password?</a></div>
 {{else if eq .Page "forgot"}}
 <h1>Reset password</h1><p>Enter your account email address.</p><form method="post"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required autofocus><button type="submit">Send reset link</button></form><div class="single-link"><a href="/account/sign-in">Back to sign in</a></div>
 {{else if eq .Page "reset"}}

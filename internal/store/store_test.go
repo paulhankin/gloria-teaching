@@ -16,12 +16,16 @@ func TestUserAndAuthTokenLifecycle(t *testing.T) {
 	}
 	defer db.Close()
 
-	u, err := db.CreateUser("person@example.com", []byte("hash"))
+	u, err := db.CreateUser("person-1", "person@example.com", []byte("hash"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if u.Verified || u.Email != "person@example.com" {
+	if u.Verified || u.Username != "person-1" || u.Email != "person@example.com" {
 		t.Fatalf("new user = %#v", u)
+	}
+	byUsername, err := db.UserByUsername("person-1")
+	if err != nil || byUsername.ID != u.ID {
+		t.Fatalf("username lookup = %#v, %v", byUsername, err)
 	}
 	byEmail, err := db.UserByEmail("PERSON@example.com")
 	if err != nil || byEmail.ID != u.ID {
@@ -105,5 +109,50 @@ func TestWorksheetOwnershipVisibilityAndSharing(t *testing.T) {
 	}
 	if err := db.DeleteWorksheetShare("math/fractions", "g.n.hankin@gmail.com", "friend@example.com"); err != nil {
 		t.Fatal(err)
+	}
+}
+
+func TestMigrateAssignsExistingUsernames(t *testing.T) {
+	path := filepath.Join(t.TempDir(), "legacy.db")
+	legacy, err := sql.Open("sqlite", path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, err = legacy.Exec(`CREATE TABLE users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		email TEXT NOT NULL COLLATE NOCASE UNIQUE,
+		password_hash BLOB NOT NULL,
+		verified_at INTEGER NOT NULL DEFAULT 0,
+		created_at INTEGER NOT NULL,
+		updated_at INTEGER NOT NULL
+	);
+	INSERT INTO users (email, password_hash, created_at, updated_at) VALUES
+		('paul.hankin@pobox.com', X'00', 1, 1),
+		('g.n.hankin@gmail.com', X'00', 1, 1),
+		('other@example.com', X'00', 1, 1);`)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := legacy.Close(); err != nil {
+		t.Fatal(err)
+	}
+
+	db, err := Open(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for email, want := range map[string]string{
+		"paul.hankin@pobox.com": "paulhankin",
+		"g.n.hankin@gmail.com":  "gloriahankin",
+		"other@example.com":     "user-3",
+	} {
+		user, err := db.UserByEmail(email)
+		if err != nil || user.Username != want {
+			t.Errorf("username for %s = %q, %v; want %q", email, user.Username, err, want)
+		}
+	}
+	if _, err := db.CreateUser("paulhankin", "duplicate@example.com", []byte("hash")); err == nil {
+		t.Fatal("duplicate username was accepted")
 	}
 }

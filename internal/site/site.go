@@ -45,9 +45,9 @@ type Data struct {
 	// Static marks the offline copy written by cmd/generate: no forms,
 	// no admin controls (there is no server to talk to).
 	Static bool
-	// User is the effective account email on the live site.
+	// User is the effective account username on the live site.
 	User string
-	// Actor is the account that signed in; it differs from User while impersonating.
+	// Actor is the username that signed in; it differs from User while impersonating.
 	Actor string
 	// CanImpersonate enables the admin-only account switcher.
 	CanImpersonate bool
@@ -194,8 +194,8 @@ const indexCSS = `
   header p { color:var(--muted); margin:4px 0 0; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
-  .account button, .account .impersonate-email { padding:5px 9px; }
-  .account .impersonate-email { width:230px; border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; font:inherit; }
+  .account button, .account .impersonate-username { padding:5px 9px; }
+  .account .impersonate-username { width:230px; border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; font:inherit; }
   .impersonation { color:#b54708; font-weight:650; }
   h2 { font-size:18px; margin:30px 0 10px; }
   .count { color:var(--muted); font-weight:400; }
@@ -316,7 +316,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body><div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-email" type="email" name="email" list="impersonation-users" required placeholder="User email" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="email" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
 {{if not .Static}}
@@ -331,7 +331,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <tr id="request-{{.ID}}">
   <td><span class="status {{.Status}}">{{statusLabel .Status}}</span><span class="status-help">{{statusHelp .Status}}</span></td>
   <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>
-    <div class="request-meta">Request #{{.ID}}{{if .Requester}} · {{.Requester}}{{else if .Author}} · {{.Author}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
+    <div class="request-meta">Request #{{.ID}}{{if .Author}} · {{.Author}}{{else if .Requester}} · {{.Requester}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
     {{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}
     {{if $.Admin}}{{template "actions" .}}{{end}}
   </td>

@@ -42,14 +42,14 @@ func TestRequestFormsUseSignedInIdentity(t *testing.T) {
 		User:       "teacher@example.com",
 		Worksheets: []Worksheet{{Subject: "math", Name: "fractions", Title: "Brüche"}},
 		Requests: []store.Request{{
-			ID: 7, Kind: store.KindChange, Worksheet: "math/fractions", Requester: "teacher@example.com",
+			ID: 7, Kind: store.KindChange, Worksheet: "math/fractions", Author: "teacher", Requester: "teacher@example.com",
 			Status: store.StatusQueued, Body: "Add another task",
 		}},
 	})
 	if strings.Contains(html, `name="author"`) || strings.Contains(html, "Your name (optional)") {
 		t.Fatal("request forms still ask the signed-in user for a name")
 	}
-	if !strings.Contains(html, "Request #7 · teacher@example.com") {
+	if !strings.Contains(html, "Request #7 · teacher") {
 		t.Fatal("request metadata does not use the signed-in identity")
 	}
 }
@@ -73,8 +73,8 @@ func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 }
 
 func TestSignedInUserHasSignOutControl(t *testing.T) {
-	html := Index(Data{User: "paul.hankin@pobox.com"})
-	for _, want := range []string{"paul.hankin@pobox.com", `/account/sign-out`, "Sign out"} {
+	html := Index(Data{User: "paulhankin"})
+	for _, want := range []string{"paulhankin", `/account/sign-out`, "Sign out"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("signed-in header is missing %q", want)
 		}
@@ -83,14 +83,14 @@ func TestSignedInUserHasSignOutControl(t *testing.T) {
 
 func TestAdminCanSwitchUsersAndStopImpersonating(t *testing.T) {
 	html := Index(Data{
-		User:           "teacher@example.com",
-		Actor:          "admin@example.com",
+		User:           "teacher",
+		Actor:          "admin",
 		CanImpersonate: true,
-		Users:          []string{"admin@example.com", "teacher@example.com"},
+		Users:          []string{"admin", "teacher"},
 	})
 	for _, want := range []string{
-		"Viewing as teacher@example.com", `/account/impersonate`, "admin@example.com",
-		"teacher@example.com", "View as", "Stop impersonating",
+		"Viewing as teacher", `/account/impersonate`, "admin",
+		"teacher", "View as", "Stop impersonating",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("impersonation controls are missing %q", want)

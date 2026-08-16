@@ -1,4 +1,4 @@
-// Command serve exposes the output/ directory behind email/password accounts
+// Command serve exposes the output/ directory behind username/email/password accounts
 // and renders the interactive front page (worksheet index + request forms).
 //
 //	go run ./cmd/serve -addr :8000 -dir output -db data/requests.db
@@ -80,8 +80,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		Revisions:      revisions,
 		Admin:          db.AdminMode(),
 		Flash:          flash(w, r),
-		User:           account.Email(r),
-		Actor:          account.ActorEmail(r),
+		User:           account.Username(r),
+		Actor:          account.ActorUsername(r),
 		CanImpersonate: account.IsAdmin(r),
 	}
 	if d.CanImpersonate {
@@ -91,7 +91,7 @@ func index(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		for _, user := range users {
-			d.Users = append(d.Users, user.Email)
+			d.Users = append(d.Users, user.Username)
 		}
 	}
 	rs, err := db.All()
@@ -173,6 +173,7 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 	req := store.Request{
 		Kind:      kind,
 		Worksheet: worksheet,
+		Author:    account.Username(r),
 		Requester: account.Email(r),
 		Body:      body,
 	}

@@ -291,9 +291,9 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	}
 	b.WriteString(it.Body)
 	b.WriteString("\n\n")
-	requester := it.Requester
+	requester := it.Author
 	if requester == "" {
-		requester = it.Author
+		requester = it.Requester
 	}
 	if requester != "" {
 		fmt.Fprintf(&b, "Requested by: %s\n\n", requester)

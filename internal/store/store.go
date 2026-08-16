@@ -49,7 +49,7 @@ type Request struct {
 	ID        int64
 	Kind      Kind
 	Worksheet string // worksheet path ("math/venn_diagrams"), empty for KindNew
-	Author    string // optional display name
+	Author    string // username (or legacy optional display name)
 	Requester string // authenticated account email
 	Body      string
 	CreatedAt time.Time
@@ -72,9 +72,10 @@ func (r Request) Lane() string {
 	return fmt.Sprintf("new:%d", r.ID)
 }
 
-// User is an account that can authenticate with an email address and password.
+// User is an account that can authenticate with a username or email address and password.
 type User struct {
 	ID           int64
+	Username     string
 	Email        string
 	PasswordHash []byte
 	Verified     bool
@@ -169,6 +170,7 @@ CREATE TABLE IF NOT EXISTS settings (
 );
 CREATE TABLE IF NOT EXISTS users (
   id            INTEGER PRIMARY KEY AUTOINCREMENT,
+  username      TEXT NOT NULL UNIQUE,
   email         TEXT NOT NULL COLLATE NOCASE UNIQUE,
   password_hash BLOB NOT NULL,
   verified_at   INTEGER NOT NULL DEFAULT 0,
@@ -220,7 +222,55 @@ CREATE INDEX IF NOT EXISTS worksheet_shares_email ON worksheet_shares(email);`
 			return fmt.Errorf("store: adding column %s: %w", name, err)
 		}
 	}
+	if _, err := d.Exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''"); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return fmt.Errorf("store: adding column username: %w", err)
+	}
+	if err := migrateUsernames(d); err != nil {
+		return err
+	}
 	return nil
+}
+
+func migrateUsernames(d *sql.DB) error {
+	tx, err := d.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	for email, username := range map[string]string{
+		"paul.hankin@pobox.com": "paulhankin",
+		"g.n.hankin@gmail.com":  "gloriahankin",
+	} {
+		if _, err := tx.Exec(`UPDATE users SET username = ? WHERE email = ? AND username = ''`, username, email); err != nil {
+			return fmt.Errorf("store: assigning username %s: %w", username, err)
+		}
+	}
+	rows, err := tx.Query(`SELECT id FROM users WHERE username = '' ORDER BY id`)
+	if err != nil {
+		return err
+	}
+	var ids []int64
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			rows.Close()
+			return err
+		}
+		ids = append(ids, id)
+	}
+	if err := rows.Close(); err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := tx.Exec(`UPDATE users SET username = ? WHERE id = ?`, fmt.Sprintf("user-%d", id), id); err != nil {
+			return fmt.Errorf("store: assigning fallback username: %w", err)
+		}
+	}
+	if _, err := tx.Exec(`CREATE UNIQUE INDEX IF NOT EXISTS users_username ON users(username)`); err != nil {
+		return fmt.Errorf("store: indexing usernames: %w", err)
+	}
+	return tx.Commit()
 }
 
 // Add stores a new request and returns its ID.
@@ -373,11 +423,14 @@ func (db *DB) SetAdminMode(on bool) error {
 }
 
 // CreateUser creates an unverified account.
-func (db *DB) CreateUser(email string, passwordHash []byte) (User, error) {
+func (db *DB) CreateUser(username, email string, passwordHash []byte) (User, error) {
+	if username == "" {
+		return User{}, fmt.Errorf("store: empty username")
+	}
 	now := time.Now().Unix()
 	res, err := db.sql.Exec(
-		`INSERT INTO users (email, password_hash, created_at, updated_at) VALUES (?,?,?,?)`,
-		email, passwordHash, now, now)
+		`INSERT INTO users (username, email, password_hash, created_at, updated_at) VALUES (?,?,?,?,?)`,
+		username, email, passwordHash, now, now)
 	if err != nil {
 		return User{}, err
 	}
@@ -390,19 +443,24 @@ func (db *DB) CreateUser(email string, passwordHash []byte) (User, error) {
 
 // UserByID returns an account by ID.
 func (db *DB) UserByID(id int64) (User, error) {
-	return db.scanUser(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users WHERE id = ?`, id)
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE id = ?`, id)
 }
 
 // UserByEmail returns an account by its case-insensitive email address.
 func (db *DB) UserByEmail(email string) (User, error) {
-	return db.scanUser(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users WHERE email = ?`, email)
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE email = ?`, email)
+}
+
+// UserByUsername returns an account by its unique username.
+func (db *DB) UserByUsername(username string) (User, error) {
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE username = ?`, username)
 }
 
 func (db *DB) scanUser(query string, arg any) (User, error) {
 	var u User
 	var verified, created, updated int64
 	err := db.sql.QueryRow(query, arg).Scan(
-		&u.ID, &u.Email, &u.PasswordHash, &verified, &created, &updated)
+		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &created, &updated)
 	if err != nil {
 		return User{}, err
 	}
@@ -412,9 +470,9 @@ func (db *DB) scanUser(query string, arg any) (User, error) {
 	return u, nil
 }
 
-// Users returns all accounts ordered by email address.
+// Users returns all accounts ordered by username.
 func (db *DB) Users() ([]User, error) {
-	rows, err := db.sql.Query(`SELECT id, email, password_hash, verified_at, created_at, updated_at FROM users ORDER BY email COLLATE NOCASE`)
+	rows, err := db.sql.Query(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -423,7 +481,7 @@ func (db *DB) Users() ([]User, error) {
 	for rows.Next() {
 		var u User
 		var verified, created, updated int64
-		if err := rows.Scan(&u.ID, &u.Email, &u.PasswordHash, &verified, &created, &updated); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &created, &updated); err != nil {
 			return nil, err
 		}
 		u.Verified = verified != 0

@@ -10,12 +10,12 @@ import (
 	"learningmaterial/internal/store"
 )
 
-func TestPromptUsesAuthenticatedRequester(t *testing.T) {
+func TestPromptUsesUsername(t *testing.T) {
 	p := &Pipeline{}
 	got := p.prompt(store.Request{
-		Kind: store.KindNew, Body: "Make a worksheet", Requester: "teacher@example.com", Author: "Old name",
+		Kind: store.KindNew, Body: "Make a worksheet", Requester: "teacher@example.com", Author: "teacher",
 	}, "")
-	if !strings.Contains(got, "Requested by: teacher@example.com") || strings.Contains(got, "Requested by: Old name") {
+	if !strings.Contains(got, "Requested by: teacher") || strings.Contains(got, "Requested by: teacher@example.com") {
 		t.Fatalf("prompt requester attribution = %q", got)
 	}
 }
