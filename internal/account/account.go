@@ -131,17 +131,12 @@ func (m *Manager) create(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	email := normalizeEmail(r.FormValue("email"))
-	confirmEmail := normalizeEmail(r.FormValue("confirm_email"))
 	password := r.FormValue("password")
 	if !validEmail(email) {
 		m.render(w, pageData{Page: "create", Email: email, Error: "Enter a valid email address."})
 		return
 	}
-	if email != confirmEmail {
-		m.render(w, pageData{Page: "create", Email: email, Error: "The email addresses do not match."})
-		return
-	}
-	if err := validPassword(password, r.FormValue("confirm_password")); err != nil {
+	if err := validPassword(password); err != nil {
 		m.render(w, pageData{Page: "create", Email: email, Error: err.Error()})
 		return
 	}
@@ -282,7 +277,7 @@ func (m *Manager) resetPassword(w http.ResponseWriter, r *http.Request) {
 	}
 	tokenText = r.FormValue("token")
 	password := r.FormValue("password")
-	if err := validPassword(password, r.FormValue("confirm_password")); err != nil {
+	if err := validPassword(password); err != nil {
 		m.render(w, pageData{Page: "reset", Token: tokenText, Error: err.Error()})
 		return
 	}
@@ -397,15 +392,12 @@ func validEmail(s string) bool {
 	return err == nil && addr.Address == s && strings.Contains(s, "@") && len(s) <= 254
 }
 
-func validPassword(password, confirm string) error {
+func validPassword(password string) error {
 	if len(password) < 10 {
 		return errors.New("Use at least 10 characters for your password.")
 	}
 	if len(password) > 72 {
 		return errors.New("Use no more than 72 characters for your password.")
-	}
-	if password != confirm {
-		return errors.New("The passwords do not match.")
 	}
 	return nil
 }
@@ -459,14 +451,14 @@ var pageTemplate = template.Must(template.New("account").Parse(`<!DOCTYPE html>
 </style></head><body><main class="card">
 {{if eq .Page "create"}}
 <h1>Create account</h1><p>Your email address is your username.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
-<form method="post"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required value="{{.Email}}"><label for="confirm_email">Confirm email address</label><input id="confirm_email" name="confirm_email" type="email" autocomplete="email" required><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required><label for="confirm_password">Confirm password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" required><button type="submit">Create account</button></form><div class="single-link"><a href="/account/sign-in">Already have an account? Sign in</a></div>
+<form method="post"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required value="{{.Email}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required><button type="submit">Create account</button></form><div class="single-link"><a href="/account/sign-in">Already have an account? Sign in</a></div>
 {{else if eq .Page "sign-in"}}
 <h1>Sign in</h1><p>Use your email address and password.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}
 <form method="post"><input type="hidden" name="next" value="{{.Next}}"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required autofocus value="{{.Email}}"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required><button type="submit">Sign in</button></form><div class="links"><a href="/account/create">Create account</a><a href="/account/forgot-password">Forgot password?</a></div>
 {{else if eq .Page "forgot"}}
 <h1>Reset password</h1><p>Enter your account email address.</p><form method="post"><label for="email">Email address</label><input id="email" name="email" type="email" autocomplete="email" required autofocus><button type="submit">Send reset link</button></form><div class="single-link"><a href="/account/sign-in">Back to sign in</a></div>
 {{else if eq .Page "reset"}}
-<h1>Choose a new password</h1><p>Use at least 10 characters.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}<form method="post"><input type="hidden" name="token" value="{{.Token}}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><label for="confirm_password">Confirm new password</label><input id="confirm_password" name="confirm_password" type="password" autocomplete="new-password" minlength="10" required><button type="submit">Update password</button></form>
+<h1>Choose a new password</h1><p>Use at least 10 characters.</p>{{if .Error}}<div class="error">{{.Error}}</div>{{end}}<form method="post"><input type="hidden" name="token" value="{{.Token}}"><label for="password">New password</label><input id="password" name="password" type="password" autocomplete="new-password" minlength="10" required autofocus><button type="submit">Update password</button></form>
 {{else}}
 <h1>{{.Title}}</h1><p>{{.Message}}</p><div class="single-link"><a href="/account/sign-in">Go to sign in</a></div>
 {{end}}

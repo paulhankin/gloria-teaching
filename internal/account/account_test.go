@@ -80,8 +80,7 @@ func TestAllowedAccountCreationVerificationAndSignIn(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"allowed@example.com"}, "confirm_email": {"allowed@example.com"},
-		"password": {"long-enough-password"}, "confirm_password": {"long-enough-password"},
+		"email": {"allowed@example.com"}, "password": {"long-enough-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "Check your email") {
 		t.Fatalf("create response = %s", body)
@@ -121,8 +120,7 @@ func TestAccountOutsideAllowlistCannotAccessSite(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"other@example.com"}, "confirm_email": {"other@example.com"},
-		"password": {"long-enough-password"}, "confirm_password": {"long-enough-password"},
+		"email": {"other@example.com"}, "password": {"long-enough-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "access to the site has not been granted") {
 		t.Fatalf("create response = %s", body)
@@ -142,8 +140,7 @@ func TestPasswordReset(t *testing.T) {
 	server, mailer := testServer(t, "allowed@example.com")
 	client := server.Client()
 	resp := postForm(t, client, server.URL+"/account/create", url.Values{
-		"email": {"allowed@example.com"}, "confirm_email": {"allowed@example.com"},
-		"password": {"long-enough-password"}, "confirm_password": {"long-enough-password"},
+		"email": {"allowed@example.com"}, "password": {"long-enough-password"},
 	})
 	responseText(t, resp)
 	verifyToken := tokenFromMail(t, mailer.messages[0].body)
@@ -154,7 +151,7 @@ func TestPasswordReset(t *testing.T) {
 	responseText(t, resp)
 	resetToken := tokenFromMail(t, mailer.messages[1].body)
 	resp = postForm(t, client, server.URL+"/account/reset-password", url.Values{
-		"token": {resetToken}, "password": {"replacement-password"}, "confirm_password": {"replacement-password"},
+		"token": {resetToken}, "password": {"replacement-password"},
 	})
 	if body := responseText(t, resp); !strings.Contains(body, "Password updated") {
 		t.Fatalf("reset response = %s", body)
