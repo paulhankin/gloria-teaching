@@ -30,12 +30,16 @@ const css = `
   .draw-note { margin: 0; color: #7a869a; font-size: 10.5pt; }
   .later-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 9mm;
                 flex: 1 1 auto; min-height: 0; }
-  .later-task { display: grid; grid-template-columns: 8mm 36mm 1fr 39mm; align-items: center;
+  .later-task { display: grid; grid-template-columns: 8mm 34mm 1fr 34mm; align-items: center;
                 min-height: 0; padding: 1mm 2mm; border-bottom: 1.5px dotted #ccd5e0; }
-  .later-task .clock { width: 35mm; height: 31mm; min-height: 0; }
-  .arrow { text-align: center; color: #e8548c; font: 700 16pt 'Caveat', cursive; line-height: 1.1; }
-  .later-answer { text-align: center; white-space: nowrap; }
-  .later-answer .blank { min-width: 25mm; }
+  .later-task .clock { width: 33mm; height: 30mm; min-height: 0; }
+  .arrow { text-align: center; color: #e8548c; font: 700 15pt 'Caveat', cursive; line-height: 1.05; }
+  .later-answer { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                  align-self: stretch; min-height: 0; }
+  .later-answer .clock { flex: 1 1 auto; width: 31mm; min-height: 25mm; }
+  .time-line { display: flex; align-items: flex-end; justify-content: flex-end; width: 30mm;
+               height: 6mm; padding-right: 1mm; border-bottom: 2px dotted #b6c0cf;
+               line-height: 1; white-space: nowrap; }
   .solution-clock { display: inline-block; position: relative; width: 19mm; height: 19mm;
                     vertical-align: middle; margin-right: 2mm; }
   .solution-clock svg { position: absolute; inset: 0; width: 100%; height: 100%; }
@@ -131,10 +135,13 @@ func laterPage() string {
 		fmt.Fprintf(&tasks, `    <div class="later-task">
       <span class="task-number">%d.</span>
       <div class="clock" data-clock="%s"></div>
-      <div class="arrow">+ eine halbe<br>Stunde &rarr;</div>
-      <div class="later-answer"><span class="blank"></span><br>Uhr</div>
+      <div class="arrow">eine halbe<br>Stunde später &rarr;</div>
+      <div class="later-answer">
+        <div class="clock" data-clock="%s-answer" data-blank="true"></div>
+        <div class="time-line">Uhr</div>
+      </div>
     </div>
-`, i+1, task.Key)
+`, i+1, task.Key, task.Key)
 	}
 	content := fmt.Sprintf(`  <p class="tip"><b>Eine halbe Stunde später:</b> Zähle auf der Uhr 30 Minuten weiter. Nach <b>8:30 Uhr</b> kommt zum Beispiel <b>9:00 Uhr</b>.</p>
   <div class="later-list">
