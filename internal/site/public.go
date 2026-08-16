@@ -71,7 +71,7 @@ var publicIndexTmpl = template.Must(template.New("public-index").Parse(`<!DOCTYP
   <td><a class="title" href="/worksheets/{{$.OwnerUsername}}/sheet/{{.Name}}">{{.Title}}</a></td>
   <td class="date">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
   <td class="meta">{{.Meta}}</td>
-  <td class="actions"><a href="/{{.Path}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a href="/{{.Path}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
+  <td class="actions"><a href="/{{.OutputPath}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a href="/{{.OutputPath}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
 </tr>
 {{end}}</tbody>
 </table>

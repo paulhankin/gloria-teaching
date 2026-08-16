@@ -43,7 +43,7 @@ func TestPublishOutput(t *testing.T) {
 	root := t.TempDir()
 	build := filepath.Join(root, "build")
 	target := filepath.Join(root, "output")
-	if err := os.MkdirAll(filepath.Join(build, "math", "new_sheet"), 0o755); err != nil {
+	if err := os.MkdirAll(filepath.Join(build, "teacher", "new_sheet"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.MkdirAll(filepath.Join(target, "math", "old_sheet"), 0o755); err != nil {
@@ -55,28 +55,29 @@ func TestPublishOutput(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	write(filepath.Join(build, "math", "new_sheet", "index.html"), "new")
-	write(filepath.Join(build, site.ManifestName), `[{"subject":"math","name":"new_sheet"}]`)
+	write(filepath.Join(build, "teacher", "new_sheet", "index.html"), "new")
+	write(filepath.Join(build, site.ManifestName), `[{"username":"teacher","subject":"math","name":"new_sheet"}]`)
 	write(filepath.Join(target, "math", "old_sheet", "index.html"), "old")
 
 	if err := publishOutput(build, target); err != nil {
 		t.Fatal(err)
 	}
-	for path, want := range map[string]string{
-		filepath.Join(target, "math", "new_sheet", "index.html"): "new",
-		filepath.Join(target, "math", "old_sheet", "index.html"): "old",
-	} {
-		got, err := os.ReadFile(path)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if string(got) != want {
-			t.Fatalf("%s = %q, want %q", path, got, want)
-		}
-	}
 	worksheets, err := site.ReadManifest(filepath.Join(target, site.ManifestName))
 	if err != nil {
 		t.Fatal(err)
+	}
+	if err := pruneOutput(target, worksheets); err != nil {
+		t.Fatal(err)
+	}
+	got, err := os.ReadFile(filepath.Join(target, "teacher", "new_sheet", "index.html"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if string(got) != "new" {
+		t.Fatalf("published worksheet = %q, want new", got)
+	}
+	if _, err := os.Stat(filepath.Join(target, "math", "old_sheet")); !os.IsNotExist(err) {
+		t.Fatalf("stale worksheet was not removed: %v", err)
 	}
 	if len(worksheets) != 1 || worksheets[0].Path() != "math/new_sheet" {
 		t.Fatalf("published manifest = %#v", worksheets)

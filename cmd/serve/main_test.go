@@ -8,6 +8,33 @@ import (
 	"learningmaterial/internal/store"
 )
 
+func TestCanServeWorksheetUsesGeneratedUsernamePath(t *testing.T) {
+	root := t.TempDir()
+	testDB, err := store.Open(filepath.Join(root, "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer testDB.Close()
+	manifest := filepath.Join(root, site.ManifestName)
+	if err := site.WriteManifest(manifest, []site.Worksheet{{Username: "teacher", Subject: "math", Name: "fractions"}}); err != nil {
+		t.Fatal(err)
+	}
+	if err := testDB.EnsureWorksheets([]string{"math/fractions"}, "teacher@example.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	oldDB, oldManifest := db, manifestPath
+	db, manifestPath = testDB, manifest
+	defer func() { db, manifestPath = oldDB, oldManifest }()
+
+	if !canServeWorksheet("/teacher/fractions/index.pdf", "teacher@example.com") {
+		t.Fatal("generated username path was denied")
+	}
+	if canServeWorksheet("/math/fractions/index.pdf", "teacher@example.com") {
+		t.Fatal("old subject path was still accepted")
+	}
+}
+
 func TestPublicWorksheetsFiltersByUsernameAndVisibility(t *testing.T) {
 	testDB, err := store.Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

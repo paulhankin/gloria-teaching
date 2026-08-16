@@ -1,4 +1,4 @@
-// Command generate builds every worksheet into output/<subject>/<name>/.
+// Command generate builds every worksheet into output/<username>/<name>/.
 //
 //	go run ./cmd/generate            # HTML + PDF for all worksheets
 //	go run ./cmd/generate -pdf=false # HTML only (fast)
@@ -50,7 +50,7 @@ func main() {
 		if !matches(w, filters) {
 			continue
 		}
-		dir := filepath.Join(buildDir, w.Subject, w.Name)
+		dir := filepath.Join(buildDir, w.OutputPath())
 		if err := os.MkdirAll(dir, 0o755); err != nil {
 			log.Fatal(err)
 		}
@@ -82,7 +82,7 @@ func main() {
 			}
 		}
 		built = append(built, w)
-		version, err := worksheetVersion(buildDir, w.Path())
+		version, err := worksheetVersion(buildDir, w.OutputPath())
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -101,7 +101,7 @@ func main() {
 		if versions[w.Path()] != "" {
 			continue
 		}
-		version, err := worksheetVersion(target, w.Path())
+		version, err := worksheetVersion(target, w.OutputPath())
 		if err != nil && !os.IsNotExist(err) {
 			log.Fatal(err)
 		}
@@ -119,7 +119,58 @@ func main() {
 	if err := publishOutput(buildDir, target); err != nil {
 		log.Fatal(err)
 	}
+	if err := pruneOutput(target, worksheets); err != nil {
+		log.Fatal(err)
+	}
 	fmt.Println(filepath.Join(target, "index.html"))
+}
+
+func pruneOutput(target string, worksheets []site.Worksheet) error {
+	valid := make(map[string]bool, len(worksheets))
+	for _, ws := range worksheets {
+		valid[filepath.Clean(ws.OutputPath())] = true
+	}
+	users, err := os.ReadDir(target)
+	if err != nil {
+		return err
+	}
+	for _, user := range users {
+		if !user.IsDir() {
+			continue
+		}
+		userDir := filepath.Join(target, user.Name())
+		sheets, err := os.ReadDir(userDir)
+		if err != nil {
+			return err
+		}
+		for _, worksheet := range sheets {
+			if !worksheet.IsDir() {
+				continue
+			}
+			rel := filepath.Join(user.Name(), worksheet.Name())
+			if valid[rel] {
+				continue
+			}
+			dir := filepath.Join(userDir, worksheet.Name())
+			if _, err := os.Stat(filepath.Join(dir, "index.html")); err == nil {
+				if err := os.RemoveAll(dir); err != nil {
+					return err
+				}
+			} else if !os.IsNotExist(err) {
+				return err
+			}
+		}
+		remaining, err := os.ReadDir(userDir)
+		if err != nil {
+			return err
+		}
+		if len(remaining) == 0 {
+			if err := os.Remove(userDir); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func publishOutput(buildDir, target string) error {

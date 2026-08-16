@@ -510,7 +510,7 @@ func serveWorksheet(w http.ResponseWriter, r *http.Request, username, name strin
 		http.NotFound(w, r)
 		return
 	}
-	http.ServeFile(w, r, filepath.Join(outputRoot, ws.Path(), "index.html"))
+	http.ServeFile(w, r, filepath.Join(outputRoot, ws.OutputPath(), "index.html"))
 }
 
 func canServeWorksheet(path, viewerEmail string) bool {
@@ -519,8 +519,19 @@ func canServeWorksheet(path, viewerEmail string) bool {
 	if len(parts) < 3 {
 		return true
 	}
-	allowed, err := db.CanViewWorksheet(parts[0]+"/"+parts[1], viewerEmail)
-	return err == nil && allowed
+	manifest, err := site.ReadManifest(manifestPath)
+	if err != nil {
+		return false
+	}
+	outputPath := parts[0] + "/" + parts[1]
+	for _, ws := range manifest {
+		if ws.OutputPath() != outputPath {
+			continue
+		}
+		allowed, err := db.CanViewWorksheet(ws.Path(), viewerEmail)
+		return err == nil && allowed
+	}
+	return false
 }
 
 func main() {
@@ -529,6 +540,7 @@ func main() {
 	dbPath := flag.String("db", "data/requests.db", "SQLite database with the requests")
 	repo := flag.String("repo", ".", "git checkout the pipeline works on")
 	workRoot := flag.String("work", "data/worktrees", "directory for the per-item git worktrees")
+	usersRoot := flag.String("users", "/users", "directory containing local per-user worksheet repositories")
 	preview := flag.String("preview", "data/preview", "directory for the per-item preview builds")
 	push := flag.Bool("push", true, "push to origin after an approved change")
 	flag.Parse()
@@ -572,11 +584,12 @@ func main() {
 		log.Fatalf("worksheet access: %v", err)
 	}
 	pipe = pipeline.New(db, pipeline.Config{
-		Repo:        abs(*repo),
-		WorkRoot:    abs(*workRoot),
-		PreviewRoot: abs(*preview),
-		OutputDir:   outputDir,
-		Push:        *push,
+		Repo:          abs(*repo),
+		WorksheetRoot: abs(*usersRoot),
+		WorkRoot:      abs(*workRoot),
+		PreviewRoot:   abs(*preview),
+		OutputDir:     outputDir,
+		Push:          *push,
 	})
 	pipe.Start()
 

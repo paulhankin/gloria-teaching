@@ -16,9 +16,10 @@ internal/pdf/                 HTML -> PDF via headless Chrome (CDP, own WS clien
 internal/store/               SQLite: requests / work items and settings
 internal/pipeline/            drives work items through the agent
 internal/site/                the front page (worksheet index + request/review UI)
-generate/<username>/          local Git repo containing all worksheets owned by that user
+users/<username>/             represented on disk as /users/<username>; local Git repository
   <sheet>/                    one worksheet package (Go + render.js)
-output/<subject>/<sheet>/     generated index.html/.pdf + solutions.html/.pdf
+generate/<username>/          ignored build-time symlink or isolated request worktree
+output/<username>/<sheet>/    generated index.html/.pdf + solutions.html/.pdf
 output/worksheets.json         runtime worksheet catalog (generated atomically)
 data/                         database, worktrees, previews (not in the repo)
 cmd/generate/                 builds all worksheets + the index page
@@ -26,10 +27,10 @@ cmd/serve/                    server: site, requests, work item pipeline
 ```
 
 The worksheet source is deliberately not stored in the main GitHub repository.
-Each first-level directory below `generate/` is an independent local repository;
-for example, the existing worksheets live in the local
-`generate/gloriahankin/` repository. `make` discovers its packages and writes an
-ignored import file before compiling the generator.
+Each `/users/<username>/` directory is an independent local repository; for
+example, the existing worksheets live in `/users/gloriahankin/`. `make`
+discovers these repositories, creates ignored package symlinks under
+`generate/`, and writes an ignored import file before compiling the generator.
 
 ## Building
 
@@ -101,11 +102,11 @@ queued -> working -> review -> done (approved: merged + pushed)
   **Reject**, **Refine** (free text sent back into the same conversation) and
   **Retry** for failed items, plus a log of recent pipeline events.
 
-Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
+Server flags: `-repo`, `-users`, `-work`, `-preview`, `-db`, `-push`.
 
 ## Adding a worksheet
 
-1. Ensure `generate/<username>/` is a Git repository on branch `main` (the
+1. Ensure `/users/<username>/` is a Git repository on branch `main` (the
    request pipeline creates it automatically), then create `<name>/` inside it.
 2. In `init()` call `sheet.Register(sheet.Worksheet{Username, Subject, Name, Title, Meta, Build})`.
 3. `Build() *sheet.Doc` returns the title, extra CSS, worksheet body and

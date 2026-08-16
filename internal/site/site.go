@@ -34,6 +34,9 @@ type Revision struct {
 
 func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
 
+// OutputPath is the generated-file location below the output root.
+func (w Worksheet) OutputPath() string { return w.Username + "/" + w.Name }
+
 // Private reports whether the worksheet can have explicit shares.
 func (w Worksheet) Private() bool { return w.Visibility == store.VisibilityPrivate }
 
@@ -359,7 +362,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
     {{$rs := $.ChangeRequests .}}
     {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
   </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{.Path}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{.Path}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
+  <td class="row-actions"><a class="pdf" href="{{.OutputPath}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{.OutputPath}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
 </tr>
 {{if not $.Static}}
 <tr class="worksheet-request"><td colspan="5">

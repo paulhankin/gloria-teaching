@@ -1,5 +1,6 @@
 /output/
 /bin/
 /data/
-/generate/*/
+/generate/*
+!/generate/README.md
 /cmd/generate/worksheets_local.go

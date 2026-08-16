@@ -26,7 +26,7 @@ import (
 // Config describes where the pipeline works.
 type Config struct {
 	Repo          string // main git checkout (the served one)
-	WorksheetRoot string // local per-user repositories; defaults to Repo/generate
+	WorksheetRoot string // local per-user repositories; defaults to /users
 	WorkRoot      string // parent directory for the per-item worktrees
 	PreviewRoot   string // parent directory for the per-item preview builds
 	OutputDir     string // the directory cmd/serve serves
@@ -49,7 +49,7 @@ type Pipeline struct {
 // New creates a pipeline. Start must be called to run it.
 func New(db *store.DB, cfg Config) *Pipeline {
 	if cfg.WorksheetRoot == "" {
-		cfg.WorksheetRoot = filepath.Join(cfg.Repo, "generate")
+		cfg.WorksheetRoot = "/users"
 	}
 	return &Pipeline{cfg: cfg, db: db, busy: map[string]bool{}, wake: make(chan struct{}, 1)}
 }

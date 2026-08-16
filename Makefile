@@ -1,3 +1,5 @@
+.DEFAULT_GOAL := all
+
 .PHONY: all html serve build clean prepare
 
 # Discover worksheet packages in the local per-user repositories.

@@ -9,6 +9,7 @@ EnvironmentFile=/etc/learningmaterial/env
 ExecStart=/home/exedev/learningmaterial/bin/serve -addr :8000 \
   -dir /home/exedev/learningmaterial/output \
   -repo /home/exedev/learningmaterial \
+  -users /users \
   -db /home/exedev/learningmaterial/data/requests.db \
   -work /home/exedev/learningmaterial/data/worktrees \
   -preview /home/exedev/learningmaterial/data/preview

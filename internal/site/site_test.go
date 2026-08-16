@@ -9,11 +9,11 @@ import (
 
 func TestWorksheetIndexLinksWorksheetAndSolutionsPDFs(t *testing.T) {
 	html := Index(Data{Static: true, Worksheets: []Worksheet{{
-		Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "4. Klasse · Lösungen", Version: "abc123",
+		Username: "gloriahankin", Subject: "math", Name: "fractions", Title: "Brüche", Date: "12 Aug 2026", Meta: "4. Klasse · Lösungen", Version: "abc123",
 	}}})
 	for _, want := range []string{
 		"<table", "Brüche", "12 Aug 2026", "Worksheet PDF", "Solutions PDF",
-		"math/fractions/index.pdf?v=abc123", "math/fractions/solutions.pdf?v=abc123",
+		"gloriahankin/fractions/index.pdf?v=abc123", "gloriahankin/fractions/solutions.pdf?v=abc123",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("index is missing %q", want)
@@ -179,13 +179,13 @@ func TestPublicIndexLinksPublishedWorksheets(t *testing.T) {
 		OwnerUsername:  "teacher",
 		ViewerUsername: "friend",
 		Worksheets: []Worksheet{{
-			Subject: "math", Name: "fractions", Title: "Brüche", Date: "16 Aug 2026",
+			Username: "teacher", Subject: "math", Name: "fractions", Title: "Brüche", Date: "16 Aug 2026",
 			Meta: "4. Klasse", Version: "abc123",
 		}},
 	})
 	for _, want := range []string{
 		"teacher's worksheets", "friend", "/worksheets/teacher/sheet/fractions",
-		"/math/fractions/index.pdf?v=abc123", "/math/fractions/solutions.pdf?v=abc123",
+		"/teacher/fractions/index.pdf?v=abc123", "/teacher/fractions/solutions.pdf?v=abc123",
 	} {
 		if !strings.Contains(html, want) {
 			t.Errorf("public index is missing %q", want)

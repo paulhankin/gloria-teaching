@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"go/format"
 	"log"
@@ -10,10 +11,29 @@ import (
 	"strings"
 )
 
-const outputPath = "cmd/generate/worksheets_local.go"
+const (
+	outputPath       = "cmd/generate/worksheets_local.go"
+	localGenerateDir = "generate"
+	defaultUsersRoot = "/users"
+)
 
 func main() {
-	packages, err := worksheetPackages("generate")
+	usersRoot := flag.String("users", "", "directory containing per-user worksheet repositories")
+	flag.Parse()
+
+	root := *usersRoot
+	if root == "" {
+		root = defaultUsersRoot
+		if hasLocalUserDirectories(localGenerateDir) {
+			root = localGenerateDir
+		}
+	}
+	if filepath.Clean(root) != filepath.Clean(localGenerateDir) {
+		if err := linkUserRepositories(root, localGenerateDir); err != nil {
+			log.Fatal(err)
+		}
+	}
+	packages, err := worksheetPackages(root)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -32,6 +52,56 @@ func main() {
 	if err := os.WriteFile(outputPath, data, 0o644); err != nil {
 		log.Fatal(err)
 	}
+}
+
+func hasLocalUserDirectories(root string) bool {
+	entries, err := os.ReadDir(root)
+	if err != nil {
+		return false
+	}
+	for _, entry := range entries {
+		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+			return true
+		}
+	}
+	return false
+}
+
+func linkUserRepositories(usersRoot, generateDir string) error {
+	users, err := os.ReadDir(usersRoot)
+	if os.IsNotExist(err) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	if err := os.MkdirAll(generateDir, 0o755); err != nil {
+		return err
+	}
+	for _, user := range users {
+		if !user.IsDir() || strings.HasPrefix(user.Name(), ".") {
+			continue
+		}
+		source, err := filepath.Abs(filepath.Join(usersRoot, user.Name()))
+		if err != nil {
+			return err
+		}
+		link := filepath.Join(generateDir, user.Name())
+		current, err := os.Readlink(link)
+		if err == nil {
+			if current != source {
+				return fmt.Errorf("%s links to %s, want %s", link, current, source)
+			}
+			continue
+		}
+		if !os.IsNotExist(err) {
+			return fmt.Errorf("%s exists and is not a symlink", link)
+		}
+		if err := os.Symlink(source, link); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 func worksheetPackages(root string) ([]string, error) {
@@ -63,7 +133,7 @@ func worksheetPackages(root string) ([]string, error) {
 			}
 			for _, entry := range entries {
 				if !entry.IsDir() && strings.HasSuffix(entry.Name(), ".go") && !strings.HasSuffix(entry.Name(), "_test.go") {
-					packages = append(packages, dir)
+					packages = append(packages, filepath.Join(localGenerateDir, user.Name(), sheet.Name()))
 					break
 				}
 			}

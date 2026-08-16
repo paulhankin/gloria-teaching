@@ -1,9 +1,9 @@
 // Package sheet is the mini framework for worksheets.
 //
 // A worksheet's code lives in the local per-user Git repository
-// generate/<username>/<name>/ and registers itself via Register(). The
-// generator (cmd/generate) turns it into
-// output/<subject>/<name>/index.{html,pdf} and solutions.{html,pdf}.
+// /users/<username>/<name>/ and is exposed to the Go build below generate/.
+// It registers itself via Register(). The generator (cmd/generate) turns it into
+// output/<username>/<name>/index.{html,pdf} and solutions.{html,pdf}.
 package sheet
 
 import (
@@ -39,6 +39,9 @@ type Worksheet struct {
 
 // Path is the output path relative to the output directory.
 func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
+
+// OutputPath is the generated-file location below the output root.
+func (w Worksheet) OutputPath() string { return w.Username + "/" + w.Name }
 
 var registry []Worksheet
 
