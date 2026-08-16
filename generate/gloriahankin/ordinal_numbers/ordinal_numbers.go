@@ -34,12 +34,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "ordinal_numbers",
-		Title:   "Ordinalzahlen",
-		Date:    "12 Aug 2026",
-		Meta:    "Jüngere Primarstufe · 3 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "ordinal_numbers",
+		Title:    "Ordinalzahlen",
+		Date:     "12 Aug 2026",
+		Meta:     "Jüngere Primarstufe · 3 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

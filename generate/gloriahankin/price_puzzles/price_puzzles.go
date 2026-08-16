@@ -45,12 +45,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "price_puzzles",
-		Title:   "Preisrätsel",
-		Date:    "12 Aug 2026",
-		Meta:    "Mathe und Deutsch · 8 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "price_puzzles",
+		Title:    "Preisrätsel",
+		Date:     "12 Aug 2026",
+		Meta:     "Mathe und Deutsch · 8 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

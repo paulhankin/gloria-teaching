@@ -40,12 +40,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "negative_numbers",
-		Title:   "Negative Zahlen",
-		Date:    "15 Aug 2026",
-		Meta:    "Primarschule / Unterstufe · einfache Minusaufgaben mit Zahlenstrahl · 1 Aufgabenblatt + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "negative_numbers",
+		Title:    "Negative Zahlen",
+		Date:     "15 Aug 2026",
+		Meta:     "Primarschule / Unterstufe · einfache Minusaufgaben mit Zahlenstrahl · 1 Aufgabenblatt + Lösungen",
+		Build:    build,
 	})
 }
 

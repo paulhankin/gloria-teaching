@@ -48,12 +48,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "venn_diagrams",
-		Title:   "Venn-Diagramme",
-		Date:    "12 Aug 2026",
-		Meta:    "Ca. 9 Jahre · 4 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "venn_diagrams",
+		Title:    "Venn-Diagramme",
+		Date:     "12 Aug 2026",
+		Meta:     "Ca. 9 Jahre · 4 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

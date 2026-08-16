@@ -6,10 +6,11 @@
   **English**. Only the worksheet content itself (everything a pupil reads,
   including solutions for parents/teachers) is in **German**
   (Swiss context: Franken).
-- One worksheet = one directory `generate/<subject>/<name>/`, one Go package,
-  registered via `sheet.Register` in `init()`.
+- One worksheet = one directory `generate/<username>/<name>/`, one Go package,
+  registered via `sheet.Register` in `init()`. The registered `Subject` controls
+  the generated output category; it is not the source directory.
 - Output always goes to `output/<subject>/<name>/index.{html,pdf}` for the
-  worksheet and `solutions.{html,pdf}` for its solutions — mirroring `generate/`.
+  worksheet and `solutions.{html,pdf}`, using the registered subject.
 - Task data lives in Go structs (`tasks.go`), not in JSON files.
 - Shared layout lives in `internal/sheet` (`BaseCSS`, `Page`, `SolutionPage`,
   ...). Sheet-specific CSS only for sheet-specific things.

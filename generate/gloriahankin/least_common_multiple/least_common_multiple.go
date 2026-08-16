@@ -49,12 +49,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "least_common_multiple",
-		Title:   "Das kgV entdecken",
-		Date:    "15 Aug 2026",
-		Meta:    "4. Klasse · kleinstes gemeinsames Vielfaches · 4 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "least_common_multiple",
+		Title:    "Das kgV entdecken",
+		Date:     "15 Aug 2026",
+		Meta:     "4. Klasse · kleinstes gemeinsames Vielfaches · 4 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

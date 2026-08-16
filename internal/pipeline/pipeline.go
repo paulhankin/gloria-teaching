@@ -284,8 +284,12 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	b.WriteString("You are working on the `learningmaterial` repository in this worktree. " +
 		"Follow AGENTS.md.\n\n")
 	if it.Kind == store.KindChange {
+		source := filepath.Join("generate", it.Worksheet)
+		if path, err := p.worksheetSourcePath(it.Worksheet); err == nil {
+			source = path
+		}
 		fmt.Fprintf(&b, "A change was requested for the worksheet `%s` "+
-			"(directory `generate/%s`):\n\n", it.Worksheet, it.Worksheet)
+			"(directory `%s`):\n\n", it.Worksheet, source)
 	} else {
 		b.WriteString("A new worksheet was requested:\n\n")
 	}
@@ -297,6 +301,9 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	}
 	if requester != "" {
 		fmt.Fprintf(&b, "Requested by: %s\n\n", requester)
+		if it.Kind == store.KindNew {
+			fmt.Fprintf(&b, "Put the worksheet code in `generate/%s/<worksheet>`; the first directory is the requester's username, not the subject.\n\n", requester)
+		}
 	}
 	b.WriteString("Implement it. Then run `gofmt -l -w .`, `go build ./...` and `make html`, " +
 		"and commit everything on the current branch with a good commit message. " +
@@ -621,7 +628,7 @@ func (p *Pipeline) merge(it store.Request) error {
 
 // Revisions returns the Git history for one worksheet, newest first.
 func (p *Pipeline) Revisions(worksheet string) ([]site.Revision, error) {
-	path, err := worksheetSourcePath(worksheet)
+	path, err := p.worksheetSourcePath(worksheet)
 	if err != nil {
 		return nil, err
 	}
@@ -651,19 +658,31 @@ func (p *Pipeline) Revisions(worksheet string) ([]site.Revision, error) {
 	return revisions, nil
 }
 
-func worksheetSourcePath(worksheet string) (string, error) {
+func (p *Pipeline) worksheetSourcePath(worksheet string) (string, error) {
 	parts := strings.Split(worksheet, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" ||
 		parts[0] == "." || parts[0] == ".." || parts[1] == "." || parts[1] == ".." {
 		return "", fmt.Errorf("invalid worksheet path %q", worksheet)
 	}
-	return filepath.Join("generate", parts[0], parts[1]), nil
+	worksheets, err := site.ReadManifest(filepath.Join(p.cfg.OutputDir, site.ManifestName))
+	if err != nil {
+		return "", fmt.Errorf("read worksheet catalog: %w", err)
+	}
+	for _, ws := range worksheets {
+		if ws.Path() == worksheet {
+			if ws.Username == "" {
+				return "", fmt.Errorf("worksheet %q has no source username", worksheet)
+			}
+			return filepath.Join("generate", ws.Username, ws.Name), nil
+		}
+	}
+	return "", fmt.Errorf("unknown worksheet %q", worksheet)
 }
 
 // Revert restores one worksheet directory from an earlier Git revision,
 // commits that restoration as a new revision, and republishes the site.
 func (p *Pipeline) Revert(worksheet, commit string) error {
-	path, err := worksheetSourcePath(worksheet)
+	path, err := p.worksheetSourcePath(worksheet)
 	if err != nil {
 		return err
 	}

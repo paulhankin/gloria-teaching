@@ -49,12 +49,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "half_hour_times",
-		Title:   "Uhrzeiten: halbe Stunden",
-		Date:    "15 Aug 2026",
-		Meta:    "1.–2. Klasse · halbe Stunden lesen und einzeichnen · 3 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "half_hour_times",
+		Title:    "Uhrzeiten: halbe Stunden",
+		Date:     "15 Aug 2026",
+		Meta:     "1.–2. Klasse · halbe Stunden lesen und einzeichnen · 3 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

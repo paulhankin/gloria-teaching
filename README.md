@@ -16,17 +16,15 @@ internal/pdf/                 HTML -> PDF via headless Chrome (CDP, own WS clien
 internal/store/               SQLite: requests / work items and settings
 internal/pipeline/            drives work items through the agent
 internal/site/                the front page (worksheet index + request/review UI)
-generate/<subject>/<sheet>/   one worksheet (Go + render.js)
-output/<subject>/<sheet>/     index.html/.pdf + solutions.html/.pdf (generated)
+generate/<username>/<sheet>/  worksheet source owned by that username (Go + render.js)
+output/<subject>/<sheet>/     generated index.html/.pdf + solutions.html/.pdf
 output/worksheets.json         runtime worksheet catalog (generated atomically)
 data/                         database, worktrees, previews (not in the repo)
 cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    server: site, requests, work item pipeline
 ```
 
-Currently: `generate/math/answer_checks`, `generate/math/least_common_multiple`,
-`generate/math/metric_conversions`, `generate/math/venn_diagrams`,
-`generate/math/ordinal_numbers`, and `generate/math/price_puzzles`.
+Currently, the existing worksheets live under `generate/gloriahankin/`.
 
 ## Building
 
@@ -98,8 +96,8 @@ Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
 
 ## Adding a worksheet
 
-1. Create `generate/<subject>/<name>/` and name the package.
-2. In `init()` call `sheet.Register(sheet.Worksheet{Subject, Name, Title, Meta, Build})`.
+1. Create `generate/<username>/<name>/` and name the package.
+2. In `init()` call `sheet.Register(sheet.Worksheet{Username, Subject, Name, Title, Meta, Build})`.
 3. `Build() *sheet.Doc` returns the title, extra CSS, worksheet body and
    solution body. Put pupil pages in `Doc.Body` and `sheet.SolutionPage(...)` in
    `Doc.Solutions`; they are emitted as separate documents. Building blocks:

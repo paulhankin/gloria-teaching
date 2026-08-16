@@ -22,14 +22,14 @@ import (
 	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
 
-	_ "learningmaterial/generate/math/answer_checks"
-	_ "learningmaterial/generate/math/half_hour_times"
-	_ "learningmaterial/generate/math/least_common_multiple"
-	_ "learningmaterial/generate/math/metric_conversions"
-	_ "learningmaterial/generate/math/negative_numbers"
-	_ "learningmaterial/generate/math/ordinal_numbers"
-	_ "learningmaterial/generate/math/price_puzzles"
-	_ "learningmaterial/generate/math/venn_diagrams"
+	_ "learningmaterial/generate/gloriahankin/answer_checks"
+	_ "learningmaterial/generate/gloriahankin/half_hour_times"
+	_ "learningmaterial/generate/gloriahankin/least_common_multiple"
+	_ "learningmaterial/generate/gloriahankin/metric_conversions"
+	_ "learningmaterial/generate/gloriahankin/negative_numbers"
+	_ "learningmaterial/generate/gloriahankin/ordinal_numbers"
+	_ "learningmaterial/generate/gloriahankin/price_puzzles"
+	_ "learningmaterial/generate/gloriahankin/venn_diagrams"
 )
 
 func main() {
@@ -185,12 +185,13 @@ func siteWorksheets(in []sheet.Worksheet, versions map[string]string) []site.Wor
 	out := make([]site.Worksheet, 0, len(in))
 	for _, w := range in {
 		out = append(out, site.Worksheet{
-			Subject: w.Subject,
-			Name:    w.Name,
-			Title:   w.Title,
-			Date:    w.Date,
-			Meta:    w.Meta,
-			Version: versions[w.Path()],
+			Username: w.Username,
+			Subject:  w.Subject,
+			Name:     w.Name,
+			Title:    w.Title,
+			Date:     w.Date,
+			Meta:     w.Meta,
+			Version:  versions[w.Path()],
 		})
 	}
 	return out

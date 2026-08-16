@@ -18,6 +18,9 @@ func TestPromptUsesUsername(t *testing.T) {
 	if !strings.Contains(got, "Requested by: teacher") || strings.Contains(got, "Requested by: teacher@example.com") {
 		t.Fatalf("prompt requester attribution = %q", got)
 	}
+	if !strings.Contains(got, "generate/teacher/<worksheet>") {
+		t.Fatalf("prompt source directory = %q", got)
+	}
 }
 
 func TestRevisionsUsesWorksheetGitHistory(t *testing.T) {
@@ -33,7 +36,7 @@ func TestRevisionsUsesWorksheetGitHistory(t *testing.T) {
 	git("init", "-b", "main")
 	git("config", "user.name", "Test")
 	git("config", "user.email", "test@example.com")
-	path := filepath.Join(repo, "generate", "math", "fractions")
+	path := filepath.Join(repo, "generate", "teacher", "fractions")
 	if err := os.MkdirAll(path, 0o755); err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +51,14 @@ func TestRevisionsUsesWorksheetGitHistory(t *testing.T) {
 	write("first", "First worksheet version")
 	write("second", "Second worksheet version")
 
-	p := &Pipeline{cfg: Config{Repo: repo}}
+	output := filepath.Join(repo, "output")
+	if err := os.MkdirAll(output, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(output, "worksheets.json"), []byte(`[{"username":"teacher","subject":"math","name":"fractions"}]`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	p := &Pipeline{cfg: Config{Repo: repo, OutputDir: output}}
 	revisions, err := p.Revisions("math/fractions")
 	if err != nil {
 		t.Fatal(err)

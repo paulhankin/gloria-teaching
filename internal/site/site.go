@@ -11,6 +11,7 @@ import (
 )
 
 type Worksheet struct {
+	Username   string                 `json:"username"`
 	Subject    string                 `json:"subject"`
 	Name       string                 `json:"name"`
 	Title      string                 `json:"title"`

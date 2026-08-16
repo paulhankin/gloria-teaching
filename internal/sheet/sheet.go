@@ -1,7 +1,7 @@
 // Package sheet is the mini framework for worksheets.
 //
-// A worksheet lives in generate/<subject>/<name>/ and registers itself via
-// Register(). The generator (cmd/generate) turns it into
+// A worksheet's code lives in generate/<username>/<name>/ and registers itself
+// via Register(). The generator (cmd/generate) turns it into
 // output/<subject>/<name>/index.{html,pdf} and solutions.{html,pdf}.
 package sheet
 
@@ -26,7 +26,8 @@ func Asset(name string) string {
 
 // Worksheet describes a worksheet for the registry and the index page.
 type Worksheet struct {
-	Subject  string // e.g. "math" -> directory name
+	Username string // source owner, e.g. "gloriahankin" -> generate/gloriahankin/<name>
+	Subject  string // output category, e.g. "math" -> output/math/<name>
 	Name     string // e.g. "venn_diagrams" -> directory name
 	Title    string // display name, e.g. "Venn-Diagramme"
 	Date     string // last content update, e.g. "12 Aug 2026"
@@ -42,8 +43,8 @@ var registry []Worksheet
 
 // Register adds a worksheet to the registry (call from init()).
 func Register(w Worksheet) {
-	if w.Subject == "" || w.Name == "" || w.Build == nil {
-		panic("sheet.Register: Subject, Name and Build are required")
+	if w.Username == "" || w.Subject == "" || w.Name == "" || w.Build == nil {
+		panic("sheet.Register: Username, Subject, Name and Build are required")
 	}
 	registry = append(registry, w)
 }

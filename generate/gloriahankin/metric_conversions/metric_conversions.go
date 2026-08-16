@@ -48,12 +48,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "metric_conversions",
-		Title:   "Längen umwandeln",
-		Date:    "15 Aug 2026",
-		Meta:    "4. Klasse · mm, cm, dm, m und km · 4 Aufgabenblätter + Lösungen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "metric_conversions",
+		Title:    "Längen umwandeln",
+		Date:     "15 Aug 2026",
+		Meta:     "4. Klasse · mm, cm, dm, m und km · 4 Aufgabenblätter + Lösungen",
+		Build:    build,
 	})
 }
 

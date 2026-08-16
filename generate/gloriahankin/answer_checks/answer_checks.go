@@ -62,12 +62,13 @@ const css = `
 
 func init() {
 	sheet.Register(sheet.Worksheet{
-		Subject: "math",
-		Name:    "answer_checks",
-		Title:   "Rechnen und prüfen",
-		Date:    "15 Aug 2026",
-		Meta:    "3./4. Klasse · 9 Seiten + Lösungen · Aufgaben lösen und selbst prüfen",
-		Build:   build,
+		Username: "gloriahankin",
+		Subject:  "math",
+		Name:     "answer_checks",
+		Title:    "Rechnen und prüfen",
+		Date:     "15 Aug 2026",
+		Meta:     "3./4. Klasse · 9 Seiten + Lösungen · Aufgaben lösen und selbst prüfen",
+		Build:    build,
 	})
 }
 
