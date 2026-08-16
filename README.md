@@ -123,11 +123,11 @@ queued -> working -> review -> done (approved: merged + pushed)
 - Whenever an item reaches `review`, the whole site (HTML + PDF) is rendered
   from its worktree into `data/preview/<id>/`, reachable at `/preview/<id>/`
   (admin mode only).
-- Approving rebases and fast-forward merges both request branches, pushes any
-  main-repository changes, and regenerates `output/`, including an atomic
-  `worksheets.json` catalog. User worksheet repositories remain local and have
-  no remote. The running server reads that catalog dynamically, so worksheet
-  additions and content changes require no server rebuild or restart.
+- Approving rebases and fast-forward merges both request branches, pushes main-repository
+  changes to its `origin`, pushes worksheet changes to
+  `https://worksheet-gits.exe.xyz/user/<username>.git`, and regenerates `output/`, including
+  an atomic `worksheets.json` catalog. The running server reads that catalog dynamically,
+  so worksheet additions and content changes require no server rebuild or restart.
 - The review UI lives in admin mode on the front page: **Approve & push**,
   **Reject**, **Refine** (free text sent back into the same conversation) and
   **Retry** for failed items, plus a log of recent pipeline events.

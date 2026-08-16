@@ -25,12 +25,13 @@ import (
 
 // Config describes where the pipeline works.
 type Config struct {
-	Repo          string // main git checkout (the served one)
-	WorksheetRoot string // local per-user repositories; defaults to /users
-	WorkRoot      string // parent directory for the per-item worktrees
-	PreviewRoot   string // parent directory for the per-item preview builds
-	OutputDir     string // the directory cmd/serve serves
-	Push          bool   // push main repository changes after publication
+	Repo                   string // main git checkout (the served one)
+	WorksheetRoot          string // local per-user repositories; defaults to /users
+	WorksheetRemoteBaseURL string // per-user Git remote base; defaults to the worksheet Git service
+	WorkRoot               string // parent directory for the per-item worktrees
+	PreviewRoot            string // parent directory for the per-item preview builds
+	OutputDir              string // the directory cmd/serve serves
+	Push                   bool   // push main and worksheet repository changes after publication
 }
 
 // Pipeline runs the work items.
@@ -45,6 +46,8 @@ type Pipeline struct {
 
 	wake chan struct{}
 }
+
+const defaultWorksheetRemoteBaseURL = "https://worksheet-gits.exe.xyz/user"
 
 // New creates a pipeline. Start must be called to run it.
 func New(db *store.DB, cfg Config) *Pipeline {
@@ -340,6 +343,31 @@ func (p *Pipeline) userRepo(username string) string {
 
 func (p *Pipeline) workspaceUserRepo(worktree, username string) string {
 	return filepath.Join(worktree, "generate", username)
+}
+
+func (p *Pipeline) worksheetRemoteURL(username string) string {
+	base := p.cfg.WorksheetRemoteBaseURL
+	if base == "" {
+		base = defaultWorksheetRemoteBaseURL
+	}
+	return strings.TrimRight(base, "/") + "/" + username + ".git"
+}
+
+func (p *Pipeline) configureUserRemote(username string) error {
+	repo := p.userRepo(username)
+	remoteURL := p.worksheetRemoteURL(username)
+	out, err := p.git(repo, "remote")
+	if err != nil {
+		return err
+	}
+	for _, remote := range strings.Fields(out) {
+		if remote == "origin" {
+			_, err = p.git(repo, "remote", "set-url", "origin", remoteURL)
+			return err
+		}
+	}
+	_, err = p.git(repo, "remote", "add", "origin", remoteURL)
+	return err
 }
 
 func (p *Pipeline) configureUserRepo(repo string) error {
@@ -684,6 +712,11 @@ func (p *Pipeline) publish(it store.Request, summary string) error {
 			return fmt.Errorf("merge: %w", err)
 		}
 	}
+	if p.cfg.Push {
+		if err := p.push(username); err != nil {
+			return fmt.Errorf("push: %w", err)
+		}
+	}
 	p.db.SetStatus(it.ID, store.StatusWorking, "merged and pushed; rebuilding the site")
 	p.Logf("#%d merged; rebuilding the site", it.ID)
 	if err := p.rebuild(); err != nil {
@@ -732,12 +765,18 @@ func (p *Pipeline) merge(it store.Request) error {
 			return err
 		}
 	}
-	if p.cfg.Push {
-		if _, err := p.git(p.cfg.Repo, "push", "origin", "main"); err != nil {
-			return err
-		}
-	}
 	return nil
+}
+
+func (p *Pipeline) push(username string) error {
+	if err := p.configureUserRemote(username); err != nil {
+		return err
+	}
+	if _, err := p.git(p.userRepo(username), "push", "origin", "main"); err != nil {
+		return err
+	}
+	_, err := p.git(p.cfg.Repo, "push", "origin", "main")
+	return err
 }
 
 // Revisions returns the local Git history for one worksheet, newest first.

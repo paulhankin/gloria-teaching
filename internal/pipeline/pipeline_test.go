@@ -120,3 +120,70 @@ func TestRevisionsUsesWorksheetGitHistory(t *testing.T) {
 		t.Fatalf("revision order = %#v", revisions)
 	}
 }
+
+func TestPushPublishesMainAndUserRepositories(t *testing.T) {
+	root := t.TempDir()
+	runGit := func(dir string, args ...string) string {
+		t.Helper()
+		cmd := exec.Command("git", args...)
+		cmd.Dir = dir
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			t.Fatalf("git -C %s %v: %v: %s", dir, args, err, out)
+		}
+		return strings.TrimSpace(string(out))
+	}
+	initRepo := func(dir, content string) {
+		t.Helper()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		runGit(dir, "init", "-b", "main")
+		runGit(dir, "config", "user.name", "Test")
+		runGit(dir, "config", "user.email", "test@example.com")
+		if err := os.WriteFile(filepath.Join(dir, "content.txt"), []byte(content), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		runGit(dir, "add", ".")
+		runGit(dir, "commit", "-m", "Initial")
+	}
+	initBare := func(dir string) {
+		t.Helper()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		runGit(dir, "init", "--bare")
+	}
+
+	mainRepo := filepath.Join(root, "main")
+	mainRemote := filepath.Join(root, "main.git")
+	usersRoot := filepath.Join(root, "users")
+	userRepo := filepath.Join(usersRoot, "teacher")
+	remoteBase := filepath.Join(root, "worksheet-remotes")
+	userRemote := filepath.Join(remoteBase, "teacher.git")
+	initRepo(mainRepo, "framework")
+	initBare(mainRemote)
+	runGit(mainRepo, "remote", "add", "origin", mainRemote)
+	initRepo(userRepo, "worksheet")
+	initBare(userRemote)
+
+	p := &Pipeline{cfg: Config{
+		Repo:                   mainRepo,
+		WorksheetRoot:          usersRoot,
+		WorksheetRemoteBaseURL: remoteBase,
+	}}
+	if err := p.push("teacher"); err != nil {
+		t.Fatal(err)
+	}
+
+	if got, want := runGit(userRepo, "remote", "get-url", "origin"), userRemote; got != want {
+		t.Fatalf("user remote = %q, want %q", got, want)
+	}
+	for _, pair := range [][2]string{{mainRepo, mainRemote}, {userRepo, userRemote}} {
+		local := runGit(pair[0], "rev-parse", "main")
+		remote := runGit(pair[1], "rev-parse", "refs/heads/main")
+		if local != remote {
+			t.Fatalf("remote %s is at %s, want %s", pair[1], remote, local)
+		}
+	}
+}
