@@ -49,7 +49,8 @@ type Request struct {
 	ID        int64
 	Kind      Kind
 	Worksheet string // worksheet path ("math/venn_diagrams"), empty for KindNew
-	Author    string // optional
+	Author    string // optional display name
+	Requester string // authenticated account email
 	Body      string
 	CreatedAt time.Time
 
@@ -88,6 +89,42 @@ type AuthToken struct {
 	ExpiresAt time.Time
 }
 
+// Visibility controls whether a worksheet is private or public. Public and
+// shared worksheets are recorded now, but are not exposed to other users yet.
+type Visibility string
+
+const (
+	VisibilityPrivate Visibility = "private"
+	VisibilityPublic  Visibility = "public"
+)
+
+// Permission is the access level granted to another user.
+type Permission string
+
+const (
+	PermissionView Permission = "view"
+	PermissionEdit Permission = "edit"
+)
+
+// WorksheetAccess stores ownership and sharing settings for one generated
+// worksheet path.
+type WorksheetAccess struct {
+	Worksheet  string
+	OwnerEmail string
+	Visibility Visibility
+	Shares     []WorksheetShare
+	UpdatedAt  time.Time
+}
+
+// WorksheetShare grants another account view or edit rights.
+type WorksheetShare struct {
+	Worksheet  string
+	Email      string
+	Permission Permission
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 // DB is the request and account database.
 type DB struct{ sql *sql.DB }
 
@@ -114,6 +151,7 @@ CREATE TABLE IF NOT EXISTS requests (
   kind       TEXT NOT NULL,
   worksheet  TEXT NOT NULL DEFAULT '',
   author     TEXT NOT NULL DEFAULT '',
+  requester  TEXT NOT NULL DEFAULT '',
   body       TEXT NOT NULL,
   created_at INTEGER NOT NULL,
   status     TEXT NOT NULL DEFAULT 'queued',
@@ -144,12 +182,30 @@ CREATE TABLE IF NOT EXISTS auth_tokens (
   expires_at INTEGER NOT NULL,
   created_at INTEGER NOT NULL
 );
-CREATE INDEX IF NOT EXISTS auth_tokens_user ON auth_tokens(user_id, purpose);`
+CREATE INDEX IF NOT EXISTS auth_tokens_user ON auth_tokens(user_id, purpose);
+CREATE TABLE IF NOT EXISTS worksheets (
+  worksheet   TEXT PRIMARY KEY,
+  owner_email TEXT NOT NULL COLLATE NOCASE,
+  visibility  TEXT NOT NULL DEFAULT 'private' CHECK (visibility IN ('private','public')),
+  created_at  INTEGER NOT NULL,
+  updated_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS worksheets_owner ON worksheets(owner_email);
+CREATE TABLE IF NOT EXISTS worksheet_shares (
+  worksheet  TEXT NOT NULL REFERENCES worksheets(worksheet) ON DELETE CASCADE,
+  email      TEXT NOT NULL COLLATE NOCASE,
+  permission TEXT NOT NULL CHECK (permission IN ('view','edit')),
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (worksheet, email)
+);
+CREATE INDEX IF NOT EXISTS worksheet_shares_email ON worksheet_shares(email);`
 	if _, err := d.Exec(schema); err != nil {
 		return err
 	}
 	// Databases created before the pipeline existed lack these columns.
 	for _, col := range []string{
+		"requester TEXT NOT NULL DEFAULT ''",
 		"status TEXT NOT NULL DEFAULT 'queued'",
 		"conv_id TEXT NOT NULL DEFAULT ''",
 		"branch TEXT NOT NULL DEFAULT ''",
@@ -174,9 +230,9 @@ func (db *DB) Add(r Request) (int64, error) {
 	}
 	now := time.Now().Unix()
 	res, err := db.sql.Exec(
-		`INSERT INTO requests (kind, worksheet, author, body, created_at, status, updated_at)
-		 VALUES (?,?,?,?,?,?,?)`,
-		string(r.Kind), r.Worksheet, r.Author, r.Body, now, string(StatusQueued), now)
+		`INSERT INTO requests (kind, worksheet, author, requester, body, created_at, status, updated_at)
+		 VALUES (?,?,?,?,?,?,?,?)`,
+		string(r.Kind), r.Worksheet, r.Author, r.Requester, r.Body, now, string(StatusQueued), now)
 	if err != nil {
 		return 0, err
 	}
@@ -241,7 +297,7 @@ func (db *DB) Delete(id int64) error {
 	return err
 }
 
-const selectRequests = `SELECT id, kind, worksheet, author, body, created_at,
+const selectRequests = `SELECT id, kind, worksheet, author, requester, body, created_at,
  status, conv_id, branch, worktree, note, preview, updated_at FROM requests`
 
 func scanRequests(rows *sql.Rows) ([]Request, error) {
@@ -251,7 +307,7 @@ func scanRequests(rows *sql.Rows) ([]Request, error) {
 		var created, updated int64
 		var kind, status string
 		var preview int
-		if err := rows.Scan(&r.ID, &kind, &r.Worksheet, &r.Author, &r.Body, &created,
+		if err := rows.Scan(&r.ID, &kind, &r.Worksheet, &r.Author, &r.Requester, &r.Body, &created,
 			&status, &r.ConvID, &r.Branch, &r.Worktree, &r.Note, &preview, &updated); err != nil {
 			return nil, err
 		}
@@ -426,4 +482,166 @@ func (db *DB) ConsumeAuthToken(tokenHash []byte, purpose string) (AuthToken, err
 func (db *DB) DeleteExpiredAuthTokens() error {
 	_, err := db.sql.Exec(`DELETE FROM auth_tokens WHERE expires_at < ?`, time.Now().Unix())
 	return err
+}
+
+// EnsureWorksheets gives every generated worksheet a persistent owner and
+// private visibility. Existing records are left unchanged.
+func (db *DB) EnsureWorksheets(paths []string, defaultOwner string) error {
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	now := time.Now().Unix()
+	for _, path := range paths {
+		if strings.TrimSpace(path) == "" {
+			continue
+		}
+		if _, err := tx.Exec(
+			`INSERT OR IGNORE INTO worksheets (worksheet, owner_email, visibility, created_at, updated_at)
+			 VALUES (?,?,?,?,?)`, path, defaultOwner, string(VisibilityPrivate), now, now); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
+}
+
+// WorksheetByPath returns the ownership and sharing settings for a worksheet.
+func (db *DB) WorksheetByPath(path string) (WorksheetAccess, error) {
+	var ws WorksheetAccess
+	var visibility string
+	var updated int64
+	err := db.sql.QueryRow(
+		`SELECT worksheet, owner_email, visibility, updated_at FROM worksheets WHERE worksheet = ?`, path,
+	).Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &updated)
+	if err != nil {
+		return WorksheetAccess{}, err
+	}
+	ws.Visibility = Visibility(visibility)
+	ws.UpdatedAt = time.Unix(updated, 0)
+	ws.Shares, err = db.WorksheetShares(path)
+	return ws, err
+}
+
+// WorksheetsOwnedBy returns all worksheet settings owned by an account.
+func (db *DB) WorksheetsOwnedBy(email string) ([]WorksheetAccess, error) {
+	rows, err := db.sql.Query(
+		`SELECT worksheet, owner_email, visibility, updated_at FROM worksheets WHERE owner_email = ? ORDER BY worksheet`, email)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []WorksheetAccess
+	for rows.Next() {
+		var ws WorksheetAccess
+		var visibility string
+		var updated int64
+		if err := rows.Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &updated); err != nil {
+			return nil, err
+		}
+		ws.Visibility = Visibility(visibility)
+		ws.UpdatedAt = time.Unix(updated, 0)
+		ws.Shares, err = db.WorksheetShares(ws.Worksheet)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, ws)
+	}
+	return out, rows.Err()
+}
+
+// SetWorksheetVisibility changes a worksheet owned by owner to private or public.
+func (db *DB) SetWorksheetVisibility(path, owner string, visibility Visibility) error {
+	if visibility != VisibilityPrivate && visibility != VisibilityPublic {
+		return fmt.Errorf("store: unknown visibility %q", visibility)
+	}
+	res, err := db.sql.Exec(
+		`UPDATE worksheets SET visibility = ?, updated_at = ? WHERE worksheet = ? AND owner_email = ?`,
+		string(visibility), time.Now().Unix(), path, owner)
+	if err != nil {
+		return err
+	}
+	return requireChanged(res, "worksheet not found or not owned by user")
+}
+
+// SetWorksheetShare creates or updates a private worksheet share.
+func (db *DB) SetWorksheetShare(path, owner, email string, permission Permission) error {
+	if permission != PermissionView && permission != PermissionEdit {
+		return fmt.Errorf("store: unknown permission %q", permission)
+	}
+	if strings.EqualFold(owner, email) {
+		return fmt.Errorf("store: owner cannot share a worksheet with themselves")
+	}
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	var visibility string
+	if err := tx.QueryRow(
+		`SELECT visibility FROM worksheets WHERE worksheet = ? AND owner_email = ?`, path, owner,
+	).Scan(&visibility); err != nil {
+		return err
+	}
+	if Visibility(visibility) != VisibilityPrivate {
+		return fmt.Errorf("store: public worksheets cannot be shared")
+	}
+	now := time.Now().Unix()
+	_, err = tx.Exec(
+		`INSERT INTO worksheet_shares (worksheet, email, permission, created_at, updated_at)
+		 VALUES (?,?,?,?,?)
+		 ON CONFLICT(worksheet,email) DO UPDATE SET permission = excluded.permission, updated_at = excluded.updated_at`,
+		path, email, string(permission), now, now)
+	if err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
+// DeleteWorksheetShare removes one user's access from a worksheet.
+func (db *DB) DeleteWorksheetShare(path, owner, email string) error {
+	res, err := db.sql.Exec(
+		`DELETE FROM worksheet_shares WHERE worksheet = ? AND email = ?
+		 AND EXISTS (SELECT 1 FROM worksheets WHERE worksheet = ? AND owner_email = ?)`,
+		path, email, path, owner)
+	if err != nil {
+		return err
+	}
+	return requireChanged(res, "share not found or worksheet not owned by user")
+}
+
+// WorksheetShares returns the grants for a worksheet.
+func (db *DB) WorksheetShares(path string) ([]WorksheetShare, error) {
+	rows, err := db.sql.Query(
+		`SELECT worksheet, email, permission, created_at, updated_at
+		 FROM worksheet_shares WHERE worksheet = ? ORDER BY email`, path)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []WorksheetShare
+	for rows.Next() {
+		var share WorksheetShare
+		var permission string
+		var created, updated int64
+		if err := rows.Scan(&share.Worksheet, &share.Email, &permission, &created, &updated); err != nil {
+			return nil, err
+		}
+		share.Permission = Permission(permission)
+		share.CreatedAt = time.Unix(created, 0)
+		share.UpdatedAt = time.Unix(updated, 0)
+		out = append(out, share)
+	}
+	return out, rows.Err()
+}
+
+func requireChanged(result sql.Result, message string) error {
+	n, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("store: %s", message)
+	}
+	return nil
 }

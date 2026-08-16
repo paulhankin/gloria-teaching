@@ -58,6 +58,11 @@ make serve                    # locally, using account sign-in
   optional `SITE_BASE_URL` for links in account emails) — not in the repo.
 - Accounts use an email address as the username. New allowlisted accounts must confirm
   their email before signing in; password-reset links are also sent by email.
+- Worksheets have a persistent owner and are private by default. Owners can mark them
+  public or share private worksheets with existing users using view/edit grants. Public
+  and shared worksheet discovery is intentionally not exposed yet; the live index and
+  generated files remain available only to the owner. Existing worksheets are assigned
+  to `g.n.hankin@gmail.com`, while newly requested worksheets belong to their requester.
 
 ## Requests and the work item pipeline
 

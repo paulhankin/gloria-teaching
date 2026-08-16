@@ -11,15 +11,21 @@ import (
 )
 
 type Worksheet struct {
-	Subject string `json:"subject"`
-	Name    string `json:"name"`
-	Title   string `json:"title"`
-	Date    string `json:"date"`
-	Meta    string `json:"meta"`
-	Version string `json:"version,omitempty"`
+	Subject    string                 `json:"subject"`
+	Name       string                 `json:"name"`
+	Title      string                 `json:"title"`
+	Date       string                 `json:"date"`
+	Meta       string                 `json:"meta"`
+	Version    string                 `json:"version,omitempty"`
+	Owner      string                 `json:"-"`
+	Visibility store.Visibility       `json:"-"`
+	Shares     []store.WorksheetShare `json:"-"`
 }
 
 func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
+
+// Private reports whether the worksheet can have explicit shares.
+func (w Worksheet) Private() bool { return w.Visibility == store.VisibilityPrivate }
 
 // Data is everything the front page needs.
 type Data struct {
@@ -187,6 +193,17 @@ const indexCSS = `
   .worksheet-request td { padding-top:0; }
   .worksheet-request details { width:100%; }
   .worksheet-request form.ask { max-width:none; }
+  .sharing { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; padding:8px 0 5px; }
+  .sharing form { margin:0; }
+  .sharing .visibility { display:flex; gap:7px; align-items:center; }
+  .sharing select, .sharing input[type=email] { padding:7px 9px; border:1px solid #98a2b3;
+    border-radius:3px; background:#fff; color:inherit; font:14px/1.4 system-ui,sans-serif; }
+  .sharing input[type=email] { min-width:240px; }
+  .share-form { display:flex; gap:7px; flex-wrap:wrap; }
+  .share-list { width:100%; max-width:620px; margin:4px 0 0; padding:0; list-style:none; }
+  .share-list li { display:flex; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--line); }
+  .share-list .email { flex:1; }
+  .privacy { display:inline-block; margin-top:4px; color:var(--muted); font-size:12px; }
   details { margin-top:6px; }
   summary { color:var(--link); cursor:pointer; font-size:13px; }
   form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
@@ -307,8 +324,9 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
 <tbody>
 {{range .Worksheets}}
+{{$worksheet := .Path}}
 <tr{{if not $.Static}} class="worksheet-main"{{end}}>
-  <td><div class="title">{{.Title}}</div></td>
+  <td><div class="title">{{.Title}}</div>{{if not $.Static}}<span class="privacy">{{if .Private}}Private{{else}}Public{{end}} · owner: {{.Owner}}</span>{{end}}</td>
   <td class="date">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
   <td class="meta">{{.Meta}}</td>
   {{if not $.Static}}<td>
@@ -319,6 +337,28 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </tr>
 {{if not $.Static}}
 <tr class="worksheet-request"><td colspan="5">
+  <details><summary>Sharing settings</summary>
+    <div class="sharing">
+      <form class="visibility" method="POST" action="/worksheets/visibility">
+        <input type="hidden" name="worksheet" value="{{.Path}}">
+        <label for="visibility-{{.Name}}">Access</label>
+        <select id="visibility-{{.Name}}" name="visibility">
+          <option value="private"{{if .Private}} selected{{end}}>Private</option>
+          <option value="public"{{if not .Private}} selected{{end}}>Public</option>
+        </select>
+        <button type="submit">Save</button>
+      </form>
+      {{if .Private}}
+      <form class="share-form" method="POST" action="/worksheets/shares">
+        <input type="hidden" name="worksheet" value="{{.Path}}">
+        <input type="email" name="email" required placeholder="Existing user's email">
+        <select name="permission" aria-label="Permission"><option value="view">Can view</option><option value="edit">Can edit</option></select>
+        <button type="submit">Share</button>
+      </form>
+      {{if .Shares}}<ul class="share-list">{{range .Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">Remove</button></form></li>{{end}}</ul>{{end}}
+      {{else}}<span class="meta">Public discovery is not available yet.</span>{{end}}
+    </div>
+  </details>
   <details><summary>Request an update</summary>
     <form class="ask" method="POST" action="/requests">
       <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">

@@ -19,6 +19,7 @@ import (
 	"sync"
 	"time"
 
+	"learningmaterial/internal/site"
 	"learningmaterial/internal/store"
 )
 
@@ -523,6 +524,23 @@ func (p *Pipeline) Approve(id int64) error {
 			p.Logf("#%d rebuild failed: %v", id, err)
 			p.db.SetStatus(id, store.StatusReview, "merged and pushed, but rebuild failed: "+err.Error())
 			return
+		}
+		if it.Kind == store.KindNew && it.Requester != "" {
+			worksheets, err := site.ReadManifest(filepath.Join(p.cfg.OutputDir, site.ManifestName))
+			if err != nil {
+				p.Logf("#%d ownership update failed: %v", id, err)
+				p.db.SetStatus(id, store.StatusReview, "published, but worksheet ownership could not be recorded: "+err.Error())
+				return
+			}
+			paths := make([]string, 0, len(worksheets))
+			for _, ws := range worksheets {
+				paths = append(paths, ws.Path())
+			}
+			if err := p.db.EnsureWorksheets(paths, it.Requester); err != nil {
+				p.Logf("#%d ownership update failed: %v", id, err)
+				p.db.SetStatus(id, store.StatusReview, "published, but worksheet ownership could not be recorded: "+err.Error())
+				return
+			}
 		}
 		p.db.SetStatus(id, store.StatusDone, "approved, merged, pushed and published")
 		p.removeWorktree(it)

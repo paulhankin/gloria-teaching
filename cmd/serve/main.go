@@ -25,6 +25,8 @@ var db *store.DB
 var pipe *pipeline.Pipeline
 var manifestPath string
 
+const existingWorksheetOwner = "g.n.hankin@gmail.com"
+
 func siteBaseURL() string {
 	if value := strings.TrimRight(os.Getenv("SITE_BASE_URL"), "/"); value != "" {
 		return value
@@ -48,9 +50,14 @@ func allowedEmails() []string {
 
 // index renders the front page with the request UI.
 func index(w http.ResponseWriter, r *http.Request) {
-	worksheets, err := site.ReadManifest(manifestPath)
+	manifest, err := site.ReadManifest(manifestPath)
 	if err != nil {
 		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	worksheets, err := ownedWorksheets(manifest, account.Email(r))
+	if err != nil {
+		http.Error(w, "worksheet access: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	d := site.Data{Worksheets: worksheets, Admin: db.AdminMode(), Flash: flash(w, r), User: account.Email(r)}
@@ -92,6 +99,8 @@ func flash(w http.ResponseWriter, r *http.Request) string {
 		return "Restarted."
 	case "rebuild":
 		return "Rebuilding the site."
+	case "sharing":
+		return "Sharing settings saved."
 	}
 	return ""
 }
@@ -114,7 +123,7 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 	} else if kind != store.KindChange {
 		http.Error(w, "bad request", http.StatusBadRequest)
 		return
-	} else if known, err := knownWorksheet(worksheet); err != nil {
+	} else if known, err := knownOwnedWorksheet(worksheet, account.Email(r)); err != nil {
 		http.Error(w, "worksheet catalog: "+err.Error(), http.StatusInternalServerError)
 		return
 	} else if !known {
@@ -130,6 +139,7 @@ func postRequest(w http.ResponseWriter, r *http.Request) {
 		Kind:      kind,
 		Worksheet: worksheet,
 		Author:    strings.TrimSpace(r.FormValue("author")),
+		Requester: account.Email(r),
 		Body:      body,
 	}
 	if _, err := db.Add(req); err != nil {
@@ -232,17 +242,126 @@ func postAdmin(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
-func knownWorksheet(path string) (bool, error) {
+func knownOwnedWorksheet(path, owner string) (bool, error) {
 	worksheets, err := site.ReadManifest(manifestPath)
 	if err != nil {
 		return false, err
 	}
+	known := false
 	for _, ws := range worksheets {
 		if ws.Path() == path {
-			return true, nil
+			known = true
+			break
 		}
 	}
-	return false, nil
+	if !known {
+		return false, nil
+	}
+	access, err := db.WorksheetByPath(path)
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(access.OwnerEmail, owner), nil
+}
+
+func ownedWorksheets(manifest []site.Worksheet, owner string) ([]site.Worksheet, error) {
+	paths := make([]string, 0, len(manifest))
+	byPath := make(map[string]site.Worksheet, len(manifest))
+	for _, ws := range manifest {
+		paths = append(paths, ws.Path())
+		byPath[ws.Path()] = ws
+	}
+	if err := db.EnsureWorksheets(paths, existingWorksheetOwner); err != nil {
+		return nil, err
+	}
+	access, err := db.WorksheetsOwnedBy(owner)
+	if err != nil {
+		return nil, err
+	}
+	out := make([]site.Worksheet, 0, len(access))
+	for _, a := range access {
+		ws, ok := byPath[a.Worksheet]
+		if !ok {
+			continue
+		}
+		ws.Owner = a.OwnerEmail
+		ws.Visibility = a.Visibility
+		ws.Shares = a.Shares
+		out = append(out, ws)
+	}
+	return out, nil
+}
+
+func worksheetVisibility(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	visibility := store.Visibility(r.FormValue("visibility"))
+	if err := db.SetWorksheetVisibility(r.FormValue("worksheet"), account.Email(r), visibility); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "sharing")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func worksheetShare(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	email := strings.ToLower(strings.TrimSpace(r.FormValue("email")))
+	user, err := db.UserByEmail(email)
+	if err != nil || !user.Verified {
+		http.Error(w, "share recipient must be an existing verified user", http.StatusBadRequest)
+		return
+	}
+	if err := db.SetWorksheetShare(
+		r.FormValue("worksheet"), account.Email(r), user.Email, store.Permission(r.FormValue("permission")),
+	); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "sharing")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func worksheetShareDelete(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	if err := db.DeleteWorksheetShare(
+		r.FormValue("worksheet"), account.Email(r), strings.TrimSpace(r.FormValue("email")),
+	); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "sharing")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func canServeWorksheet(path, owner string) bool {
+	path = strings.TrimPrefix(path, "/")
+	parts := strings.Split(path, "/")
+	if len(parts) < 3 {
+		return true
+	}
+	ws, err := db.WorksheetByPath(parts[0] + "/" + parts[1])
+	return err == nil && strings.EqualFold(ws.OwnerEmail, owner)
 }
 
 func main() {
@@ -281,8 +400,16 @@ func main() {
 	}
 	outputDir := abs(*dir)
 	manifestPath = filepath.Join(outputDir, site.ManifestName)
-	if _, err := site.ReadManifest(manifestPath); err != nil {
+	manifest, err := site.ReadManifest(manifestPath)
+	if err != nil {
 		log.Fatalf("worksheet catalog: %v", err)
+	}
+	paths := make([]string, 0, len(manifest))
+	for _, ws := range manifest {
+		paths = append(paths, ws.Path())
+	}
+	if err := db.EnsureWorksheets(paths, existingWorksheetOwner); err != nil {
+		log.Fatalf("worksheet access: %v", err)
 	}
 	pipe = pipeline.New(db, pipeline.Config{
 		Repo:        abs(*repo),
@@ -298,6 +425,9 @@ func main() {
 	mux := http.NewServeMux()
 	mux.HandleFunc("/requests", postRequest)
 	mux.HandleFunc("/requests/delete", deleteRequest)
+	mux.HandleFunc("/worksheets/visibility", worksheetVisibility)
+	mux.HandleFunc("/worksheets/shares", worksheetShare)
+	mux.HandleFunc("/worksheets/shares/delete", worksheetShareDelete)
 	mux.HandleFunc("/work/", work)
 	mux.HandleFunc("/admin", postAdmin)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
@@ -312,6 +442,10 @@ func main() {
 			w.Header().Set("Cache-Control", "no-store")
 			previews.ServeHTTP(w, r)
 		default:
+			if !canServeWorksheet(r.URL.Path, account.Email(r)) {
+				http.NotFound(w, r)
+				return
+			}
 			files.ServeHTTP(w, r)
 		}
 	})

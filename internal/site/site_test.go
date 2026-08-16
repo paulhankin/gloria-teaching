@@ -88,3 +88,32 @@ func TestCompletedItemHasNoActions(t *testing.T) {
 		t.Fatal("completed work has decision actions")
 	}
 }
+
+func TestPrivateWorksheetShowsSharingControls(t *testing.T) {
+	html := Index(Data{User: "owner@example.com", Worksheets: []Worksheet{{
+		Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com",
+		Visibility: store.VisibilityPrivate,
+		Shares:     []store.WorksheetShare{{Email: "friend@example.com", Permission: store.PermissionEdit}},
+	}}})
+	for _, want := range []string{
+		"Private · owner: owner@example.com", "Sharing settings", `/worksheets/visibility`,
+		`/worksheets/shares`, "friend@example.com", "Can edit", "Remove",
+	} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("sharing controls are missing %q", want)
+		}
+	}
+}
+
+func TestPublicWorksheetDoesNotShowShareForm(t *testing.T) {
+	html := Index(Data{Worksheets: []Worksheet{{
+		Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com",
+		Visibility: store.VisibilityPublic,
+	}}})
+	if !strings.Contains(html, "Public · owner: owner@example.com") || !strings.Contains(html, "Public discovery is not available yet.") {
+		t.Fatal("public worksheet state is missing")
+	}
+	if strings.Contains(html, `class="share-form"`) {
+		t.Fatal("public worksheet exposes private sharing form")
+	}
+}
