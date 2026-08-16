@@ -28,16 +28,46 @@ cmd/serve/                    server: site, requests, work item pipeline
 
 The worksheet source is deliberately not stored in the main GitHub repository.
 Each `/users/<username>/` directory is an independent local repository; for
-example, the existing worksheets live in `/users/gloriahankin/`. `make`
+example, the existing worksheets live in `/users/gloriahankin/`. The generator
 discovers these repositories, creates ignored package symlinks under
-`generate/`, and writes an ignored import file before compiling the generator.
+`generate/`, and writes an ignored import file before compiling itself.
+
+## User repository contract
+
+A user's repository is intentionally only worksheet source:
+
+```
+<worksheet-name>/
+  worksheet.go
+  tasks.go          # optional
+  render.js         # optional, embedded by worksheet.go
+```
+
+It has no `go.mod`, vendored Go packages, fonts, framework code, or generated
+files. Those all belong to this core repository. Each worksheet imports
+`learningmaterial/internal/sheet`; the build-time symlink makes the separately
+cloned source part of this Go module.
+
+For an isolated build, clone user repositories below one parent directory (the
+last path component is the username), check out this repository separately,
+and run:
+
+```
+go run ./cmd/generate -users /workspace/users
+```
+
+For example, `/workspace/users/alice/fractions/worksheet.go` produces
+`output/alice/fractions/index.pdf` and `solutions.pdf`. The `-users` flag may
+point at any parent directory, so the user repositories need not be inside the
+core checkout. Pushing user changes and exporting generated PDFs are deliberately
+outside the generator's responsibility.
 
 ## Building
 
 ```
 make                          # HTML + PDF for all worksheets into output/
 make html                     # HTML only (fast, no Chrome)
-make prepare && go run ./cmd/generate venn  # only matching worksheets (substring)
+go run ./cmd/generate venn    # only matching worksheets (substring)
 make build                    # binaries into bin/
 ```
 

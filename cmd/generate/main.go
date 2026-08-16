@@ -13,6 +13,7 @@ import (
 	"io"
 	"log"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"sort"
 	"strings"
@@ -21,13 +22,30 @@ import (
 	"learningmaterial/internal/pdf"
 	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
+	"learningmaterial/internal/worksheetrepo"
 )
 
 func main() {
 	out := flag.String("out", "output", "output directory")
+	usersRoot := flag.String("users", "", "directory containing per-user worksheet repositories")
 	makePDF := flag.Bool("pdf", true, "also produce PDFs")
 	wait := flag.Duration("wait", 4*time.Second, "time to wait for JS rendering before the PDF export")
 	flag.Parse()
+
+	changed, err := worksheetrepo.Prepare(*usersRoot)
+	if err != nil {
+		log.Fatal(err)
+	}
+	if changed {
+		cmd := exec.Command("go", append([]string{"run", "./cmd/generate"}, os.Args[1:]...)...)
+		cmd.Stdin = os.Stdin
+		cmd.Stdout = os.Stdout
+		cmd.Stderr = os.Stderr
+		if err := cmd.Run(); err != nil {
+			log.Fatal(err)
+		}
+		return
+	}
 
 	filters := flag.Args()
 	target, err := filepath.Abs(*out)
