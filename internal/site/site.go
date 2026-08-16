@@ -22,6 +22,15 @@ type Worksheet struct {
 	Shares     []store.WorksheetShare `json:"-"`
 }
 
+// Revision is a Git-backed version of one worksheet.
+type Revision struct {
+	Commit  string
+	Short   string
+	Subject string
+	Date    string
+	Current bool
+}
+
 func (w Worksheet) Path() string { return w.Subject + "/" + w.Name }
 
 // Private reports whether the worksheet can have explicit shares.
@@ -30,7 +39,8 @@ func (w Worksheet) Private() bool { return w.Visibility == store.VisibilityPriva
 // Data is everything the front page needs.
 type Data struct {
 	Worksheets []Worksheet
-	Requests   []store.Request // newest first
+	Revisions  map[string][]Revision // worksheet path -> newest first
+	Requests   []store.Request       // newest first
 	Admin      bool
 	// Static marks the offline copy written by cmd/generate: no forms,
 	// no admin controls (there is no server to talk to).
@@ -139,7 +149,7 @@ func statusLabel(s store.Status) string {
 	case store.StatusWorking:
 		return "Work in progress"
 	case store.StatusReview:
-		return "Ready for review"
+		return "Ready to publish"
 	case store.StatusFailed:
 		return "Needs attention"
 	case store.StatusDone:
@@ -158,7 +168,7 @@ func statusHelp(s store.Status) string {
 	case store.StatusWorking:
 		return "The worksheet is being updated now"
 	case store.StatusReview:
-		return "The update is finished and awaiting approval"
+		return "The update is finished and will be published automatically"
 	case store.StatusFailed:
 		return "The update could not be completed"
 	case store.StatusDone:
@@ -217,6 +227,12 @@ const indexCSS = `
   .share-list li { display:flex; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--line); }
   .share-list .email { flex:1; }
   .privacy { display:inline-block; margin-top:4px; color:var(--muted); font-size:12px; }
+  .revision-list { width:100%; max-width:720px; margin:8px 0 2px; padding:0; list-style:none; }
+  .revision-list li { display:flex; gap:10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
+  .revision-list .revision-info { flex:1; min-width:0; }
+  .revision-list code { font-size:12px; }
+  .revision-list .current { color:var(--done); font-size:12px; font-weight:700; }
+  .revision-list form { margin:0; }
   details { margin-top:6px; }
   summary { color:var(--link); cursor:pointer; font-size:13px; }
   form.ask { max-width:620px; margin:10px 0 4px; display:grid; gap:8px; }
@@ -273,16 +289,12 @@ const indexCSS = `
 const requestActions = `
 {{define "actions"}}
   <div class="actions">
-    {{if .HasPreview}}<a href="/preview/{{.ID}}/" target="_blank">Open preview</a>{{end}}
-    {{if eq .Status "review"}}
-    <form method="POST" action="/work/approve"><input type="hidden" name="id" value="{{.ID}}"><button class="ok" type="submit">Approve &amp; publish</button></form>
-    {{end}}
     {{if eq .Status "failed"}}
     <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">Retry</button></form>
     {{end}}
     <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}"><button class="no" type="submit">Reject</button></form>
   </div>
-  {{if or (eq .Status "review") (eq .Status "failed")}}
+  {{if eq .Status "failed"}}
   <form class="refine" method="POST" action="/work/refine">
     <input type="hidden" name="id" value="{{.ID}}"><input type="text" name="body" required placeholder="Describe the refinement">
     <button type="submit">Refine</button>
@@ -350,6 +362,13 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </tr>
 {{if not $.Static}}
 <tr class="worksheet-request"><td colspan="5">
+  {{$revisions := index $.Revisions .Path}}
+  {{if $revisions}}<details><summary>Revision history</summary>
+    <ul class="revision-list">{{range $revisions}}<li>
+      <div class="revision-info"><code>{{.Short}}</code> · {{.Date}} · {{.Subject}}</div>
+      {{if .Current}}<span class="current">Current</span>{{else}}<form method="POST" action="/worksheets/revert"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="commit" value="{{.Commit}}"><button type="submit">Revert to this version</button></form>{{end}}
+    </li>{{end}}</ul>
+  </details>{{end}}
   <details><summary>Sharing settings</summary>
     <div class="sharing">
       <form class="visibility" method="POST" action="/worksheets/visibility">

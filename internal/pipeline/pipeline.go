@@ -15,6 +15,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -52,7 +53,10 @@ func New(db *store.DB, cfg Config) *Pipeline {
 
 // Start begins the scheduler loop.
 func (p *Pipeline) Start() {
-	p.recover()
+	ready := p.recover()
+	for _, it := range ready {
+		p.publishAsync(it)
+	}
 	go p.loop()
 }
 
@@ -87,19 +91,28 @@ func (p *Pipeline) Log() []string {
 	return out
 }
 
-// recover puts items that were in flight when the server stopped back in the
-// queue: the agent conversation is gone, so the work has to start over.
-func (p *Pipeline) recover() {
+// recover puts interrupted agent work back in the queue and returns completed
+// items that were waiting under the old manual-approval workflow.
+func (p *Pipeline) recover() []store.Request {
 	items, err := p.db.Active()
 	if err != nil {
 		log.Printf("pipeline: recover: %v", err)
-		return
+		return nil
 	}
+	var ready []store.Request
 	for _, it := range items {
-		if it.Status == store.StatusWorking {
-			p.db.SetStatus(it.ID, store.StatusQueued, "requeued after a server restart")
+		switch it.Status {
+		case store.StatusWorking:
+			if it.HasPreview && it.Branch != "" {
+				ready = append(ready, it)
+			} else {
+				p.db.SetStatus(it.ID, store.StatusQueued, "requeued after a server restart")
+			}
+		case store.StatusReview:
+			ready = append(ready, it)
 		}
 	}
+	return ready
 }
 
 func (p *Pipeline) loop() {
@@ -154,6 +167,7 @@ func (p *Pipeline) start(it store.Request, followUp string) {
 	p.busy[lane] = true
 	p.mu.Unlock()
 
+	p.db.SetPreview(it.ID, false)
 	p.db.SetStatus(it.ID, store.StatusWorking, "the agent is working on it")
 	go func() {
 		defer func() {
@@ -177,6 +191,16 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		return err
 	}
 	it = cur
+
+	// A restart may have interrupted publication after the branch was already
+	// merged. In that case, finish rebuilding instead of asking the agent to
+	// redo work that is already on main.
+	if it.Branch != "" {
+		merged, err := p.isAncestor(it.Branch, "main")
+		if err == nil && merged {
+			return p.publish(it, it.Note)
+		}
+	}
 
 	worktree := it.Worktree
 	branch := it.Branch
@@ -231,14 +255,13 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		return fmt.Errorf("the agent did not commit anything: %s", firstLine(summary))
 	}
 
-	p.Logf("#%d: building the preview", it.ID)
+	p.Logf("#%d: validating the generated worksheet", it.ID)
 	if err := p.buildPreview(it, worktree); err != nil {
-		return fmt.Errorf("preview build: %w", err)
+		return fmt.Errorf("worksheet build: %w", err)
 	}
 	p.db.SetPreview(it.ID, true)
-	p.db.SetStatus(it.ID, store.StatusReview, summary)
-	p.Logf("#%d: ready for review", it.ID)
-	return nil
+	p.Logf("#%d: finished; publishing automatically", it.ID)
+	return p.publish(it, summary)
 }
 
 func firstLine(s string) string {
@@ -338,6 +361,19 @@ func (p *Pipeline) hasCommits(branch string) (bool, error) {
 		return false, err
 	}
 	return strings.TrimSpace(out) != "0", nil
+}
+
+func (p *Pipeline) isAncestor(ancestor, descendant string) (bool, error) {
+	cmd := exec.Command("git", "merge-base", "--is-ancestor", ancestor, descendant)
+	cmd.Dir = p.cfg.Repo
+	err := cmd.Run()
+	if err == nil {
+		return true, nil
+	}
+	if exit, ok := err.(*exec.ExitError); ok && exit.ExitCode() == 1 {
+		return false, nil
+	}
+	return false, err
 }
 
 // --- shelley ---------------------------------------------------------------
@@ -482,25 +518,29 @@ func tail(s string, n int) string {
 
 // --- decisions -------------------------------------------------------------
 
-// Approve merges the work into main, pushes it and publishes generated output.
+// Approve remains for compatibility with work completed by older server
+// versions. New work is published automatically as soon as it is finished.
 func (p *Pipeline) Approve(id int64) error {
 	it, err := p.db.Get(id)
 	if err != nil {
 		return err
 	}
 	if it.Status != store.StatusReview {
-		return fmt.Errorf("request #%d is not waiting for a decision", id)
+		return fmt.Errorf("request #%d is not ready to publish", id)
 	}
+	return p.publishAsync(it)
+}
+
+func (p *Pipeline) publishAsync(it store.Request) error {
 	lane := it.Lane()
 	p.mu.Lock()
 	if p.busy[lane] {
 		p.mu.Unlock()
-		return fmt.Errorf("request #%d is busy", id)
+		return fmt.Errorf("request #%d is busy", it.ID)
 	}
 	p.busy[lane] = true
 	p.mu.Unlock()
 
-	p.db.SetStatus(id, store.StatusWorking, "merging")
 	go func() {
 		defer func() {
 			p.mu.Lock()
@@ -508,44 +548,54 @@ func (p *Pipeline) Approve(id int64) error {
 			p.mu.Unlock()
 			p.Kick()
 		}()
-		p.publishMu.Lock()
-		defer p.publishMu.Unlock()
-		if err := p.merge(it); err != nil {
-			p.Logf("#%d merge failed: %v", id, err)
-			p.db.SetStatus(id, store.StatusReview, "merge failed: "+err.Error())
-			return
+		if err := p.publish(it, it.Note); err != nil {
+			p.Logf("#%d publication failed: %v", it.ID, err)
+			p.db.SetStatus(it.ID, store.StatusFailed, err.Error())
 		}
-		// Keep the item visible and recoverable until the generated site and
-		// manifest are safely on disk. If this process is interrupted during
-		// generation, approval can simply be retried (the merge is up to date).
-		p.db.SetStatus(id, store.StatusReview, "merged and pushed; rebuilding the site")
-		p.Logf("#%d approved; rebuilding the site", id)
-		if err := p.rebuild(); err != nil {
-			p.Logf("#%d rebuild failed: %v", id, err)
-			p.db.SetStatus(id, store.StatusReview, "merged and pushed, but rebuild failed: "+err.Error())
-			return
-		}
-		if it.Kind == store.KindNew && it.Requester != "" {
-			worksheets, err := site.ReadManifest(filepath.Join(p.cfg.OutputDir, site.ManifestName))
-			if err != nil {
-				p.Logf("#%d ownership update failed: %v", id, err)
-				p.db.SetStatus(id, store.StatusReview, "published, but worksheet ownership could not be recorded: "+err.Error())
-				return
-			}
-			paths := make([]string, 0, len(worksheets))
-			for _, ws := range worksheets {
-				paths = append(paths, ws.Path())
-			}
-			if err := p.db.EnsureWorksheets(paths, it.Requester); err != nil {
-				p.Logf("#%d ownership update failed: %v", id, err)
-				p.db.SetStatus(id, store.StatusReview, "published, but worksheet ownership could not be recorded: "+err.Error())
-				return
-			}
-		}
-		p.db.SetStatus(id, store.StatusDone, "approved, merged, pushed and published")
-		p.removeWorktree(it)
-		p.Logf("#%d done", id)
 	}()
+	return nil
+}
+
+// publish merges a finished worksheet, rebuilds the public files and closes
+// the request. The caller must hold the request lane.
+func (p *Pipeline) publish(it store.Request, summary string) error {
+	p.db.SetStatus(it.ID, store.StatusWorking, "publishing")
+	p.publishMu.Lock()
+	defer p.publishMu.Unlock()
+
+	merged, err := p.isAncestor(it.Branch, "main")
+	if err != nil {
+		return err
+	}
+	if !merged {
+		if err := p.merge(it); err != nil {
+			return fmt.Errorf("merge: %w", err)
+		}
+	}
+	p.db.SetStatus(it.ID, store.StatusWorking, "merged and pushed; rebuilding the site")
+	p.Logf("#%d merged; rebuilding the site", it.ID)
+	if err := p.rebuild(); err != nil {
+		return fmt.Errorf("rebuild: %w", err)
+	}
+	if it.Kind == store.KindNew && it.Requester != "" {
+		worksheets, err := site.ReadManifest(filepath.Join(p.cfg.OutputDir, site.ManifestName))
+		if err != nil {
+			return fmt.Errorf("record worksheet ownership: %w", err)
+		}
+		paths := make([]string, 0, len(worksheets))
+		for _, ws := range worksheets {
+			paths = append(paths, ws.Path())
+		}
+		if err := p.db.EnsureWorksheets(paths, it.Requester); err != nil {
+			return fmt.Errorf("record worksheet ownership: %w", err)
+		}
+	}
+	if strings.TrimSpace(summary) == "" {
+		summary = "published automatically"
+	}
+	p.db.SetStatus(it.ID, store.StatusDone, summary)
+	p.removeWorktree(it)
+	p.Logf("#%d published automatically", it.ID)
 	return nil
 }
 
@@ -562,6 +612,135 @@ func (p *Pipeline) merge(it store.Request) error {
 			return err
 		}
 	}
+	return nil
+}
+
+// Revisions returns the Git history for one worksheet, newest first.
+func (p *Pipeline) Revisions(worksheet string) ([]site.Revision, error) {
+	path, err := worksheetSourcePath(worksheet)
+	if err != nil {
+		return nil, err
+	}
+	out, err := p.git(p.cfg.Repo, "log", "--format=%H%x09%h%x09%ct%x09%s", "--", path)
+	if err != nil {
+		return nil, err
+	}
+	var revisions []site.Revision
+	for _, line := range strings.Split(strings.TrimSpace(out), "\n") {
+		if line == "" {
+			continue
+		}
+		parts := strings.SplitN(line, "\t", 4)
+		if len(parts) != 4 {
+			continue
+		}
+		unix, err := strconv.ParseInt(parts[2], 10, 64)
+		if err != nil {
+			continue
+		}
+		revisions = append(revisions, site.Revision{
+			Commit: parts[0], Short: parts[1], Subject: parts[3],
+			Date:    time.Unix(unix, 0).Format("2 Jan 2006, 15:04"),
+			Current: len(revisions) == 0,
+		})
+	}
+	return revisions, nil
+}
+
+func worksheetSourcePath(worksheet string) (string, error) {
+	parts := strings.Split(worksheet, "/")
+	if len(parts) != 2 || parts[0] == "" || parts[1] == "" ||
+		parts[0] == "." || parts[0] == ".." || parts[1] == "." || parts[1] == ".." {
+		return "", fmt.Errorf("invalid worksheet path %q", worksheet)
+	}
+	return filepath.Join("generate", parts[0], parts[1]), nil
+}
+
+// Revert restores one worksheet directory from an earlier Git revision,
+// commits that restoration as a new revision, and republishes the site.
+func (p *Pipeline) Revert(worksheet, commit string) error {
+	path, err := worksheetSourcePath(worksheet)
+	if err != nil {
+		return err
+	}
+	revisions, err := p.Revisions(worksheet)
+	if err != nil {
+		return err
+	}
+	valid := false
+	for _, revision := range revisions {
+		if revision.Commit == commit && !revision.Current {
+			valid = true
+			break
+		}
+	}
+	if !valid {
+		return fmt.Errorf("revision is not available for %s", worksheet)
+	}
+	active, err := p.db.Active()
+	if err != nil {
+		return err
+	}
+	for _, it := range active {
+		if it.Worksheet == worksheet {
+			return fmt.Errorf("a worksheet update is already in progress")
+		}
+	}
+
+	lane := "sheet:" + worksheet
+	p.mu.Lock()
+	if p.busy[lane] {
+		p.mu.Unlock()
+		return fmt.Errorf("the worksheet is busy")
+	}
+	p.busy[lane] = true
+	p.mu.Unlock()
+	defer func() {
+		p.mu.Lock()
+		delete(p.busy, lane)
+		p.mu.Unlock()
+		p.Kick()
+	}()
+
+	p.publishMu.Lock()
+	defer p.publishMu.Unlock()
+	status, err := p.git(p.cfg.Repo, "status", "--porcelain")
+	if err != nil {
+		return err
+	}
+	if strings.TrimSpace(status) != "" {
+		return fmt.Errorf("cannot revert while the main checkout has uncommitted changes")
+	}
+	if _, err := p.git(p.cfg.Repo, "checkout", commit, "--", path); err != nil {
+		return err
+	}
+	committed := false
+	defer func() {
+		if !committed {
+			p.git(p.cfg.Repo, "reset", "--hard", "HEAD")
+		}
+	}()
+	cmd := exec.Command("git", "diff", "--cached", "--quiet", "--", path)
+	cmd.Dir = p.cfg.Repo
+	if err := cmd.Run(); err == nil {
+		return fmt.Errorf("that revision is already current")
+	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 {
+		return err
+	}
+	message := fmt.Sprintf("Revert %s to %s", worksheet, commit[:12])
+	if _, err := p.git(p.cfg.Repo, "commit", "-m", message, "--", path); err != nil {
+		return err
+	}
+	committed = true
+	if p.cfg.Push {
+		if _, err := p.git(p.cfg.Repo, "push", "origin", "main"); err != nil {
+			return err
+		}
+	}
+	if err := p.rebuild(); err != nil {
+		return fmt.Errorf("revision committed, but rebuild failed: %w", err)
+	}
+	p.Logf("%s reverted to %s and published", worksheet, commit[:12])
 	return nil
 }
 
@@ -613,11 +792,15 @@ func (p *Pipeline) Refine(id int64, text string) error {
 	return nil
 }
 
-// Retry restarts a failed item from scratch.
+// Retry restarts failed agent work, or retries publication when a validated
+// worksheet is already waiting in its worktree.
 func (p *Pipeline) Retry(id int64) error {
 	it, err := p.db.Get(id)
 	if err != nil {
 		return err
+	}
+	if it.HasPreview && it.Branch != "" && it.Worktree != "" {
+		return p.publishAsync(it)
 	}
 	p.removeWorktree(it)
 	if err := p.db.SetRun(id, "", "", ""); err != nil {

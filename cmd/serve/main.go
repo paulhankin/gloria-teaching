@@ -66,8 +66,18 @@ func index(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, "worksheet access: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
+	revisions := make(map[string][]site.Revision, len(worksheets))
+	for _, ws := range worksheets {
+		history, err := pipe.Revisions(ws.Path())
+		if err != nil {
+			http.Error(w, "worksheet revisions: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		revisions[ws.Path()] = history
+	}
 	d := site.Data{
 		Worksheets:     worksheets,
+		Revisions:      revisions,
 		Admin:          db.AdminMode(),
 		Flash:          flash(w, r),
 		User:           account.Email(r),
@@ -124,6 +134,8 @@ func flash(w http.ResponseWriter, r *http.Request) string {
 		return "Rebuilding the site."
 	case "sharing":
 		return "Sharing settings saved."
+	case "reverted":
+		return "Earlier revision restored and published."
 	}
 	return ""
 }
@@ -315,6 +327,33 @@ func ownedWorksheets(manifest []site.Worksheet, owner string) ([]site.Worksheet,
 	return out, nil
 }
 
+func worksheetRevert(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	worksheet := r.FormValue("worksheet")
+	known, err := knownOwnedWorksheet(worksheet, account.Email(r))
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	if !known {
+		http.Error(w, "worksheet not found", http.StatusNotFound)
+		return
+	}
+	if err := pipe.Revert(worksheet, r.FormValue("commit")); err != nil {
+		http.Error(w, err.Error(), http.StatusConflict)
+		return
+	}
+	setFlash(w, "reverted")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
 func worksheetVisibility(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
@@ -449,6 +488,7 @@ func main() {
 	mux.HandleFunc("/requests", postRequest)
 	mux.HandleFunc("/requests/delete", deleteRequest)
 	mux.HandleFunc("/worksheets/visibility", worksheetVisibility)
+	mux.HandleFunc("/worksheets/revert", worksheetRevert)
 	mux.HandleFunc("/worksheets/shares", worksheetShare)
 	mux.HandleFunc("/worksheets/shares/delete", worksheetShareDelete)
 	mux.HandleFunc("/work/", work)

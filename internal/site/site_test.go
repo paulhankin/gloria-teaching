@@ -106,6 +106,28 @@ func TestCompletedItemHasNoActions(t *testing.T) {
 	}
 }
 
+func TestRevisionHistoryOffersRevertWithoutApproval(t *testing.T) {
+	html := Index(Data{
+		Admin: true,
+		Worksheets: []Worksheet{{
+			Subject: "math", Name: "fractions", Title: "Brüche",
+		}},
+		Revisions: map[string][]Revision{"math/fractions": {
+			{Commit: "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa", Short: "aaaaaaaaaaaa", Subject: "Latest", Date: "16 Aug 2026, 10:00", Current: true},
+			{Commit: "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb", Short: "bbbbbbbbbbbb", Subject: "Earlier", Date: "15 Aug 2026, 10:00"},
+		}},
+		Requests: []store.Request{{ID: 8, Status: store.StatusReview, Body: "finished work"}},
+	})
+	for _, want := range []string{"Revision history", "Current", "Revert to this version", `/worksheets/revert`, "will be published automatically"} {
+		if !strings.Contains(html, want) {
+			t.Fatalf("revision UI is missing %q", want)
+		}
+	}
+	if strings.Contains(html, "Approve &amp; publish") || strings.Contains(html, `/work/approve`) {
+		t.Fatal("finished work still asks for approval")
+	}
+}
+
 func TestPrivateWorksheetShowsSharingControls(t *testing.T) {
 	html := Index(Data{User: "owner@example.com", Worksheets: []Worksheet{{
 		Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com",
