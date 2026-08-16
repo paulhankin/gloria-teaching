@@ -14,4 +14,5 @@
 - Task data lives in Go structs (`tasks.go`), not in JSON files.
 - Shared layout lives in `internal/sheet` (`BaseCSS`, `Page`, `SolutionPage`,
   ...). Sheet-specific CSS only for sheet-specific things.
-- Before committing: `gofmt -l -w .`, `go build ./...`, `make html`.
+- Before returning: `gofmt -l -w .`, `go build ./...`, `make html`, commit
+  the changes with a good message, and `git push`.
