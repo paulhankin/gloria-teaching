@@ -44,6 +44,13 @@ type sandboxMetadata struct {
 	PID             int       `json:"pid"`  // 0 while no isolated server is running
 	Unit            string    `json:"unit"` // transient systemd unit/scope name while active
 	CleanupState    string    `json:"cleanup_state"`
+
+	// ImportedCoreCommit and ImportedWorksheetCommit record the rebased tips
+	// that were fast-forwarded into each live main. They make the import
+	// idempotent: after a crash between the two fast-forwards (or before the
+	// push) the already-imported side is skipped instead of duplicated.
+	ImportedCoreCommit      string `json:"imported_core_commit,omitempty"`
+	ImportedWorksheetCommit string `json:"imported_worksheet_commit,omitempty"`
 }
 
 // writeMetadata atomically replaces the metadata file (temp file + rename).

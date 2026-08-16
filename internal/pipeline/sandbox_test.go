@@ -122,7 +122,9 @@ func setupCloneFixture(t *testing.T) (*Pipeline, sandboxPaths, string, string, s
 	root := t.TempDir()
 	coreRepo := filepath.Join(root, "live-core")
 	coreHead := initTestRepo(t, coreRepo, "framework")
-	if err := os.WriteFile(filepath.Join(coreRepo, ".gitignore"), []byte("/generate/*\n!/generate/README.md\n"), 0o644); err != nil {
+	// The core repository ignores the whole generate/ tree: per-user
+	// worksheet repositories are mounted below it.
+	if err := os.WriteFile(filepath.Join(coreRepo, ".gitignore"), []byte("/generate/\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	gitOK(t, coreRepo, "add", ".")

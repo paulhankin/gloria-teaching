@@ -303,10 +303,22 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		return err
 	}
 
-	// A restart may have interrupted publication after both branches were
-	// already merged. In that case, finish rebuilding instead of asking the
-	// agent to redo completed work.
-	if it.Branch != "" {
+	// A restart may have interrupted publication after the agent's commits
+	// already reached the live repositories. In that case, finish rebuilding
+	// instead of asking the agent to redo completed work. Sandbox mode
+	// checks the imported tips recorded in the sandbox metadata; worktree
+	// mode checks the shared request branches.
+	if it.Branch != "" && p.cfg.Sandbox {
+		paths, pathErr := sandboxPathsFor(p.cfg.SandboxRoot, it.ID, username)
+		if pathErr == nil {
+			if meta, metaErr := readMetadata(paths); metaErr == nil {
+				applied, impErr := p.importsApplied(meta)
+				if impErr == nil && applied {
+					return p.publish(it, it.Note)
+				}
+			}
+		}
+	} else if it.Branch != "" {
 		merged, err := p.branchesMerged(it.Branch, username)
 		if err == nil && merged {
 			return p.publish(it, it.Note)
@@ -431,6 +443,11 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		}
 	}
 
+	if p.cfg.Sandbox {
+		if err := setPhase(paths, phaseValidating); err != nil {
+			p.Logf("#%d: record sandbox phase: %v", it.ID, err)
+		}
+	}
 	if err := p.commitLeftovers(workspace, username, it); err != nil {
 		return err
 	}
@@ -895,6 +912,11 @@ func (p *Pipeline) publishAsync(it store.Request) error {
 
 // publish merges a finished worksheet, rebuilds the public files and closes
 // the request. The caller must hold the request lane.
+//
+// In sandbox mode the request branch only exists inside the disposable
+// clones, so instead of branchesMerged + merge this imports the recorded
+// clone commits into the live repositories (importCommits) and recovers an
+// interrupted import from the sandbox metadata (importsApplied).
 func (p *Pipeline) publish(it store.Request, summary string) error {
 	p.db.SetStatus(it.ID, store.StatusWorking, "publishing")
 	p.publishMu.Lock()
@@ -904,13 +926,19 @@ func (p *Pipeline) publish(it store.Request, summary string) error {
 	if err != nil {
 		return err
 	}
-	merged, err := p.branchesMerged(it.Branch, username)
-	if err != nil {
-		return err
-	}
-	if !merged {
-		if err := p.merge(it); err != nil {
-			return fmt.Errorf("merge: %w", err)
+	if p.cfg.Sandbox {
+		if err := p.publishSandbox(it, username); err != nil {
+			return err
+		}
+	} else {
+		merged, err := p.branchesMerged(it.Branch, username)
+		if err != nil {
+			return err
+		}
+		if !merged {
+			if err := p.merge(it); err != nil {
+				return fmt.Errorf("merge: %w", err)
+			}
 		}
 	}
 	if p.cfg.Push {
