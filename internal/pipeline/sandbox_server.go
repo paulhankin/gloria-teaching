@@ -135,6 +135,23 @@ func (p *Pipeline) startShelley(paths sandboxPaths, meta sandboxMetadata) (*sand
 	}
 	header := headerName + ": " + randomHexToken(8)
 
+	command := []string{
+		"shelley",
+		"-db", paths.DB,
+		"-config", "/exe.dev/shelley.json",
+	}
+	if p.cfg.ShelleyPredictableOnly {
+		// Tests only: the builtin deterministic "predictable" model is the
+		// only model the server offers (no LLM integration discovery).
+		command = append(command, "-predictable-only")
+	}
+	command = append(command,
+		"serve",
+		"-socket", paths.Socket,
+		"-port", "0",
+		"-require-header", headerName,
+	)
+
 	spec := sandbox.Spec{
 		Name:      fmt.Sprintf("req-%d", meta.RequestID),
 		Workspace: paths.Workspace,
@@ -147,15 +164,7 @@ func (p *Pipeline) startShelley(paths sandboxPaths, meta sandboxMetadata) (*sand
 			TasksMax:  p.cfg.Limits.TasksMax,
 			CPUQuota:  p.cfg.Limits.CPUQuota,
 		},
-		Command: []string{
-			"shelley",
-			"-db", paths.DB,
-			"-config", "/exe.dev/shelley.json",
-			"serve",
-			"-socket", paths.Socket,
-			"-port", "0",
-			"-require-header", headerName,
-		},
+		Command: command,
 	}
 	if err := sandbox.SelfCheck(spec); err != nil {
 		return nil, fmt.Errorf("sandbox self-check: %w", err)
@@ -265,7 +274,8 @@ func randomHexToken(n int) string {
 }
 
 // chatExtraArgs are appended to every "shelley client chat" invocation of a
-// sandboxed request.
+// sandboxed request. Config.ChatExtraArgs (tests/development only) comes
+// first so a future conversation option here always wins over it.
 //
 // TODO(stage-1): restrict the conversation to the worksheet tool allowlist
 // (bash, patch, keyword_search, change_dir). shelley 0.930 has neither a CLI
@@ -274,7 +284,7 @@ func randomHexToken(n int) string {
 // future shelley version only needs to add arguments in one place. Until
 // then the allowlist is expressed in the prompt only.
 func (p *Pipeline) chatExtraArgs() []string {
-	return nil
+	return p.cfg.ChatExtraArgs
 }
 
 // shelleyClient runs "shelley client <args...>" against target.

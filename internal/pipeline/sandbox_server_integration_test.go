@@ -2,6 +2,8 @@ package pipeline
 
 import (
 	"context"
+	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -231,16 +233,40 @@ func serverPort(t *testing.T, handle *sandbox.Handle) string {
 }
 
 // TestSandboxedShelleyRestartRecovery restarts the isolated server on the
-// same database after a graceful stop and verifies that state (here: the
-// database with its schema and settings) survives, and that a second start
-// on the same paths cleans up the stale socket left by the first run.
+// same database after a graceful stop and verifies that a CONVERSATION
+// created before the restart can be continued after it (the plan's
+// integration test 9). It also covers the startup hygiene: a second start
+// on the same paths kills the stale process bookkeeping and removes a
+// stale socket left behind by a crash.
+//
+// The conversation uses the builtin deterministic "predictable" model (the
+// server runs with -predictable-only), so the turn is real end-to-end work
+// through the sandboxed server (chat -> bash tool -> git commit in the
+// workspace) without any LLM cost.
 func TestSandboxedShelleyRestartRecovery(t *testing.T) {
 	requireShelleySandbox(t)
 	paths := testSandboxLayout(t, 9002)
 	meta := sandboxMetadata{RequestID: 9002, Username: "teacher", Version: sandboxFormatVersion}
 
-	p := New(nil, Config{Sandbox: true})
-	first := startTestShelley(t, paths, meta)
+	p := New(nil, Config{Sandbox: true, ShelleyPredictableOnly: true})
+	first := startTestShelleyPredictable(t, paths, meta)
+
+	// Turn 1 before the restart: the predictable model runs the bash
+	// command verbatim inside the sandbox and commits to the workspace.
+	convID, err := p.chatNew(first.target, paths.Workspace,
+		"bash: echo before-restart > progress.txt && git init -q -b main . && "+
+			"git -c user.name=T -c user.email=t@t add progress.txt && "+
+			"git -c user.name=T -c user.email=t@t commit -qm before-restart")
+	if err != nil {
+		t.Fatalf("chatNew: %v", err)
+	}
+	if convID == "" {
+		t.Fatal("chatNew returned an empty conversation id")
+	}
+	waitConversationIdle(t, first.target, convID)
+	if _, err := os.Stat(filepath.Join(paths.Workspace, "progress.txt")); err != nil {
+		t.Fatalf("turn 1 did not write through the workspace bind: %v", err)
+	}
 	p.stopShelley(first)
 
 	// Simulate what a service restart leaves behind: metadata with a dead
@@ -272,19 +298,79 @@ func TestSandboxedShelleyRestartRecovery(t *testing.T) {
 	if err := sandboxIntegrityPaths(paths); err != nil {
 		t.Fatalf("integrity after graceful stop: %v", err)
 	}
-	if got := decideRecovery(true, "conv-1", sandboxIntegrityPaths(paths)); got != recoveryContinue {
+	if got := decideRecovery(true, convID, sandboxIntegrityPaths(paths)); got != recoveryContinue {
 		t.Fatalf("decideRecovery = %d, want recoveryContinue", got)
 	}
 
-	second := startTestShelley(t, paths, stale)
+	second := startTestShelleyPredictable(t, paths, stale)
 	if second.handle.PID == first.handle.PID {
 		t.Fatal("restarted server reuses the pid of the first")
 	}
+	// The conversation SURVIVED the restart on the same database: list
+	// still shows it, and the continuation turn (the pipeline's resume
+	// prompt in production; here a deterministic second bash command)
+	// runs against the same workspace and git history.
 	out, err := exec.Command("shelley", append([]string{"client"}, clientArgs(second.target, "list")...)...).CombinedOutput()
 	if err != nil {
 		t.Fatalf("list against restarted server: %v: %s", err, out)
 	}
+	if !strings.Contains(string(out), convID) {
+		t.Fatalf("conversation %s missing after the restart: %s", convID, out)
+	}
+	if err := p.chatContinue(second.target, convID,
+		"bash: echo after-restart >> progress.txt && "+
+			"git -c user.name=T -c user.email=t@t add progress.txt && "+
+			"git -c user.name=T -c user.email=t@t commit -qm after-restart"); err != nil {
+		t.Fatalf("chatContinue after restart: %v", err)
+	}
+	waitConversationIdle(t, second.target, convID)
+	data, err := os.ReadFile(filepath.Join(paths.Workspace, "progress.txt"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.Fields(string(data)); fmt.Sprint(got) != "[before-restart after-restart]" {
+		t.Fatalf("progress.txt = %q, want both turns applied", got)
+	}
+	if got := gitOK(t, paths.Workspace, "rev-list", "--count", "HEAD"); got != "2" {
+		t.Fatalf("workspace commits after the restart = %s, want 2", got)
+	}
 	p.stopShelley(second)
+}
+
+// startTestShelleyPredictable starts the isolated server with the builtin
+// predictable model as the only model (no LLM integration discovery).
+func startTestShelleyPredictable(t *testing.T, paths sandboxPaths, meta sandboxMetadata) *sandboxServer {
+	t.Helper()
+	p := New(nil, Config{Sandbox: true, SandboxRoot: filepath.Dir(paths.Root), ShelleyPredictableOnly: true})
+	srv, err := p.startShelley(paths, meta)
+	if err != nil {
+		t.Fatalf("startShelley: %v", err)
+	}
+	t.Cleanup(func() { p.stopShelley(srv) })
+	return srv
+}
+
+// waitConversationIdle polls shelley client list until the conversation is
+// no longer working (the turn ended) or the deadline passes.
+func waitConversationIdle(t *testing.T, target shelleyTarget, convID string) {
+	t.Helper()
+	deadline := time.Now().Add(60 * time.Second)
+	for time.Now().Before(deadline) {
+		out, err := exec.Command("shelley", append([]string{"client"}, clientArgs(target, "list", "-limit", "50")...)...).Output()
+		if err == nil {
+			for _, line := range strings.Split(string(out), "\n") {
+				var c struct {
+					ID      string `json:"conversation_id"`
+					Working bool   `json:"working"`
+				}
+				if json.Unmarshal([]byte(line), &c) == nil && c.ID == convID && !c.Working {
+					return
+				}
+			}
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	t.Fatalf("conversation %s still working after the deadline", convID)
 }
 
 // sandboxIntegrityPaths wraps sandboxIntegrity for the layout used here,

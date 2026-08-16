@@ -1,5 +1,61 @@
 # Stage 1 plan: filesystem-isolated Shelley worksheet jobs
 
+## Implementation status
+
+Implemented (on top of the plan commit `0da3646`):
+
+- `7462b6a` — sandbox config (`Config.Sandbox`/`SandboxRoot`), path helpers
+  with traversal rejection, standalone request clones (no shared Git
+  metadata, remotes removed, request-local identity), metadata.json with
+  atomic writes, and the `-sandbox` / `-sandboxes` service flags.
+- `d1b075b` — `internal/sandbox` bubblewrap launcher: argument construction
+  as a slice, mount/environment allowlists, startup self-checks, systemd
+  scope launch with a process-group fallback, socket readiness detection,
+  and whole-group teardown.
+- `408cd4b` — per-request sandboxed `shelley serve`: dedicated
+  database/socket/TCP port 0, random per-run required header, every client
+  call pinned to the request socket, startup recovery (stale process kill,
+  socket cleanup after ownership check, integrity-gated conversation
+  continuation).
+- `b7e938b` — host-side commit import: fetch of exactly the recorded
+  branch into a temp ref, double ancestry validation, core/worksheet path
+  separation, two-phase rebase + fast-forward under the publication mutex,
+  crash-idempotent via recorded imported tips. Live branches are never
+  force-updated.
+- `f21cd44` — resource limits (cgroup memory/tasks/CPU via the scope,
+  runtime cap, request-directory size budget), a global sandbox semaphore,
+  and the retention janitor plus startup cleanup.
+- This commit — operational documentation (`docs/sandbox-operations.md`),
+  truthful UI wording ("disposable isolated workspace"), and the remaining
+  test-plan coverage: marker-file isolation, primary-socket unreachability,
+  concurrent-sandbox invisibility, malicious-symlink handling across
+  build/import/cleanup, restart-continuation with a real conversation, and
+  one end-to-end pipeline run driven by the builtin `predictable` model
+  (`TestSandboxedPipelineEndToEnd`, no LLM traffic).
+
+Deferred / known gaps (honest list):
+
+- **Tool allowlist is prompt-expressed only.** shelley 0.930 has no CLI
+  flag or conversation-creation API option to restrict tools, so the
+  worksheet tool allowlist (bash, patch, keyword_search, change_dir) lives
+  in the prompt text. The plumbing point for a future shelley version is
+  `pipeline.chatExtraArgs` (now backed by `Config.ChatExtraArgs`).
+- **No JIT-install disable flag.** shelley 0.930 cannot turn off JIT
+  package installation; the read-only system root makes installation
+  attempts fail safely, but the attempts still happen if the model tries.
+- **The network is shared.** The agent can reach the exe.dev LLM
+  integration and anything else the host can; there is no exfiltration
+  prevention. The random required header guards only the isolated server's
+  TCP listener (defense in depth, TCP-only; the Unix socket skips header
+  checks by design).
+- **Interactive sandbox UI** (browsing the isolated Shelley's web UI) is
+  out of scope; **PDF generation** stays outside the sandbox.
+- **No real-LLM end-to-end run** inside the sandbox is automated (the
+  predictable model covers the mechanics); do it manually per the rollout
+  checklist before enabling `-sandbox` broadly. A service-level
+  restart-during-turn test (killing `cmd/serve` mid-turn) is likewise a
+  manual step; its pieces are covered individually.
+
 ## Goal
 
 Run the Shelley agent for each worksheet request inside a dedicated bubblewrap
@@ -380,6 +436,10 @@ Keep bubblewrap mechanics out of the request state machine where possible.
 - Add troubleshooting instructions for bubblewrap, user namespaces, caches,
   cgroups, stale sockets, and retained failed workspaces.
 
+Done: the operator-facing documentation is
+[sandbox-operations.md](sandbox-operations.md); the request status in the
+UI describes a "disposable isolated workspace".
+
 ## Test plan
 
 ### Unit tests
@@ -450,13 +510,38 @@ Run a predictable-model Shelley inside the real bubblewrap policy and verify:
 Stage 1 is complete only when:
 
 - [ ] Real Shelley runs inside bubblewrap for worksheet jobs.
-- [ ] No live Git metadata is mounted into the sandbox.
-- [ ] The real home, primary Shelley state, `/users`, live checkout, and service
-      database are absent from the sandbox.
-- [ ] Required formatting and builds succeed with the allowlisted mounts.
-- [ ] Every Shelley client call targets the request-local socket explicitly.
-- [ ] Resource limits and whole-cgroup cleanup are tested.
+      (Implemented and enabled via `-sandbox`; the automated end-to-end
+      coverage uses the builtin `predictable` model. A real-LLM run inside
+      bwrap is verified manually per the rollout checklist.)
+- [x] No live Git metadata is mounted into the sandbox.
+      (Standalone `--no-local --no-hardlinks` clones; `validateClone`
+      rejects linked worktrees, shared clones, symlink escapes, and
+      remotes; `TestValidateClone`, `TestCreateClones`.)
+- [x] The real home, primary Shelley state, `/users`, live checkout, and
+      service database are absent from the sandbox.
+      (`TestIntegrationMarkerFileIsolation`,
+      `TestIntegrationPrimaryShelleySocketUnreachable`,
+      `TestSandboxedShelleyServer`.)
+- [x] Required formatting and builds succeed with the allowlisted mounts.
+      (`TestIntegrationGoBuild` for `go build`/`gofmt`; `make html` inside
+      the sandbox is exercised by `TestSandboxedPipelineEndToEnd`.)
+- [x] Every Shelley client call targets the request-local socket
+      explicitly. (`clientArgs` is the single construction point;
+      `TestClientArgsSandboxTargetAlwaysSetsSocketAndHeader`.)
+- [x] Resource limits and whole-cgroup cleanup are tested.
+      (`TestIntegrationStopKillsGroup`, `TestSandboxRuntimeCapKillsServer`,
+      `TestEnforceWorkspaceLimit`, `TestSandboxSlotSemaphore`.)
 - [ ] Restart recovery is tested during both agent and publication phases.
-- [ ] Commit import validates ancestry and never force-updates live branches.
-- [ ] Integration tests prove cross-request and host-file isolation.
-- [ ] Documentation clearly states that Stage 1 retains shared network access.
+      (Isolated-server restart continuing a stored conversation:
+      `TestSandboxedShelleyRestartRecovery`. Publication-phase crash:
+      `TestImportCommitsResumesAfterCrash`. A full service-level
+      restart-during-turn e2e remains a manual rollout step.)
+- [x] Commit import validates ancestry and never force-updates live
+      branches. (`TestImportCommits*` — rewritten history rejected,
+      conflicts leave both mains untouched, crash-idempotent resume.)
+- [x] Integration tests prove cross-request and host-file isolation.
+      (`TestIntegrationConcurrentSandboxes`,
+      `TestIntegrationMarkerFileIsolation`, `TestMaliciousCloneSymlinks`.)
+- [x] Documentation clearly states that Stage 1 retains shared network
+      access. (`docs/sandbox-operations.md` threat model; UI wording says
+      "disposable isolated workspace" and never "fully isolated".)

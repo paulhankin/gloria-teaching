@@ -62,9 +62,16 @@ func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 			Status: store.StatusWorking, Body: "Add another task",
 		}},
 	})
-	for _, want := range []string{"Updates in progress", "Work in progress", "The worksheet is being updated now", "Add another task"} {
+	for _, want := range []string{"Updates in progress", "Work in progress", "The worksheet is being updated now, in a disposable isolated workspace", "Add another task"} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("active work display is missing %q", want)
+		}
+	}
+	// The workspace wording must stay truthful about Stage 1: filesystem and
+	// process isolation only, never a network boundary.
+	for _, banned := range []string{"fully isolated", "secure network sandbox"} {
+		if strings.Contains(html, banned) {
+			t.Fatalf("status wording overpromises isolation: %q", banned)
 		}
 	}
 	if strings.Contains(html, "/work/approve") || strings.Contains(html, "/work/reject") {

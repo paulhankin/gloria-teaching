@@ -73,16 +73,32 @@ func HasLocalUserDirectories(root string) bool {
 		return false
 	}
 	for _, entry := range entries {
-		if entry.IsDir() && !strings.HasPrefix(entry.Name(), ".") {
+		if !strings.HasPrefix(entry.Name(), ".") && isDirOrSymlinkToDir(root, entry) {
 			return true
 		}
 	}
 	return false
 }
 
+// isDirOrSymlinkToDir reports whether the entry is a directory or a symlink
+// whose target is a directory (os.ReadDir's IsDir never follows symlinks).
+func isDirOrSymlinkToDir(root string, entry os.DirEntry) bool {
+	if entry.IsDir() {
+		return true
+	}
+	info, err := os.Stat(filepath.Join(root, entry.Name()))
+	return err == nil && info.IsDir()
+}
+
 // LinkUserRepositories exposes every repository below usersRoot as a symlink
 // below generateDir, keeping the worksheet source physically outside the core
 // repository while making it part of the core Go module during a build.
+//
+// One layout needs no link: the sandbox request clones hold a REAL directory
+// at generate/<user> (the standalone worksheet clone). When generate/<user>
+// already is that directory (resolving to the usersRoot entry), linking is a
+// no-op. A real directory pointing anywhere else is still an error: silently
+// replacing it could hide unmerged work.
 func LinkUserRepositories(usersRoot, generateDir string) error {
 	users, err := os.ReadDir(usersRoot)
 	if os.IsNotExist(err) {
@@ -114,11 +130,30 @@ func LinkUserRepositories(usersRoot, generateDir string) error {
 		} else if !os.IsNotExist(err) {
 			return fmt.Errorf("%s exists and is not a symlink", link)
 		}
+		if sameResolvedDir(link, source) {
+			// Sandbox layout: generate/<user> is already the repository
+			// itself (a standalone clone), no symlink needed.
+			continue
+		}
 		if err := os.Symlink(source, link); err != nil {
 			return err
 		}
 	}
 	return nil
+}
+
+// sameResolvedDir reports whether path exists and resolves (all symlinks
+// evaluated) to the same directory as target.
+func sameResolvedDir(path, target string) bool {
+	p, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return false
+	}
+	t, err := filepath.EvalSymlinks(target)
+	if err != nil {
+		return false
+	}
+	return p == t
 }
 
 // Packages returns the worksheet package import paths for repositories below

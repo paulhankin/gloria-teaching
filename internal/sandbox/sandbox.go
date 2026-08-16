@@ -313,15 +313,12 @@ func Args(spec Spec) ([]string, error) {
 		}
 	}
 
-	// Go toolchain and module cache (read-only; the writable build cache is
-	// separate). GOFLAGS=-mod=mod keeps "go build" usable with a read-only
-	// module cache on Go >= 1.16. The module cache is mounted at the fixed
-	// modCacheMount (see modCacheSandboxPath), never at its host path.
+	// Go toolchain (read-only; the writable build cache is separate).
+	// GOFLAGS=-mod=mod keeps "go build" usable with a read-only module cache
+	// on Go >= 1.16. The module cache itself is mounted AFTER the writable
+	// home bind below: its destination (modCacheMount) lives below the
+	// synthetic home, so an earlier bind would be shadowed by the home bind.
 	args = roBindIfExists(args, "/usr/local/go", "/usr/local/go", &notes)
-	if spec.ModCache != "-" && spec.ModCache != "" {
-		mc := filepath.Clean(spec.ModCache)
-		args = roBindIfExists(args, mc, modCacheMount, &notes)
-	}
 
 	// Writable request mounts. Mount ORDER IS LOAD-BEARING:
 	//
@@ -331,8 +328,15 @@ func Args(spec Spec) ([]string, error) {
 	//     /home parent present (the --tmpfs /home above provides it).
 	//  2. The home bind precedes the Go build cache bind in case the cache
 	//     lives below home.
+	//  3. The read-only module cache follows the home bind because its
+	//     destination is below the synthetic home; mounted earlier it would
+	//     be hidden by the home bind.
 	args = bindIfExists(args, spec.Home, homeMount, &notes)
 	args = bindIfExists(args, spec.Tmp, "/tmp", &notes)
+	if spec.ModCache != "-" && spec.ModCache != "" {
+		mc := filepath.Clean(spec.ModCache)
+		args = roBindIfExists(args, mc, modCacheMount, &notes)
+	}
 	args = bindIfExists(args, spec.Workspace, filepath.Clean(spec.Workspace), &notes)
 	args = bindIfExists(args, spec.State, filepath.Clean(spec.State), &notes)
 	if spec.GoCache != "" && !belowHome(spec) {

@@ -40,6 +40,24 @@ type Config struct {
 	SandboxRoot string // parent directory for the per-request sandboxes
 	Limits      SandboxLimits
 
+	// ChatExtraArgs appends raw arguments to every sandbox-mode
+	// "shelley client chat" invocation (e.g. "-model", "predictable" to pin
+	// the builtin test model). chatExtraArgs applies them after its own.
+	// Only tests and local development set this.
+	ChatExtraArgs []string
+
+	// ShelleyPredictableOnly starts the sandboxed "shelley serve" with the
+	// global -predictable-only flag: the builtin deterministic test model is
+	// the only available model (no LLM integration discovery). Tests set it
+	// together with ChatExtraArgs=["-model", "predictable"].
+	ShelleyPredictableOnly bool
+
+	// RawPrompt passes the request body to the agent verbatim instead of
+	// wrapping it in the worksheet prompt. Tests only: the predictable model
+	// pattern-matches the whole prompt (e.g. a leading "bash: "), so a
+	// wrapped prompt would never reach its tool execution path.
+	RawPrompt bool
+
 	// JanitorInterval overrides how often the sandbox retention janitor
 	// scans SandboxRoot. Zero uses the default (10 minutes); only tests set
 	// it. Negative disables the background janitor (manual JanitorRun only).
@@ -592,11 +610,18 @@ func firstLine(s string) string {
 func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	var b strings.Builder
 	if followUp != "" {
+		if p.cfg.RawPrompt {
+			return followUp
+		}
 		b.WriteString("A refinement was requested for the work you just did:\n\n")
 		b.WriteString(followUp)
 		b.WriteString("\n\nAdjust your work accordingly, rebuild (`gofmt -l -w .`, `go build ./...`, " +
 			"`make html`) and amend or add a commit. Do not push.\n")
 		return b.String()
+	}
+	if p.cfg.RawPrompt {
+		// Tests only: the request body IS the whole prompt.
+		return it.Body
 	}
 	b.WriteString("You are working in an isolated workspace for the `learningmaterial` project. " +
 		"Follow AGENTS.md. The requester's worksheets are a separate Git repository " +
@@ -959,13 +984,24 @@ func (p *Pipeline) previewDir(id int64) string {
 	return filepath.Join(p.cfg.PreviewRoot, fmt.Sprint(id))
 }
 
-func (p *Pipeline) runGenerator(repo, out string) error {
-	prepare := exec.Command("go", "run", "./cmd/importworksheets")
+// runGenerator builds the worksheets of repo into out. usersRoot selects the
+// per-user worksheet repositories: buildPreview passes "generate" (the
+// workspace/worktree always embeds the requester's repository at
+// generate/<username>, as a standalone clone or a worktree), while the
+// trusted rebuild of the served output uses the live WorksheetRoot.
+func (p *Pipeline) runGenerator(repo, out, usersRoot string) error {
+	// Both commands take the worksheet root explicitly: the default
+	// ("" → /users, or generate/ when it holds user directories) is right
+	// in production, but tests and the sandbox clones keep their worksheet
+	// repositories somewhere else. importworksheets resolves the root the
+	// same way generate does, so passing it to both keeps them in sync.
+	users := []string{"-users", usersRoot}
+	prepare := exec.Command("go", append([]string{"run", "./cmd/importworksheets"}, users...)...)
 	prepare.Dir = repo
 	if output, err := prepare.CombinedOutput(); err != nil {
 		return fmt.Errorf("discover worksheets: %v: %s", err, tail(string(output), 800))
 	}
-	cmd := exec.Command("go", "run", "./cmd/generate", "-out", out)
+	cmd := exec.Command("go", append([]string{"run", "./cmd/generate"}, append(users, "-out", out)...)...)
 	cmd.Dir = repo
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("generate: %v: %s", err, tail(string(output), 800))
@@ -973,20 +1009,24 @@ func (p *Pipeline) runGenerator(repo, out string) error {
 	return nil
 }
 
-// buildPreview renders the target user's worksheets from the isolated workspace.
+// buildPreview renders the target user's worksheets from the isolated
+// workspace. The worksheet root is the workspace's own generate/ directory:
+// both modes embed the requester's repository there (a standalone clone in
+// sandbox mode, a linked worktree otherwise), so the preview reflects exactly
+// what the agent did — never the live repositories.
 func (p *Pipeline) buildPreview(it store.Request, worktree string) error {
 	dir := p.previewDir(it.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	return p.runGenerator(worktree, dir)
+	return p.runGenerator(worktree, dir, "generate")
 }
 
 // rebuild regenerates the served output. The running server reads the generated
 // manifest dynamically, so publishing worksheet content needs no binary rebuild
 // or service restart.
 func (p *Pipeline) rebuild() error {
-	return p.runGenerator(p.cfg.Repo, p.cfg.OutputDir)
+	return p.runGenerator(p.cfg.Repo, p.cfg.OutputDir, p.cfg.WorksheetRoot)
 }
 
 func tail(s string, n int) string {

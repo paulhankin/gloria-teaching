@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 )
@@ -281,6 +282,25 @@ func TestArgsDefaultModCacheIsMountedReadOnly(t *testing.T) {
 	v, ok := argAfter(args, "GOMODCACHE")
 	if !ok || v != modCacheMount {
 		t.Errorf("GOMODCACHE = %q, want %q", v, modCacheMount)
+	}
+	// Mount ORDER is load-bearing: the read-only module cache lives below
+	// the synthetic home, so its bind must come AFTER the writable home
+	// bind or the home bind shadows it (the build then downloads modules
+	// into the per-request home instead of reusing the host cache).
+	homeIdx, mcIdx := -1, -1
+	for i := 0; i+1 < len(args); i++ {
+		if args[i] == "--bind" && args[i+1] == spec.Home {
+			homeIdx = i
+		}
+		if args[i] == "--ro-bind" && args[i+2] == modCacheMount && i+2 < len(args) {
+			mcIdx = i
+		}
+	}
+	if homeIdx < 0 || mcIdx < 0 {
+		t.Fatalf("home bind (%d) or module cache bind (%d) missing", homeIdx, mcIdx)
+	}
+	if mcIdx < homeIdx {
+		t.Errorf("module cache bind (arg %d) precedes the home bind (arg %d); the home bind would shadow it", mcIdx, homeIdx)
 	}
 }
 
@@ -584,5 +604,275 @@ func TestIntegrationDieWithParent(t *testing.T) {
 		// Only flag survivors whose parent chain is gone: a coarse check
 		// is enough because the test created the only "sleep 300" around.
 		t.Errorf("sandbox child %s survived the parent's SIGKILL", line)
+	}
+}
+
+// absSymlink returns target resolved to a clean absolute path, evaluating
+// symlinks when target exists. testSpec roots live below /tmp, and on some
+// hosts /tmp itself is a symlink: the bind source is resolved first, so
+// inside the sandbox the canonical path is what exists.
+func absSymlink(t *testing.T, target string) string {
+	t.Helper()
+	abs, err := filepath.Abs(target)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if resolved, err := filepath.EvalSymlinks(abs); err == nil {
+		return resolved
+	}
+	return filepath.Clean(abs)
+}
+
+// TestIntegrationMarkerFileIsolation plants a marker in every location the
+// Stage 1 threat model protects (live checkout, /users, the real home, the
+// primary Shelley configuration directory, a stand-in for the service
+// request database) and verifies from INSIDE the sandbox that none of them
+// is reachable: not by their absolute path, not through /proc/self/mounts,
+// and that a committed symlink in the workspace cannot smuggle the canary
+// in either. This is the plan's integration test 4 ("cannot read known
+// marker files") and 7 (symlink escape) for the filesystem layer.
+func TestIntegrationMarkerFileIsolation(t *testing.T) {
+	requireBwrap(t)
+	spec := testSpec(t)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	realHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	// marker holds one protected location: a marker file planted on the
+	// host and the in-sandbox probes that must not find it.
+	type marker struct {
+		name string
+		dir  string // host directory the marker lives in
+		path string // absolute marker path as probed inside the sandbox
+	}
+	secret := "top-secret-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	plant := func(dir string) string {
+		t.Helper()
+		if err := os.MkdirAll(dir, 0o755); err != nil {
+			t.Fatal(err)
+		}
+		path := filepath.Join(dir, "MARKER.txt")
+		if err := os.WriteFile(path, []byte(secret), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		return absSymlink(t, path)
+	}
+
+	// The layout mirrors production: the live checkout and the /users tree
+	// are siblings of the sandbox root, the service database lives below
+	// the data directory.
+	dataDir := filepath.Join(t.TempDir(), "data")
+	markers := []marker{
+		{"live-checkout", filepath.Join(dataDir, "live-core"), ""},
+		{"users", filepath.Join(dataDir, "users", "teacher"), ""},
+		{"service-db", filepath.Join(dataDir, "requests-db"), ""},
+	}
+	for i := range markers {
+		markers[i].path = plant(markers[i].dir)
+	}
+	// Real home and primary Shelley state: only added when this developer
+	// machine actually has them (never fail on a minimal CI box).
+	if info, err := os.Stat(realHome); err == nil && info.IsDir() {
+		markers = append(markers, marker{"real-home", realHome, plant(realHome)})
+	}
+	primaryCfg := filepath.Join(realHome, ".config", "shelley")
+	if err := os.MkdirAll(primaryCfg, 0o755); err == nil {
+		markers = append(markers, marker{"primary-shelley-config", primaryCfg, plant(primaryCfg)})
+	}
+
+	// A committed symlink in the workspace must not smuggle the canary in:
+	// the workspace bind mounts the link, but its target stays outside every
+	// mount, so reading through it must fail inside the sandbox while the
+	// host file remains intact.
+	canary := filepath.Join(dataDir, "users", "teacher", "MARKER.txt")
+	if err := os.Symlink(canary, filepath.Join(spec.Workspace, "escape")); err != nil {
+		t.Fatal(err)
+	}
+
+	var parts []string
+	for _, m := range markers {
+		parts = append(parts, fmt.Sprintf(
+			"if cat %s >/dev/null 2>&1; then echo leak-%s; else echo check-%s=hidden; fi", m.path, m.name, m.name))
+	}
+	parts = append(parts,
+		"if cat escape >/dev/null 2>&1; then echo leak-symlink; else echo check-symlink=hidden; fi",
+		"mount | grep -E '/users|"+realHome+"' || echo check-mounts=clean",
+	)
+	spec.Command = []string{"/bin/bash", "-c", strings.Join(parts, " ; ")}
+
+	out, err := runSandbox(t, spec)
+	t.Logf("sandbox output:\n%s", out)
+	if err != nil {
+		t.Fatalf("sandbox run: %v", err)
+	}
+	for _, m := range markers {
+		if !strings.Contains(out, "check-"+m.name+"=hidden") {
+			t.Errorf("marker in %s (%s) was readable inside the sandbox", m.name, m.path)
+		}
+	}
+	if strings.Contains(out, "leak-symlink") || !strings.Contains(out, "check-symlink=hidden") {
+		t.Errorf("the workspace symlink to %s escaped the sandbox", canary)
+	}
+	if !strings.Contains(out, "check-mounts=clean") {
+		t.Errorf("the sandbox mount table exposes /users or the real home")
+	}
+	if strings.Contains(out, secret) {
+		t.Error("a marker secret appeared in the sandbox output")
+	}
+	// The canary and every marker survived on the host.
+	for _, m := range markers {
+		if data, err := os.ReadFile(m.path); err != nil || strings.TrimSpace(string(data)) != secret {
+			t.Errorf("host marker %s damaged: %v", m.path, err)
+		}
+	}
+}
+
+// TestIntegrationPrimaryShelleySocketUnreachable verifies integration test 5
+// of the plan: inside the sandbox the primary Shelley Unix socket does not
+// exist, and a shelley client using the DEFAULT address (no -url) cannot
+// reach any server. The isolated server of the request is deliberately not
+// running here; the default-socket attempt must fail because the sandbox
+// mounts neither the socket nor SHELLEY_URL.
+func TestIntegrationPrimaryShelleySocketUnreachable(t *testing.T) {
+	requireBwrap(t)
+	if _, err := exec.LookPath("shelley"); err != nil {
+		t.Skip("shelley not available:", err)
+	}
+	spec := testSpec(t)
+
+	home, err := os.UserHomeDir()
+	if err != nil {
+		t.Fatal(err)
+	}
+	realHome, err := filepath.EvalSymlinks(home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	primarySock := filepath.Join(realHome, ".config", "shelley", "shelley.sock")
+
+	script := strings.Join([]string{
+		// The primary socket path must not even exist inside the sandbox.
+		"if [ -e " + primarySock + " ]; then echo check-sock-path=leak; else echo check-sock-path=absent; fi",
+		// The default config location is the synthetic home: no socket there.
+		"if [ -e $HOME/.config/shelley/shelley.sock ]; then echo check-default-sock=leak; else echo check-default-sock=absent; fi",
+		// SHELLEY_URL must not be set (clearenv), so the client really would
+		// use the default address.
+		"if [ -n \"$SHELLEY_URL\" ]; then echo check-shelley-url=leak; else echo check-shelley-url=unset; fi",
+		// A default-address client call must fail fast: there is no server
+		// to reach. -config points at the (mounted) exe.dev config so the
+		// client starts at all.
+		"if shelley -config /exe.dev/shelley.json client list >/dev/null 2>&1; then echo check-client=leak; else echo check-client=failed; fi",
+	}, " ; ")
+	spec.Command = []string{"/bin/bash", "-c", script}
+
+	out, err := runSandbox(t, spec)
+	t.Logf("sandbox output:\n%s", out)
+	if err != nil {
+		t.Fatalf("sandbox run: %v", err)
+	}
+	for _, want := range []string{
+		"check-sock-path=absent", "check-default-sock=absent",
+		"check-shelley-url=unset", "check-client=failed",
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("missing %q in sandbox output (primary Shelley reachable?)", want)
+		}
+	}
+}
+
+// TestIntegrationConcurrentSandboxes implements plan test 10: two sandboxes
+// with separate workspaces run at the same time; each can see its own
+// workspace marker but neither the other sandbox's workspace nor its marker
+// file, and each one's process list contains only its own command.
+func TestIntegrationConcurrentSandboxes(t *testing.T) {
+	requireBwrap(t)
+	specA := testSpec(t)
+	specA.Name = "concurrent-a"
+	specB := testSpec(t)
+	specB.Name = "concurrent-b"
+
+	markerA := "alpha-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	markerB := "beta-" + strconv.FormatInt(time.Now().UnixNano(), 36)
+	if err := os.WriteFile(filepath.Join(specA.Workspace, "marker.txt"), []byte(markerA), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(specB.Workspace, "marker.txt"), []byte(markerB), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	// Each sandbox writes its own marker, proves it can read it, and then
+	// probes for the OTHER workspace (both the canonical host path and its
+	// tmp-relative parent listing) before signalling readiness and idling.
+	script := func(spec, other Spec, ownMarker string) string {
+		otherWs := absSymlink(t, other.Workspace)
+		return strings.Join([]string{
+			// The marker lives at the workspace ROOT: the sandbox starts in
+			// --chdir <workspace>, but be explicit so the CWD can never be a
+			// factor.
+			"test \"$(cat " + absSymlink(t, spec.Workspace) + "/marker.txt)\" = " + ownMarker + " || echo self-unreadable",
+			"if [ -e " + otherWs + " ]; then echo peer-workspace-visible; else echo peer-workspace-absent; fi",
+			"if ls " + absSymlink(t, filepath.Dir(other.Workspace)) + " >/dev/null 2>&1; then echo peer-parent-visible; else echo peer-parent-absent; fi",
+			// The peer's /tmp is a different host dir mounted at the same
+			// /tmp: a peer-written tmp marker must not show up either.
+			"echo " + ownMarker + " > /tmp/whoami.txt",
+			"sleep 1", // let the peer write its own /tmp/whoami.txt on ITS host dir
+			"test \"$(cat /tmp/whoami.txt)\" = " + ownMarker + " || echo peer-tmp-leak",
+			"if [ -e " + otherWs + " ]; then echo peer-workspace-visible-late; fi",
+			"echo procs=$(ls /proc | grep -c '^[0-9]')",
+			"echo done-" + spec.Name,
+		}, " ; ")
+	}
+
+	var wg sync.WaitGroup
+	run := func(spec, other Spec, ownMarker string) string {
+		spec.Command = []string{"/bin/bash", "-c", script(spec, other, ownMarker)}
+		ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
+		defer cancel()
+		h, err := Start(ctx, spec)
+		if err != nil {
+			t.Errorf("start %s: %v", spec.Name, err)
+			return ""
+		}
+		defer h.Stop(0)
+		_ = h.Wait()
+		return h.OutputString()
+	}
+	var outA, outB string
+	wg.Add(2)
+	go func() { defer wg.Done(); outA = run(specA, specB, markerA) }()
+	go func() { defer wg.Done(); outB = run(specB, specA, markerB) }()
+	wg.Wait()
+
+	for name, out := range map[string]string{"A": outA, "B": outB} {
+		t.Logf("sandbox %s output:\n%s", name, out)
+		if !strings.Contains(out, "peer-workspace-absent") || strings.Contains(out, "peer-workspace-visible") {
+			t.Errorf("sandbox %s could see the peer workspace", name)
+		}
+		if !strings.Contains(out, "peer-parent-absent") {
+			t.Errorf("sandbox %s could list the peer workspace's parent", name)
+		}
+		for _, leak := range []string{"self-unreadable", "peer-tmp-leak", "peer-marker-readable"} {
+			if strings.Contains(out, leak) {
+				t.Errorf("sandbox %s leaked: %s", name, leak)
+			}
+		}
+		if !strings.Contains(out, "done-") {
+			t.Errorf("sandbox %s did not finish its script", name)
+		}
+		// The sandbox sees only its own tiny process tree.
+		for _, line := range strings.Split(out, "\n") {
+			if n, ok := strings.CutPrefix(line, "procs="); ok {
+				count, err := strconv.Atoi(strings.TrimSpace(n))
+				if err != nil || count > 10 {
+					t.Errorf("sandbox %s sees %s processes in /proc", name, n)
+				}
+			}
+		}
 	}
 }

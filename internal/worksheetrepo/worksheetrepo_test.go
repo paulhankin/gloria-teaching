@@ -7,6 +7,38 @@ import (
 	"testing"
 )
 
+func TestHasLocalUserDirectoriesFollowsSymlinks(t *testing.T) {
+	root := t.TempDir()
+	// An empty root has no user directories.
+	if HasLocalUserDirectories(root) {
+		t.Fatal("empty root reported user directories")
+	}
+	// A symlink to a directory counts (generate/<user> in production is a
+	// symlink into /users/<user>).
+	if err := os.MkdirAll(filepath.Join(root, "real-user"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	linked := t.TempDir()
+	if err := os.Symlink(filepath.Join(root, "real-user"), filepath.Join(linked, "link-user")); err != nil {
+		t.Fatal(err)
+	}
+	if !HasLocalUserDirectories(linked) {
+		t.Fatal("a symlink to a directory was not detected")
+	}
+	// A symlink to a FILE is not a user directory.
+	file := filepath.Join(root, "notes.txt")
+	if err := os.WriteFile(file, []byte("x"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	files := t.TempDir()
+	if err := os.Symlink(file, filepath.Join(files, "file-link")); err != nil {
+		t.Fatal(err)
+	}
+	if HasLocalUserDirectories(files) {
+		t.Fatal("a symlink to a file was detected as a user directory")
+	}
+}
+
 func TestLinkUserRepositories(t *testing.T) {
 	root := t.TempDir()
 	users := filepath.Join(root, "users")

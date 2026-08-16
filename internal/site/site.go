@@ -170,7 +170,7 @@ func statusHelp(s store.Status) string {
 	case store.StatusQueued:
 		return "Waiting to start"
 	case store.StatusWorking:
-		return "The worksheet is being updated now"
+		return "The worksheet is being updated now, in a disposable isolated workspace"
 	case store.StatusReview:
 		return "The update is finished and will be published automatically"
 	case store.StatusFailed:
