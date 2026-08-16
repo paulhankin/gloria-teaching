@@ -39,6 +39,12 @@ func (p *Pipeline) publishSandbox(it store.Request, username string) error {
 	if err != nil {
 		return fmt.Errorf("publish request #%d: %w", it.ID, err)
 	}
+	// Last size gate before the import touches the live repositories (the
+	// agent phase and the preview build are over; nothing should have grown
+	// since the pre-build check).
+	if err := p.enforceWorkspaceLimit(paths, p.cfg.Limits.WorkspaceMaxBytes); err != nil {
+		return err
+	}
 	applied, err := p.importsApplied(meta)
 	if err != nil {
 		return fmt.Errorf("check the imported commits of request #%d: %w", it.ID, err)

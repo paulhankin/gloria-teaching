@@ -599,13 +599,14 @@ func main() {
 	})
 	pipe.Start()
 
-	// SIGTERM (systemd stop) gracefully stops every sandboxed Shelley server
-	// before the process exits, so no sandboxed agent outlives the service.
+	// SIGTERM (systemd stop) and SIGINT (Ctrl-C) gracefully stop every
+	// sandboxed Shelley server before the process exits, so no sandboxed
+	// agent outlives the service.
 	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGTERM)
+	signal.Notify(sigs, syscall.SIGTERM, syscall.SIGINT)
 	go func() {
-		<-sigs
-		log.Printf("received SIGTERM; stopping sandboxed shelley servers")
+		sig := <-sigs
+		log.Printf("received %s; stopping sandboxed shelley servers", sig)
 		pipe.Shutdown()
 		os.Exit(0)
 	}()

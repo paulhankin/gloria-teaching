@@ -39,6 +39,11 @@ type Config struct {
 	Sandbox     bool
 	SandboxRoot string // parent directory for the per-request sandboxes
 	Limits      SandboxLimits
+
+	// JanitorInterval overrides how often the sandbox retention janitor
+	// scans SandboxRoot. Zero uses the default (10 minutes); only tests set
+	// it. Negative disables the background janitor (manual JanitorRun only).
+	JanitorInterval time.Duration
 }
 
 // SandboxLimits bounds the resource consumption of one request sandbox. The
@@ -51,6 +56,8 @@ type SandboxLimits struct {
 	GracefulStop      time.Duration // time before a stopping sandbox is killed
 	WorkspaceMaxBytes int64         // maximum size of one request sandbox directory
 	MaxSandboxes      int           // global limit of concurrently active sandboxes
+	RetainCompleted   time.Duration // how long a done request's sandbox survives the janitor
+	RetainFailed      time.Duration // same for failed/rejected/orphaned sandboxes
 }
 
 // withDefaults fills zero Limit fields with conservative defaults.
@@ -76,8 +83,21 @@ func (l SandboxLimits) withDefaults() SandboxLimits {
 	if l.MaxSandboxes <= 0 {
 		l.MaxSandboxes = 2
 	}
+	if l.RetainCompleted <= 0 {
+		l.RetainCompleted = 24 * time.Hour
+	}
+	if l.RetainFailed <= 0 {
+		l.RetainFailed = 7 * 24 * time.Hour
+	}
 	return l
 }
+
+// defaultJanitorInterval is how often the retention janitor scans SandboxRoot.
+const defaultJanitorInterval = 10 * time.Minute
+
+// legacyRuntimeMax caps one agent turn in worktree mode (the historical
+// hard-coded deadline). Sandbox mode uses Limits.RuntimeMax instead.
+const legacyRuntimeMax = 90 * time.Minute
 
 // Pipeline runs the work items.
 type Pipeline struct {
@@ -87,8 +107,10 @@ type Pipeline struct {
 	mu        sync.Mutex
 	busy      map[string]bool // lane -> a goroutine is working on it
 	servers   map[int64]*sandboxServer
-	publishMu sync.Mutex // serializes main merges and output publication
-	log       []string   // recent pipeline events, newest last
+	slots     chan struct{} // global semaphore: one token per active sandbox
+	slotsUsed int           // held sandbox tokens (with slots, for the admin log)
+	publishMu sync.Mutex    // serializes main merges and output publication
+	log       []string      // recent pipeline events, newest last
 
 	wake chan struct{}
 }
@@ -101,13 +123,19 @@ func New(db *store.DB, cfg Config) *Pipeline {
 		cfg.WorksheetRoot = "/users"
 	}
 	cfg.Limits = cfg.Limits.withDefaults()
-	return &Pipeline{
+	p := &Pipeline{
 		cfg:     cfg,
 		db:      db,
 		busy:    map[string]bool{},
 		servers: map[int64]*sandboxServer{},
 		wake:    make(chan struct{}, 1),
 	}
+	if cfg.Sandbox {
+		// One token per concurrently active sandbox. Worktree-mode lanes
+		// are deliberately not bounded by it (legacy behavior).
+		p.slots = make(chan struct{}, cfg.Limits.MaxSandboxes)
+	}
+	return p
 }
 
 // Start begins the scheduler loop.
@@ -115,6 +143,16 @@ func (p *Pipeline) Start() {
 	ready := p.recover()
 	for _, it := range ready {
 		p.publishAsync(it)
+	}
+	if p.cfg.Sandbox {
+		p.cleanStaleSandboxes()
+		interval := p.cfg.JanitorInterval
+		if interval == 0 {
+			interval = defaultJanitorInterval
+		}
+		if interval > 0 {
+			go p.janitor(interval)
+		}
 	}
 	go p.loop()
 }
@@ -179,11 +217,11 @@ func (p *Pipeline) Logf(format string, args ...any) {
 	msg := fmt.Sprintf(format, args...)
 	log.Printf("pipeline: %s", msg)
 	p.mu.Lock()
-	defer p.mu.Unlock()
 	p.log = append(p.log, time.Now().Format("15:04:05")+"  "+msg)
 	if len(p.log) > 60 {
 		p.log = p.log[len(p.log)-60:]
 	}
+	p.mu.Unlock()
 }
 
 // Log returns the recent pipeline events, newest first.
@@ -261,6 +299,45 @@ func (p *Pipeline) schedule() {
 	}
 }
 
+// acquireSandboxSlot blocks until fewer than Limits.MaxSandboxes sandboxes
+// are active, then takes one slot. While it waits it keeps the request
+// visible as waiting (see start). The returned func releases the slot.
+func (p *Pipeline) acquireSandboxSlot(it store.Request) func() {
+	p.mu.Lock()
+	waiting := len(p.slots) >= cap(p.slots)
+	p.mu.Unlock()
+	if waiting {
+		msg := fmt.Sprintf("waiting for a sandbox slot (%d of %d in use)",
+			p.sandboxSlotsUsed(), p.cfg.Limits.MaxSandboxes)
+		p.Logf("#%d: %s", it.ID, msg)
+		if p.db != nil {
+			p.db.SetStatus(it.ID, store.StatusQueued, msg)
+		}
+	}
+	p.slots <- struct{}{}
+	p.mu.Lock()
+	p.slotsUsed++
+	p.mu.Unlock()
+	p.Logf("#%d: acquired a sandbox slot (%d of %d in use)",
+		it.ID, p.sandboxSlotsUsed(), p.cfg.Limits.MaxSandboxes)
+	var once sync.Once
+	return func() {
+		once.Do(func() {
+			<-p.slots
+			p.mu.Lock()
+			p.slotsUsed--
+			p.mu.Unlock()
+		})
+	}
+}
+
+// sandboxSlotsUsed reports how many sandbox slots are currently held.
+func (p *Pipeline) sandboxSlotsUsed() int {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	return p.slotsUsed
+}
+
 // start runs one work item in the background. followUp is a refinement message
 // for an existing conversation ("" starts a fresh one).
 func (p *Pipeline) start(it store.Request, followUp string) {
@@ -274,6 +351,17 @@ func (p *Pipeline) start(it store.Request, followUp string) {
 	p.mu.Unlock()
 
 	p.db.SetPreview(it.ID, false)
+	if p.cfg.Sandbox {
+		// The global sandbox semaphore bounds total resource consumption
+		// across DIFFERENT lanes (lanes only serialize work on the same
+		// worksheet). It is acquired here, before the "working" status, so
+		// a request waiting for a slot stays queued in the UI instead of
+		// looking like the agent is already working on it. The lane stays
+		// busy while waiting, preserving in-lane ordering. A restart
+		// requeues the request and re-acquires the slot from scratch.
+		release := p.acquireSandboxSlot(it)
+		defer release()
+	}
 	p.db.SetStatus(it.ID, store.StatusWorking, "the agent is working on it")
 	go func() {
 		defer func() {
@@ -433,8 +521,16 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		}
 	}
 
-	summary, err := p.waitForTurn(it.ID, target, convID)
+	summary, err := p.waitForTurn(it.ID, target, convID, p.agentRuntimeMax(), paths)
 	if err != nil {
+		// On a runtime-cap expiry or an exceeded workspace limit the
+		// isolated server is considered compromised: kill it now (grace,
+		// then the cgroup/pgroup kill inside Stop). The deferred
+		// unregister+stop below runs exactly once and is a no-op for the
+		// already-stopped handle.
+		if p.cfg.Sandbox {
+			p.stopShelley(p.unregisterServer(it.ID))
+		}
 		return err
 	}
 	if p.cfg.Sandbox {
@@ -460,12 +556,29 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 	}
 
 	p.Logf("#%d: validating the generated worksheet", it.ID)
+	// The agent phase is over; before building a preview or importing, the
+	// sandbox must still be within its size budget (a bloated workspace
+	// would otherwise flow into the build and the import).
+	if p.cfg.Sandbox {
+		if err := p.enforceWorkspaceLimit(paths, p.cfg.Limits.WorkspaceMaxBytes); err != nil {
+			return err
+		}
+	}
 	if err := p.buildPreview(it, workspace); err != nil {
 		return fmt.Errorf("worksheet build: %w", err)
 	}
 	p.db.SetPreview(it.ID, true)
 	p.Logf("#%d: finished; publishing automatically", it.ID)
 	return p.publish(it, summary)
+}
+
+// agentRuntimeMax returns the hard cap for one agent turn: Limits.RuntimeMax
+// in sandbox mode, the historical 90-minute deadline in worktree mode.
+func (p *Pipeline) agentRuntimeMax() time.Duration {
+	if p.cfg.Sandbox {
+		return p.cfg.Limits.RuntimeMax
+	}
+	return legacyRuntimeMax
 }
 
 func firstLine(s string) string {
@@ -742,17 +855,29 @@ func (p *Pipeline) chatContinue(t shelleyTarget, convID, prompt string) error {
 // It polls `shelley client list` instead of using `read -wait`, which does not
 // reliably return when it attaches to a turn that is already running.
 //
+// The deadline is the hard runtime cap: sandbox mode passes
+// Limits.RuntimeMax, worktree mode the historical 90 minutes. On expiry the
+// turn is failed; run() then kills the isolated server. In sandbox mode
+// (paths valid) the whole request-directory size is also checked against
+// Limits.WorkspaceMaxBytes on every poll; exceeding it fails the turn the
+// same way.
+//
 // In sandbox mode the conversation lives on the request's isolated server, so
 // the target is re-read from the server registry on every poll. Polling the
 // default socket during the window before registration (or after a shutdown
 // race) would return a bogus "conversation not found", so the poll is simply
 // skipped while no server is registered; the chat call that precedes the wait
 // always registers the server first.
-func (p *Pipeline) waitForTurn(reqID int64, t shelleyTarget, convID string) (string, error) {
-	deadline := time.Now().Add(90 * time.Minute)
+func (p *Pipeline) waitForTurn(reqID int64, t shelleyTarget, convID string, deadline time.Duration, paths sandboxPaths) (string, error) {
+	timer := time.NewTimer(deadline)
+	defer timer.Stop()
 	idle := 0
-	for time.Now().Before(deadline) {
-		time.Sleep(5 * time.Second)
+	for {
+		select {
+		case <-timer.C:
+			return "", fmt.Errorf("the agent did not finish within %s (runtime limit)", deadline)
+		case <-time.After(5 * time.Second):
+		}
 		pollTarget := t
 		if p.cfg.Sandbox {
 			registered, ok := p.serverTarget(reqID)
@@ -760,6 +885,9 @@ func (p *Pipeline) waitForTurn(reqID int64, t shelleyTarget, convID string) (str
 				continue
 			}
 			pollTarget = registered
+			if err := p.enforceWorkspaceLimit(paths, p.cfg.Limits.WorkspaceMaxBytes); err != nil {
+				return "", err
+			}
 		}
 		working, err := p.working(pollTarget, convID)
 		if err != nil {
@@ -776,7 +904,6 @@ func (p *Pipeline) waitForTurn(reqID int64, t shelleyTarget, convID string) (str
 			return p.lastAgentMessage(pollTarget, convID)
 		}
 	}
-	return "", fmt.Errorf("the agent did not finish within 90 minutes")
 }
 
 // working reports whether the agent is currently working on the conversation.

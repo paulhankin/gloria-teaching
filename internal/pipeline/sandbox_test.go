@@ -484,17 +484,31 @@ func TestSandboxLimitsDefaults(t *testing.T) {
 	if limits.MaxSandboxes != 2 {
 		t.Errorf("MaxSandboxes = %d", limits.MaxSandboxes)
 	}
+	if limits.RetainCompleted != 24*time.Hour {
+		t.Errorf("RetainCompleted = %v", limits.RetainCompleted)
+	}
+	if limits.RetainFailed != 7*24*time.Hour {
+		t.Errorf("RetainFailed = %v", limits.RetainFailed)
+	}
 
 	// Explicit values are kept.
 	custom := SandboxLimits{MemoryMax: "8G", TasksMax: 64, CPUQuota: "100%",
-		RuntimeMax: 5 * time.Minute, GracefulStop: time.Second, WorkspaceMaxBytes: 1 << 20, MaxSandboxes: 4}
+		RuntimeMax: 5 * time.Minute, GracefulStop: time.Second, WorkspaceMaxBytes: 1 << 20,
+		MaxSandboxes: 4, RetainCompleted: time.Hour, RetainFailed: 48 * time.Hour}
 	if got := custom.withDefaults(); got != custom {
 		t.Errorf("withDefaults changed explicit limits: %#v", got)
 	}
 
-	// New normalizes the config.
-	p := New(nil, Config{})
+	// New normalizes the config and sizes the sandbox semaphore.
+	p := New(nil, Config{Sandbox: true})
 	if p.cfg.Limits.MaxSandboxes != 2 {
 		t.Errorf("New did not normalize limits: %#v", p.cfg.Limits)
+	}
+	if cap(p.slots) != 2 {
+		t.Errorf("sandbox semaphore capacity = %d, want 2", cap(p.slots))
+	}
+	// Worktree mode gets no semaphore (legacy behavior).
+	if New(nil, Config{}).slots != nil {
+		t.Error("worktree mode pipeline has a sandbox semaphore")
 	}
 }
