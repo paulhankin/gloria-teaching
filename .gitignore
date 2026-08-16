@@ -1,3 +1,5 @@
 /output/
 /bin/
 /data/
+/generate/*/
+/cmd/generate/worksheets_local.go

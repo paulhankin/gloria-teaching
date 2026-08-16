@@ -1,15 +1,19 @@
-.PHONY: all html serve build clean
+.PHONY: all html serve build clean prepare
+
+# Discover worksheet packages in the local per-user repositories.
+prepare:
+	go run ./cmd/importworksheets
 
 # Build everything (HTML + PDF) into output/
-all:
+all: prepare
 	go run ./cmd/generate
 
 # HTML only (fast, no headless Chrome)
-html:
+html: prepare
 	go run ./cmd/generate -pdf=false
 
 # Binaries into bin/
-build:
+build: prepare
 	go build -o bin/generate ./cmd/generate
 	go build -o bin/serve ./cmd/serve
 

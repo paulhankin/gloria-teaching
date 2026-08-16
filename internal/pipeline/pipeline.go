@@ -1,11 +1,10 @@
 // Package pipeline turns worksheet requests into work items and drives them
 // through the agent: queued -> working -> review -> done/rejected.
 //
-// Every work item is developed in its own git worktree on its own branch, so
-// items in different lanes (one lane per worksheet, plus one lane per request
-// for a brand new worksheet) can be worked on independently. Within a lane the
-// work is strictly sequential: a queued item only starts once the previous item
-// of that lane has been approved or rejected.
+// Framework changes are developed in a worktree of the main repository. Each
+// workspace also contains a worktree of the requester's local worksheet
+// repository at generate/<username>. This keeps worksheet history out of the
+// main GitHub repository while preserving isolated, concurrent work items.
 package pipeline
 
 import (
@@ -26,11 +25,12 @@ import (
 
 // Config describes where the pipeline works.
 type Config struct {
-	Repo        string // main git checkout (the served one)
-	WorkRoot    string // parent directory for the per-item worktrees
-	PreviewRoot string // parent directory for the per-item preview builds
-	OutputDir   string // the directory cmd/serve serves
-	Push        bool   // push to origin after a merge
+	Repo          string // main git checkout (the served one)
+	WorksheetRoot string // local per-user repositories; defaults to Repo/generate
+	WorkRoot      string // parent directory for the per-item worktrees
+	PreviewRoot   string // parent directory for the per-item preview builds
+	OutputDir     string // the directory cmd/serve serves
+	Push          bool   // push main repository changes after publication
 }
 
 // Pipeline runs the work items.
@@ -48,6 +48,9 @@ type Pipeline struct {
 
 // New creates a pipeline. Start must be called to run it.
 func New(db *store.DB, cfg Config) *Pipeline {
+	if cfg.WorksheetRoot == "" {
+		cfg.WorksheetRoot = filepath.Join(cfg.Repo, "generate")
+	}
 	return &Pipeline{cfg: cfg, db: db, busy: map[string]bool{}, wake: make(chan struct{}, 1)}
 }
 
@@ -192,11 +195,16 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 	}
 	it = cur
 
-	// A restart may have interrupted publication after the branch was already
-	// merged. In that case, finish rebuilding instead of asking the agent to
-	// redo work that is already on main.
+	username, err := p.requestUsername(it)
+	if err != nil {
+		return err
+	}
+
+	// A restart may have interrupted publication after both branches were
+	// already merged. In that case, finish rebuilding instead of asking the
+	// agent to redo completed work.
 	if it.Branch != "" {
-		merged, err := p.isAncestor(it.Branch, "main")
+		merged, err := p.branchesMerged(it.Branch, username)
 		if err == nil && merged {
 			return p.publish(it, it.Note)
 		}
@@ -207,7 +215,7 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 	if worktree == "" {
 		branch = fmt.Sprintf("req-%d", it.ID)
 		worktree = filepath.Join(p.cfg.WorkRoot, branch)
-		if err := p.addWorktree(branch, worktree); err != nil {
+		if err := p.addWorkspace(username, branch, worktree); err != nil {
 			return err
 		}
 		if err := p.db.SetRun(it.ID, "", branch, worktree); err != nil {
@@ -244,10 +252,10 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		return err
 	}
 
-	if err := p.commitLeftovers(worktree, it); err != nil {
+	if err := p.commitLeftovers(worktree, username, it); err != nil {
 		return err
 	}
-	changed, err := p.hasCommits(branch)
+	changed, err := p.hasCommits(branch, username)
 	if err != nil {
 		return err
 	}
@@ -281,8 +289,9 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 			"`make html`) and amend or add a commit. Do not push.\n")
 		return b.String()
 	}
-	b.WriteString("You are working on the `learningmaterial` repository in this worktree. " +
-		"Follow AGENTS.md.\n\n")
+	b.WriteString("You are working in an isolated workspace for the `learningmaterial` project. " +
+		"Follow AGENTS.md. The requester's worksheets are a separate Git repository " +
+		"mounted below generate/<username>; the main repository intentionally ignores it.\n\n")
 	if it.Kind == store.KindChange {
 		source := filepath.Join("generate", it.Worksheet)
 		if path, err := p.worksheetSourcePath(it.Worksheet); err == nil {
@@ -305,9 +314,9 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 			fmt.Fprintf(&b, "Put the worksheet code in `generate/%s/<worksheet>`; the first directory is the requester's username, not the subject.\n\n", requester)
 		}
 	}
-	b.WriteString("Implement it. Then run `gofmt -l -w .`, `go build ./...` and `make html`, " +
-		"and commit everything on the current branch with a good commit message. " +
-		"Do NOT push and do NOT switch branches. " +
+	b.WriteString("Implement it. Then run `gofmt -l -w .`, `go build ./...` and `make html`. " +
+		"Commit main-project changes in the workspace root and worksheet changes inside " +
+		"the nested user repository. Do NOT push and do NOT switch branches. " +
 		"Finish with a two or three sentence summary of what you changed.\n")
 	return b.String()
 }
@@ -325,58 +334,134 @@ func (p *Pipeline) git(dir string, args ...string) (string, error) {
 	return string(out), nil
 }
 
-func (p *Pipeline) addWorktree(branch, dir string) error {
+func (p *Pipeline) userRepo(username string) string {
+	return filepath.Join(p.cfg.WorksheetRoot, username)
+}
+
+func (p *Pipeline) workspaceUserRepo(worktree, username string) string {
+	return filepath.Join(worktree, "generate", username)
+}
+
+func (p *Pipeline) configureUserRepo(repo string) error {
+	if _, err := p.git(repo, "config", "user.name", "Learning Material"); err != nil {
+		return err
+	}
+	_, err := p.git(repo, "config", "user.email", "learningmaterial@localhost")
+	return err
+}
+
+func (p *Pipeline) ensureUserRepo(username string) error {
+	repo := p.userRepo(username)
+	if _, err := os.Stat(filepath.Join(repo, ".git")); err == nil {
+		return p.configureUserRepo(repo)
+	} else if !os.IsNotExist(err) {
+		return err
+	}
+	if err := os.MkdirAll(repo, 0o755); err != nil {
+		return err
+	}
+	if _, err := p.git(repo, "init", "-b", "main"); err != nil {
+		return err
+	}
+	if err := p.configureUserRepo(repo); err != nil {
+		return err
+	}
+	if _, err := p.git(repo, "add", "-A"); err != nil {
+		return err
+	}
+	_, err := p.git(repo, "commit", "--allow-empty", "-m", "Initialize worksheet repository")
+	return err
+}
+
+func (p *Pipeline) addWorkspace(username, branch, dir string) error {
 	if err := os.MkdirAll(p.cfg.WorkRoot, 0o755); err != nil {
+		return err
+	}
+	if err := p.ensureUserRepo(username); err != nil {
 		return err
 	}
 	os.RemoveAll(dir)
 	p.git(p.cfg.Repo, "worktree", "prune")
 	p.git(p.cfg.Repo, "branch", "-D", branch)
-	_, err := p.git(p.cfg.Repo, "worktree", "add", "-b", branch, dir, "main")
-	return err
+	if _, err := p.git(p.cfg.Repo, "worktree", "add", "-b", branch, dir, "main"); err != nil {
+		return err
+	}
+
+	userRepo := p.userRepo(username)
+	userWorktree := p.workspaceUserRepo(dir, username)
+	p.git(userRepo, "worktree", "prune")
+	p.git(userRepo, "branch", "-D", branch)
+	if err := os.MkdirAll(filepath.Dir(userWorktree), 0o755); err != nil {
+		return err
+	}
+	if _, err := p.git(userRepo, "worktree", "add", "-b", branch, userWorktree, "main"); err != nil {
+		p.git(p.cfg.Repo, "worktree", "remove", "--force", dir)
+		return err
+	}
+	return nil
 }
 
 func (p *Pipeline) removeWorktree(it store.Request) {
+	username, _ := p.requestUsername(it)
+	if it.Worktree != "" && username != "" {
+		userRepo := p.userRepo(username)
+		userWorktree := p.workspaceUserRepo(it.Worktree, username)
+		p.git(userRepo, "worktree", "remove", "--force", userWorktree)
+		os.RemoveAll(userWorktree)
+	}
 	if it.Worktree != "" {
 		p.git(p.cfg.Repo, "worktree", "remove", "--force", it.Worktree)
 		os.RemoveAll(it.Worktree)
 	}
 	if it.Branch != "" {
 		p.git(p.cfg.Repo, "branch", "-D", it.Branch)
+		if username != "" {
+			p.git(p.userRepo(username), "branch", "-D", it.Branch)
+		}
 	}
 	os.RemoveAll(p.previewDir(it.ID))
 	p.db.SetPreview(it.ID, false)
 }
 
-// commitLeftovers commits anything the agent forgot to commit.
-func (p *Pipeline) commitLeftovers(worktree string, it store.Request) error {
-	out, err := p.git(worktree, "status", "--porcelain")
-	if err != nil {
-		return err
+// commitLeftovers commits anything the agent forgot to commit in either repo.
+func (p *Pipeline) commitLeftovers(worktree, username string, it store.Request) error {
+	repos := []string{worktree, p.workspaceUserRepo(worktree, username)}
+	for _, repo := range repos {
+		out, err := p.git(repo, "status", "--porcelain")
+		if err != nil {
+			return err
+		}
+		if strings.TrimSpace(out) == "" {
+			continue
+		}
+		if _, err := p.git(repo, "add", "-A"); err != nil {
+			return err
+		}
+		msg := fmt.Sprintf("Complete request #%d", it.ID)
+		if _, err := p.git(repo, "commit", "-m", msg); err != nil {
+			return err
+		}
 	}
-	if strings.TrimSpace(out) == "" {
-		return nil
-	}
-	if _, err := p.git(worktree, "add", "-A"); err != nil {
-		return err
-	}
-	msg := fmt.Sprintf("Uncommitted leftovers of request #%d", it.ID)
-	_, err = p.git(worktree, "commit", "-m", msg)
-	return err
+	return nil
 }
 
-// hasCommits reports whether the branch is ahead of main.
-func (p *Pipeline) hasCommits(branch string) (bool, error) {
-	out, err := p.git(p.cfg.Repo, "rev-list", "--count", "main.."+branch)
-	if err != nil {
-		return false, err
+// hasCommits reports whether either request branch is ahead of main.
+func (p *Pipeline) hasCommits(branch, username string) (bool, error) {
+	for _, repo := range []string{p.cfg.Repo, p.userRepo(username)} {
+		out, err := p.git(repo, "rev-list", "--count", "main.."+branch)
+		if err != nil {
+			return false, err
+		}
+		if strings.TrimSpace(out) != "0" {
+			return true, nil
+		}
 	}
-	return strings.TrimSpace(out) != "0", nil
+	return false, nil
 }
 
-func (p *Pipeline) isAncestor(ancestor, descendant string) (bool, error) {
+func (p *Pipeline) isAncestor(repo, ancestor, descendant string) (bool, error) {
 	cmd := exec.Command("git", "merge-base", "--is-ancestor", ancestor, descendant)
-	cmd.Dir = p.cfg.Repo
+	cmd.Dir = repo
 	err := cmd.Run()
 	if err == nil {
 		return true, nil
@@ -385,6 +470,16 @@ func (p *Pipeline) isAncestor(ancestor, descendant string) (bool, error) {
 		return false, nil
 	}
 	return false, err
+}
+
+func (p *Pipeline) branchesMerged(branch, username string) (bool, error) {
+	for _, repo := range []string{p.cfg.Repo, p.userRepo(username)} {
+		merged, err := p.isAncestor(repo, branch, "main")
+		if err != nil || !merged {
+			return merged, err
+		}
+	}
+	return true, nil
 }
 
 // --- shelley ---------------------------------------------------------------
@@ -491,32 +586,34 @@ func (p *Pipeline) previewDir(id int64) string {
 	return filepath.Join(p.cfg.PreviewRoot, fmt.Sprint(id))
 }
 
-// buildPreview renders the worksheets of the worktree into the preview
-// directory, so the result can be looked at before it is approved.
+func (p *Pipeline) runGenerator(repo, out string) error {
+	prepare := exec.Command("go", "run", "./cmd/importworksheets")
+	prepare.Dir = repo
+	if output, err := prepare.CombinedOutput(); err != nil {
+		return fmt.Errorf("discover worksheets: %v: %s", err, tail(string(output), 800))
+	}
+	cmd := exec.Command("go", "run", "./cmd/generate", "-out", out)
+	cmd.Dir = repo
+	if output, err := cmd.CombinedOutput(); err != nil {
+		return fmt.Errorf("generate: %v: %s", err, tail(string(output), 800))
+	}
+	return nil
+}
+
+// buildPreview renders the target user's worksheets from the isolated workspace.
 func (p *Pipeline) buildPreview(it store.Request, worktree string) error {
 	dir := p.previewDir(it.ID)
 	if err := os.MkdirAll(dir, 0o755); err != nil {
 		return err
 	}
-	args := []string{"run", "./cmd/generate", "-out", dir}
-	cmd := exec.Command("go", args...)
-	cmd.Dir = worktree
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("%v: %s", err, tail(string(out), 800))
-	}
-	return nil
+	return p.runGenerator(worktree, dir)
 }
 
 // rebuild regenerates the served output. The running server reads the generated
 // manifest dynamically, so publishing worksheet content needs no binary rebuild
 // or service restart.
 func (p *Pipeline) rebuild() error {
-	cmd := exec.Command("go", "run", "./cmd/generate", "-out", p.cfg.OutputDir)
-	cmd.Dir = p.cfg.Repo
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("generate: %v: %s", err, tail(string(out), 800))
-	}
-	return nil
+	return p.runGenerator(p.cfg.Repo, p.cfg.OutputDir)
 }
 
 func tail(s string, n int) string {
@@ -574,7 +671,11 @@ func (p *Pipeline) publish(it store.Request, summary string) error {
 	p.publishMu.Lock()
 	defer p.publishMu.Unlock()
 
-	merged, err := p.isAncestor(it.Branch, "main")
+	username, err := p.requestUsername(it)
+	if err != nil {
+		return err
+	}
+	merged, err := p.branchesMerged(it.Branch, username)
 	if err != nil {
 		return err
 	}
@@ -611,12 +712,25 @@ func (p *Pipeline) publish(it store.Request, summary string) error {
 }
 
 func (p *Pipeline) merge(it store.Request) error {
-	if _, err := p.git(it.Worktree, "rebase", "main"); err != nil {
-		p.git(it.Worktree, "rebase", "--abort")
+	username, err := p.requestUsername(it)
+	if err != nil {
 		return err
 	}
-	if _, err := p.git(p.cfg.Repo, "merge", "--ff-only", it.Branch); err != nil {
-		return err
+	repos := []struct {
+		mainRepo string
+		worktree string
+	}{
+		{mainRepo: p.cfg.Repo, worktree: it.Worktree},
+		{mainRepo: p.userRepo(username), worktree: p.workspaceUserRepo(it.Worktree, username)},
+	}
+	for _, repo := range repos {
+		if _, err := p.git(repo.worktree, "rebase", "main"); err != nil {
+			p.git(repo.worktree, "rebase", "--abort")
+			return err
+		}
+		if _, err := p.git(repo.mainRepo, "merge", "--ff-only", it.Branch); err != nil {
+			return err
+		}
 	}
 	if p.cfg.Push {
 		if _, err := p.git(p.cfg.Repo, "push", "origin", "main"); err != nil {
@@ -626,13 +740,13 @@ func (p *Pipeline) merge(it store.Request) error {
 	return nil
 }
 
-// Revisions returns the Git history for one worksheet, newest first.
+// Revisions returns the local Git history for one worksheet, newest first.
 func (p *Pipeline) Revisions(worksheet string) ([]site.Revision, error) {
-	path, err := p.worksheetSourcePath(worksheet)
+	ws, err := p.worksheetInfo(worksheet)
 	if err != nil {
 		return nil, err
 	}
-	out, err := p.git(p.cfg.Repo, "log", "--format=%H%x09%h%x09%ct%x09%s", "--", path)
+	out, err := p.git(p.userRepo(ws.Username), "log", "--format=%H%x09%h%x09%ct%x09%s", "--", ws.Name)
 	if err != nil {
 		return nil, err
 	}
@@ -658,34 +772,62 @@ func (p *Pipeline) Revisions(worksheet string) ([]site.Revision, error) {
 	return revisions, nil
 }
 
-func (p *Pipeline) worksheetSourcePath(worksheet string) (string, error) {
+func (p *Pipeline) worksheetInfo(worksheet string) (site.Worksheet, error) {
 	parts := strings.Split(worksheet, "/")
 	if len(parts) != 2 || parts[0] == "" || parts[1] == "" ||
 		parts[0] == "." || parts[0] == ".." || parts[1] == "." || parts[1] == ".." {
-		return "", fmt.Errorf("invalid worksheet path %q", worksheet)
+		return site.Worksheet{}, fmt.Errorf("invalid worksheet path %q", worksheet)
 	}
 	worksheets, err := site.ReadManifest(filepath.Join(p.cfg.OutputDir, site.ManifestName))
 	if err != nil {
-		return "", fmt.Errorf("read worksheet catalog: %w", err)
+		return site.Worksheet{}, fmt.Errorf("read worksheet catalog: %w", err)
 	}
 	for _, ws := range worksheets {
 		if ws.Path() == worksheet {
 			if ws.Username == "" {
-				return "", fmt.Errorf("worksheet %q has no source username", worksheet)
+				return site.Worksheet{}, fmt.Errorf("worksheet %q has no source username", worksheet)
 			}
-			return filepath.Join("generate", ws.Username, ws.Name), nil
+			return ws, nil
 		}
 	}
-	return "", fmt.Errorf("unknown worksheet %q", worksheet)
+	return site.Worksheet{}, fmt.Errorf("unknown worksheet %q", worksheet)
+}
+
+func (p *Pipeline) worksheetSourcePath(worksheet string) (string, error) {
+	ws, err := p.worksheetInfo(worksheet)
+	if err != nil {
+		return "", err
+	}
+	return filepath.Join("generate", ws.Username, ws.Name), nil
+}
+
+func (p *Pipeline) requestUsername(it store.Request) (string, error) {
+	if it.Kind == store.KindChange {
+		ws, err := p.worksheetInfo(it.Worksheet)
+		if err != nil {
+			return "", err
+		}
+		return ws.Username, nil
+	}
+	username := strings.TrimSpace(it.Author)
+	if username == "" {
+		return "", fmt.Errorf("request #%d has no username", it.ID)
+	}
+	if username == "." || username == ".." || strings.ContainsAny(username, `/\\`) {
+		return "", fmt.Errorf("request #%d has invalid username %q", it.ID, username)
+	}
+	return username, nil
 }
 
 // Revert restores one worksheet directory from an earlier Git revision,
 // commits that restoration as a new revision, and republishes the site.
 func (p *Pipeline) Revert(worksheet, commit string) error {
-	path, err := p.worksheetSourcePath(worksheet)
+	ws, err := p.worksheetInfo(worksheet)
 	if err != nil {
 		return err
 	}
+	path := ws.Name
+	repo := p.userRepo(ws.Username)
 	revisions, err := p.Revisions(worksheet)
 	if err != nil {
 		return err
@@ -727,39 +869,34 @@ func (p *Pipeline) Revert(worksheet, commit string) error {
 
 	p.publishMu.Lock()
 	defer p.publishMu.Unlock()
-	status, err := p.git(p.cfg.Repo, "status", "--porcelain")
+	status, err := p.git(repo, "status", "--porcelain")
 	if err != nil {
 		return err
 	}
 	if strings.TrimSpace(status) != "" {
-		return fmt.Errorf("cannot revert while the main checkout has uncommitted changes")
+		return fmt.Errorf("cannot revert while the worksheet repository has uncommitted changes")
 	}
-	if _, err := p.git(p.cfg.Repo, "checkout", commit, "--", path); err != nil {
+	if _, err := p.git(repo, "checkout", commit, "--", path); err != nil {
 		return err
 	}
 	committed := false
 	defer func() {
 		if !committed {
-			p.git(p.cfg.Repo, "reset", "--hard", "HEAD")
+			p.git(repo, "reset", "--hard", "HEAD")
 		}
 	}()
 	cmd := exec.Command("git", "diff", "--cached", "--quiet", "--", path)
-	cmd.Dir = p.cfg.Repo
+	cmd.Dir = repo
 	if err := cmd.Run(); err == nil {
 		return fmt.Errorf("that revision is already current")
 	} else if exit, ok := err.(*exec.ExitError); !ok || exit.ExitCode() != 1 {
 		return err
 	}
 	message := fmt.Sprintf("Revert %s to %s", worksheet, commit[:12])
-	if _, err := p.git(p.cfg.Repo, "commit", "-m", message, "--", path); err != nil {
+	if _, err := p.git(repo, "commit", "-m", message, "--", path); err != nil {
 		return err
 	}
 	committed = true
-	if p.cfg.Push {
-		if _, err := p.git(p.cfg.Repo, "push", "origin", "main"); err != nil {
-			return err
-		}
-	}
 	if err := p.rebuild(); err != nil {
 		return fmt.Errorf("revision committed, but rebuild failed: %w", err)
 	}

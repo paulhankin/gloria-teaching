@@ -21,15 +21,6 @@ import (
 	"learningmaterial/internal/pdf"
 	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
-
-	_ "learningmaterial/generate/gloriahankin/answer_checks"
-	_ "learningmaterial/generate/gloriahankin/half_hour_times"
-	_ "learningmaterial/generate/gloriahankin/least_common_multiple"
-	_ "learningmaterial/generate/gloriahankin/metric_conversions"
-	_ "learningmaterial/generate/gloriahankin/negative_numbers"
-	_ "learningmaterial/generate/gloriahankin/ordinal_numbers"
-	_ "learningmaterial/generate/gloriahankin/price_puzzles"
-	_ "learningmaterial/generate/gloriahankin/venn_diagrams"
 )
 
 func main() {

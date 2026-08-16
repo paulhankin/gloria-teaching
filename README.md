@@ -16,7 +16,8 @@ internal/pdf/                 HTML -> PDF via headless Chrome (CDP, own WS clien
 internal/store/               SQLite: requests / work items and settings
 internal/pipeline/            drives work items through the agent
 internal/site/                the front page (worksheet index + request/review UI)
-generate/<username>/<sheet>/  worksheet source owned by that username (Go + render.js)
+generate/<username>/          local Git repo containing all worksheets owned by that user
+  <sheet>/                    one worksheet package (Go + render.js)
 output/<subject>/<sheet>/     generated index.html/.pdf + solutions.html/.pdf
 output/worksheets.json         runtime worksheet catalog (generated atomically)
 data/                         database, worktrees, previews (not in the repo)
@@ -24,14 +25,18 @@ cmd/generate/                 builds all worksheets + the index page
 cmd/serve/                    server: site, requests, work item pipeline
 ```
 
-Currently, the existing worksheets live under `generate/gloriahankin/`.
+The worksheet source is deliberately not stored in the main GitHub repository.
+Each first-level directory below `generate/` is an independent local repository;
+for example, the existing worksheets live in the local
+`generate/gloriahankin/` repository. `make` discovers its packages and writes an
+ignored import file before compiling the generator.
 
 ## Building
 
 ```
 make                          # HTML + PDF for all worksheets into output/
 make html                     # HTML only (fast, no Chrome)
-go run ./cmd/generate venn    # only matching worksheets (substring of the path)
+make prepare && go run ./cmd/generate venn  # only matching worksheets (substring)
 make build                    # binaries into bin/
 ```
 
@@ -76,8 +81,10 @@ queued -> working -> review -> done (approved: merged + pushed)
                            \-> refine (back to working, same conversation)
 ```
 
-- Each item is developed on its own branch `req-<id>` in its own git worktree
-  under `data/worktrees/`, so items never interfere with each other.
+- Each item gets an isolated main-repository worktree under `data/worktrees/`
+  plus a nested worktree of the requester's local repository at
+  `generate/<username>/`. Framework changes and worksheet changes are therefore
+  versioned independently.
 - Lanes: one lane per worksheet (plus one per new-worksheet request). Items in
   the same lane run strictly sequentially — a queued item only starts once the
   previous one has been approved or rejected. Different worksheets run in
@@ -85,10 +92,11 @@ queued -> working -> review -> done (approved: merged + pushed)
 - Whenever an item reaches `review`, the whole site (HTML + PDF) is rendered
   from its worktree into `data/preview/<id>/`, reachable at `/preview/<id>/`
   (admin mode only).
-- Approving rebases onto `main`, fast-forward merges, pushes and regenerates
-  `output/`, including an atomic `worksheets.json` catalog. The running server
-  reads that catalog dynamically, so worksheet additions and content changes
-  require no server rebuild or restart.
+- Approving rebases and fast-forward merges both request branches, pushes any
+  main-repository changes, and regenerates `output/`, including an atomic
+  `worksheets.json` catalog. User worksheet repositories remain local and have
+  no remote. The running server reads that catalog dynamically, so worksheet
+  additions and content changes require no server rebuild or restart.
 - The review UI lives in admin mode on the front page: **Approve & push**,
   **Reject**, **Refine** (free text sent back into the same conversation) and
   **Retry** for failed items, plus a log of recent pipeline events.
@@ -97,7 +105,8 @@ Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
 
 ## Adding a worksheet
 
-1. Create `generate/<username>/<name>/` and name the package.
+1. Ensure `generate/<username>/` is a Git repository on branch `main` (the
+   request pipeline creates it automatically), then create `<name>/` inside it.
 2. In `init()` call `sheet.Register(sheet.Worksheet{Username, Subject, Name, Title, Meta, Build})`.
 3. `Build() *sheet.Doc` returns the title, extra CSS, worksheet body and
    solution body. Put pupil pages in `Doc.Body` and `sheet.SolutionPage(...)` in
@@ -106,6 +115,6 @@ Server flags: `-repo`, `-work`, `-preview`, `-db`, `-push`.
    `sheet.NameLine`; `sheet.BaseCSS` is always applied.
 4. Drawings: embed `render.js` via `//go:embed`, pass data with
    `doc.Set("NAME", v)` as a JS constant, `doc.Rough = true` embeds rough.js.
-5. Add a blank import in `cmd/generate/main.go`.
+5. Run `make html`; worksheet packages are discovered automatically.
 
 The index page (`output/index.html`) is built automatically from the registry.

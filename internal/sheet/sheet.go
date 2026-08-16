@@ -1,7 +1,8 @@
 // Package sheet is the mini framework for worksheets.
 //
-// A worksheet's code lives in generate/<username>/<name>/ and registers itself
-// via Register(). The generator (cmd/generate) turns it into
+// A worksheet's code lives in the local per-user Git repository
+// generate/<username>/<name>/ and registers itself via Register(). The
+// generator (cmd/generate) turns it into
 // output/<subject>/<name>/index.{html,pdf} and solutions.{html,pdf}.
 package sheet
 
