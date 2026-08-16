@@ -34,9 +34,9 @@ const css = `
                 min-height: 0; padding: 1mm 2mm; border-bottom: 1.5px dotted #ccd5e0; }
   .later-task .clock { width: 33mm; height: 30mm; min-height: 0; }
   .arrow { text-align: center; color: #e8548c; font: 700 15pt 'Caveat', cursive; line-height: 1.05; }
-  .later-answer { display: flex; flex-direction: column; align-items: center; justify-content: center;
-                  align-self: stretch; min-height: 0; }
-  .later-answer .clock { flex: 1 1 auto; width: 31mm; min-height: 25mm; }
+  .later-time { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                align-self: stretch; min-height: 0; }
+  .later-time .clock { flex: 1 1 auto; width: 31mm; min-height: 25mm; }
   .time-line { display: flex; align-items: flex-end; justify-content: flex-end; width: 30mm;
                height: 6mm; padding-right: 1mm; border-bottom: 2px dotted #b6c0cf;
                line-height: 1; white-space: nowrap; }
@@ -134,9 +134,12 @@ func laterPage() string {
 	for i, task := range laterTasks {
 		fmt.Fprintf(&tasks, `    <div class="later-task">
       <span class="task-number">%d.</span>
-      <div class="clock" data-clock="%s"></div>
+      <div class="later-time">
+        <div class="clock" data-clock="%s"></div>
+        <div class="time-line">Uhr</div>
+      </div>
       <div class="arrow">eine halbe<br>Stunde später &rarr;</div>
-      <div class="later-answer">
+      <div class="later-time">
         <div class="clock" data-clock="%s-answer" data-blank="true"></div>
         <div class="time-line">Uhr</div>
       </div>
