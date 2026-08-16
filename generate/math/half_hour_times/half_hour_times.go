@@ -29,7 +29,7 @@ const css = `
   .drawing-prompt { margin: 0; color: #1f3550; font-weight: 700; font-size: 15pt; }
   .draw-note { margin: 0; color: #7a869a; font-size: 10.5pt; }
   .later-list { display: grid; grid-template-columns: 1fr 1fr; gap: 3.5mm 9mm;
-                flex: 1 1 auto; min-height: 0; }
+                flex: 1 1 auto; min-height: 0; padding-bottom: 2mm; }
   .later-task { display: grid; grid-template-columns: 8mm 34mm 1fr 34mm; align-items: center;
                 min-height: 0; padding: 1mm 2mm; border-bottom: 1.5px dotted #ccd5e0; }
   .later-task .clock { width: 33mm; height: 30mm; min-height: 0; }
