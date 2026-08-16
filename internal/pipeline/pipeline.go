@@ -86,8 +86,9 @@ type Pipeline struct {
 
 	mu        sync.Mutex
 	busy      map[string]bool // lane -> a goroutine is working on it
-	publishMu sync.Mutex      // serializes main merges and output publication
-	log       []string        // recent pipeline events, newest last
+	servers   map[int64]*sandboxServer
+	publishMu sync.Mutex // serializes main merges and output publication
+	log       []string   // recent pipeline events, newest last
 
 	wake chan struct{}
 }
@@ -100,7 +101,13 @@ func New(db *store.DB, cfg Config) *Pipeline {
 		cfg.WorksheetRoot = "/users"
 	}
 	cfg.Limits = cfg.Limits.withDefaults()
-	return &Pipeline{cfg: cfg, db: db, busy: map[string]bool{}, wake: make(chan struct{}, 1)}
+	return &Pipeline{
+		cfg:     cfg,
+		db:      db,
+		busy:    map[string]bool{},
+		servers: map[int64]*sandboxServer{},
+		wake:    make(chan struct{}, 1),
+	}
 }
 
 // Start begins the scheduler loop.
@@ -117,6 +124,53 @@ func (p *Pipeline) Kick() {
 	select {
 	case p.wake <- struct{}{}:
 	default:
+	}
+}
+
+// registerServer records the running isolated Shelley server of one request
+// so waitForTurn and Shutdown can reach it.
+func (p *Pipeline) registerServer(id int64, srv *sandboxServer) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	p.servers[id] = srv
+}
+
+// unregisterServer removes and returns the recorded server of one request.
+func (p *Pipeline) unregisterServer(id int64) *sandboxServer {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	srv := p.servers[id]
+	delete(p.servers, id)
+	return srv
+}
+
+// serverTarget returns the client target of the request's running isolated
+// server. The boolean is false when no server is registered.
+func (p *Pipeline) serverTarget(id int64) (shelleyTarget, bool) {
+	p.mu.Lock()
+	defer p.mu.Unlock()
+	srv := p.servers[id]
+	if srv == nil {
+		return shelleyTarget{}, false
+	}
+	return srv.target, true
+}
+
+// Shutdown gracefully stops every isolated Shelley server. It is called from
+// cmd/serve on SIGTERM so the sandboxed processes (and their cgroups) do not
+// outlive the service. In-flight request goroutines keep running; servers
+// started between the snapshot and process exit reappear as stale metadata
+// entries and are cleaned up by the next run's killStaleSandbox.
+func (p *Pipeline) Shutdown() {
+	p.mu.Lock()
+	servers := make([]*sandboxServer, 0, len(p.servers))
+	for id, srv := range p.servers {
+		servers = append(servers, srv)
+		delete(p.servers, id)
+	}
+	p.mu.Unlock()
+	for _, srv := range servers {
+		p.stopShelley(srv)
 	}
 }
 
@@ -274,6 +328,16 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		if err != nil {
 			return err
 		}
+		// Recovery decision: reuse surviving clones and the isolated
+		// conversation database only when they pass integrity checks;
+		// otherwise fail with an actionable error instead of silently
+		// re-cloning over possibly completed work.
+		if workspace != "" {
+			if err := sandboxIntegrity(paths); err != nil {
+				return fmt.Errorf("cannot recover the sandbox of request #%d: %w "+
+					"(delete %s and retry the request to start over)", it.ID, err, paths.Root)
+			}
+		}
 		if workspace == "" {
 			branch = fmt.Sprintf("req-%d", it.ID)
 			if err := p.createSandboxDirs(paths); err != nil {
@@ -306,11 +370,31 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 		changed = func() (bool, error) { return p.hasCommits(branch, username) }
 	}
 
+	// In sandbox mode the conversation runs on the request's own isolated
+	// Shelley server, started before the first chat and stopped again on
+	// every exit path (success, failure, cancellation, panic).
+	target := shelleyTarget{}
+	if p.cfg.Sandbox {
+		srv, err := p.startShelley(paths, meta)
+		if err != nil {
+			return fmt.Errorf("start isolated shelley: %w", err)
+		}
+		p.registerServer(it.ID, srv)
+		defer func() {
+			p.unregisterServer(it.ID)
+			p.stopShelley(srv)
+		}()
+		target = srv.target
+		// startShelley stored the agent-running phase; keep the local copy
+		// (with pid/unit) in sync so later metadata writes do not lose it.
+		meta = srv.meta
+	}
+
 	convID := it.ConvID
 	prompt := p.prompt(it, followUp)
 	if convID == "" {
 		p.Logf("#%d: starting the agent in %s", it.ID, workspace)
-		convID, err = p.chatNew(workspace, prompt)
+		convID, err = p.chatNew(target, workspace, prompt)
 		if err != nil {
 			return err
 		}
@@ -332,12 +416,12 @@ func (p *Pipeline) run(it store.Request, followUp string) error {
 				"and summarise what you changed."
 		}
 		p.Logf("#%d: sending a refinement to the agent", it.ID)
-		if err := p.chatContinue(convID, prompt); err != nil {
+		if err := p.chatContinue(target, convID, prompt); err != nil {
 			return err
 		}
 	}
 
-	summary, err := p.waitForTurn(convID)
+	summary, err := p.waitForTurn(it.ID, target, convID)
 	if err != nil {
 		return err
 	}
@@ -387,6 +471,11 @@ func (p *Pipeline) prompt(it store.Request, followUp string) string {
 	b.WriteString("You are working in an isolated workspace for the `learningmaterial` project. " +
 		"Follow AGENTS.md. The requester's worksheets are a separate Git repository " +
 		"mounted below generate/<username>; the main repository intentionally ignores it.\n\n")
+	if p.cfg.Sandbox {
+		b.WriteString("The workspace is a disposable sandbox: only files below it are imported back " +
+			"into the live repositories after you finish, everything else is discarded. " +
+			"Use only the bash, patch, keyword_search and change_dir tools.\n\n")
+	}
 	if it.Kind == store.KindChange {
 		source := filepath.Join("generate", it.Worksheet)
 		if path, err := p.worksheetSourcePath(it.Worksheet); err == nil {
@@ -604,8 +693,13 @@ func (p *Pipeline) branchesMerged(branch, username string) (bool, error) {
 
 // --- shelley ---------------------------------------------------------------
 
-func (p *Pipeline) chatNew(cwd, prompt string) (string, error) {
-	cmd := exec.Command("shelley", "client", "chat", "-cwd", cwd, "-p", prompt)
+// chatNew starts a conversation against the target server and returns its ID.
+func (p *Pipeline) chatNew(t shelleyTarget, cwd, prompt string) (string, error) {
+	args := []string{"chat", "-cwd", cwd, "-p", prompt}
+	if p.cfg.Sandbox {
+		args = append(args, p.chatExtraArgs()...)
+	}
+	cmd := p.shelleyClient(t, args...)
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("shelley client chat: %v", err)
@@ -619,8 +713,8 @@ func (p *Pipeline) chatNew(cwd, prompt string) (string, error) {
 	return res.ConversationID, nil
 }
 
-func (p *Pipeline) chatContinue(convID, prompt string) error {
-	cmd := exec.Command("shelley", "client", "chat", "-c", convID, "-p", prompt)
+func (p *Pipeline) chatContinue(t shelleyTarget, convID, prompt string) error {
+	cmd := p.shelleyClient(t, "chat", "-c", convID, "-p", prompt)
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("shelley client chat -c: %v: %s", err, strings.TrimSpace(string(out)))
 	}
@@ -630,12 +724,27 @@ func (p *Pipeline) chatContinue(convID, prompt string) error {
 // waitForTurn blocks until the agent turn ends and returns its last message.
 // It polls `shelley client list` instead of using `read -wait`, which does not
 // reliably return when it attaches to a turn that is already running.
-func (p *Pipeline) waitForTurn(convID string) (string, error) {
+//
+// In sandbox mode the conversation lives on the request's isolated server, so
+// the target is re-read from the server registry on every poll. Polling the
+// default socket during the window before registration (or after a shutdown
+// race) would return a bogus "conversation not found", so the poll is simply
+// skipped while no server is registered; the chat call that precedes the wait
+// always registers the server first.
+func (p *Pipeline) waitForTurn(reqID int64, t shelleyTarget, convID string) (string, error) {
 	deadline := time.Now().Add(90 * time.Minute)
 	idle := 0
 	for time.Now().Before(deadline) {
 		time.Sleep(5 * time.Second)
-		working, err := p.working(convID)
+		pollTarget := t
+		if p.cfg.Sandbox {
+			registered, ok := p.serverTarget(reqID)
+			if !ok {
+				continue
+			}
+			pollTarget = registered
+		}
+		working, err := p.working(pollTarget, convID)
 		if err != nil {
 			return "", err
 		}
@@ -647,15 +756,15 @@ func (p *Pipeline) waitForTurn(convID string) (string, error) {
 		// `chat` the conversation is not marked as working yet).
 		idle++
 		if idle >= 2 {
-			return p.lastAgentMessage(convID)
+			return p.lastAgentMessage(pollTarget, convID)
 		}
 	}
 	return "", fmt.Errorf("the agent did not finish within 90 minutes")
 }
 
 // working reports whether the agent is currently working on the conversation.
-func (p *Pipeline) working(convID string) (bool, error) {
-	out, err := exec.Command("shelley", "client", "list", "-limit", "200").Output()
+func (p *Pipeline) working(t shelleyTarget, convID string) (bool, error) {
+	out, err := p.shelleyClient(t, "list", "-limit", "200").Output()
 	if err != nil {
 		return false, fmt.Errorf("shelley client list: %v", err)
 	}
@@ -673,8 +782,8 @@ func (p *Pipeline) working(convID string) (bool, error) {
 }
 
 // lastAgentMessage returns the final message of the conversation.
-func (p *Pipeline) lastAgentMessage(convID string) (string, error) {
-	out, err := exec.Command("shelley", "client", "read", convID).Output()
+func (p *Pipeline) lastAgentMessage(t shelleyTarget, convID string) (string, error) {
+	out, err := p.shelleyClient(t, "read", convID).Output()
 	if err != nil {
 		return "", fmt.Errorf("shelley client read: %v", err)
 	}

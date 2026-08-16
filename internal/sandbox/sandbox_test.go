@@ -272,12 +272,15 @@ func TestArgsDefaultModCacheIsMountedReadOnly(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !argsContainPair(args, "--ro-bind", filepath.Clean(mc)) {
-		t.Error("host module cache is not mounted read-only at the same path")
+	// The host path appears only as the bind SOURCE; inside the sandbox the
+	// cache lives at the fixed modCacheMount so host home paths never show
+	// up in the sandbox mount table.
+	if !argsContainPair(args, filepath.Clean(mc), modCacheMount) {
+		t.Errorf("host module cache is not mounted read-only at %s", modCacheMount)
 	}
 	v, ok := argAfter(args, "GOMODCACHE")
-	if !ok || v != filepath.Clean(mc) {
-		t.Errorf("GOMODCACHE = %q, want %q", v, mc)
+	if !ok || v != modCacheMount {
+		t.Errorf("GOMODCACHE = %q, want %q", v, modCacheMount)
 	}
 }
 

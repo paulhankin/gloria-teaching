@@ -52,12 +52,30 @@ func (h *Handle) OutputString() string {
 	return h.Output.String()
 }
 
+// Exited reports whether the sandbox process has exited and been reaped.
+func (h *Handle) Exited() bool {
+	return h.waitClosed()
+}
+
 // String renders a short identifier for logs.
 func (h *Handle) String() string {
 	if h.Unit != "" {
 		return fmt.Sprintf("%s (unit %s, pid %d)", h.Name, h.Unit, h.PID)
 	}
 	return fmt.Sprintf("%s (pgid %d, pid %d)", h.Name, h.pgid, h.PID)
+}
+
+// scopeGone reports whether a transient systemd scope no longer exists. A
+// failing lookup is treated as "gone": the unit file disappearing is exactly
+// how systemd reports a stopped transient scope.
+func scopeGone(unit string) bool {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	out, err := exec.CommandContext(ctx, "systemctl", "--user", "show", unit, "-p", "LoadState", "--value").Output()
+	if err != nil {
+		return true
+	}
+	return strings.TrimSpace(string(out)) != "loaded"
 }
 
 // Wait blocks until the sandbox process exits and returns its exit error
@@ -96,13 +114,14 @@ func (h *Handle) Stop(grace time.Duration) error {
 		grace = 10 * time.Second
 	}
 
-	// Graceful phase.
+	// Graceful phase. Waiting on the scope alone is not enough here: the
+	// direct child is the systemd-run CLIENT, which occasionally lingers
+	// after its scope is gone, so wait for either the child to exit or the
+	// scope's cgroup to empty before escalating.
 	if h.Unit != "" {
 		// Ask systemd to stop the scope: it SIGTERMs every process in the
 		// cgroup and removes the scope.
-		ctx, cancel := context.WithTimeout(context.Background(), grace)
-		_ = exec.CommandContext(ctx, "systemctl", "--user", "stop", h.Unit).Run()
-		cancel()
+		_ = exec.Command("systemctl", "--user", "stop", h.Unit).Run()
 	} else if h.pgid > 0 {
 		_ = syscall.Kill(-h.pgid, syscall.SIGTERM)
 	}
@@ -111,6 +130,31 @@ func (h *Handle) Stop(grace time.Duration) error {
 	for time.Now().Before(deadline) {
 		if h.waitClosed() {
 			return nil
+		}
+		if h.Unit != "" && scopeGone(h.Unit) {
+			// The scope (and with it the whole cgroup) is gone. Give the
+			// systemd-run client a moment to notice and exit; Stop's caller
+			// cares about the sandboxed processes, not the client.
+			clientDeadline := time.Now().Add(2 * time.Second)
+			for time.Now().Before(clientDeadline) && !h.waitClosed() {
+				time.Sleep(50 * time.Millisecond)
+			}
+			if h.waitClosed() {
+				return nil
+			}
+			// The client is stuck; kill it directly and report success of
+			// the sandbox teardown.
+			if h.cmd != nil && h.cmd.Process != nil {
+				_ = h.cmd.Process.Kill()
+			}
+			deadline = time.Now().Add(2 * time.Second)
+			for time.Now().Before(deadline) {
+				if h.waitClosed() {
+					return nil
+				}
+				time.Sleep(50 * time.Millisecond)
+			}
+			return fmt.Errorf("sandbox %s: scope stopped but systemd-run client pid %d did not exit", h.Name, h.PID)
 		}
 		time.Sleep(50 * time.Millisecond)
 	}
@@ -209,6 +253,11 @@ func randomSuffix(n int) string {
 // properties, whole-cgroup kill via systemctl); otherwise it runs in a new
 // process group (Stop kills the group). The returned Handle tracks the
 // direct child; Wait reports its exit.
+//
+// ctx bounds the LAUNCH only. The sandbox process deliberately does NOT die
+// when ctx is canceled after Start returned: cancellation during the
+// readiness window aborts the launch, but once Start succeeds the process is
+// owned by the caller and ends via Stop (or --die-with-parent).
 func Start(ctx context.Context, spec Spec) (*Handle, error) {
 	bwrap, err := bwrapPath()
 	if err != nil {
@@ -242,14 +291,17 @@ func Start(ctx context.Context, spec Spec) (*Handle, error) {
 		sysArgs = append(sysArgs, "--", bwrap)
 		sysArgs = append(sysArgs, args...)
 
-		cmd = exec.CommandContext(ctx, "systemd-run", sysArgs...)
+		// exec.Command, not CommandContext: killing the systemd-run client
+		// on ctx cancel would orphan (or with --die-with-parent, kill) the
+		// scope; the caller controls the lifetime via Stop.
+		cmd = exec.Command("systemd-run", sysArgs...)
 		h.Unit = unit
 	} else {
 		// No working user manager: run bwrap directly in its own process
 		// group. bwrap's --die-with-parent plus Stop's kill(-pgid) provide
 		// the group lifecycle. Resource limits are not applied in this
 		// mode; log-worthy, the caller can surface probeErr.
-		cmd = exec.CommandContext(ctx, bwrap, args...)
+		cmd = exec.Command(bwrap, args...)
 		cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 	}
 

@@ -11,9 +11,11 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"os/signal"
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 
 	"learningmaterial/internal/account"
 	"learningmaterial/internal/pipeline"
@@ -596,6 +598,17 @@ func main() {
 		SandboxRoot:   abs(*sandboxRoot),
 	})
 	pipe.Start()
+
+	// SIGTERM (systemd stop) gracefully stops every sandboxed Shelley server
+	// before the process exits, so no sandboxed agent outlives the service.
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGTERM)
+	go func() {
+		<-sigs
+		log.Printf("received SIGTERM; stopping sandboxed shelley servers")
+		pipe.Shutdown()
+		os.Exit(0)
+	}()
 
 	files := http.FileServer(http.Dir(*dir))
 	previews := http.StripPrefix("/preview/", http.FileServer(http.Dir(abs(*preview))))

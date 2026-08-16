@@ -125,6 +125,14 @@ func belowHome(spec Spec) bool {
 	return cache == home || strings.HasPrefix(cache, home+string(filepath.Separator))
 }
 
+// modCacheMount is where the read-only Go module cache is mounted inside the
+// sandbox. A fixed location below the synthetic home keeps the host path
+// (typically /home/<user>/go/pkg/mod) out of the sandbox mount table:
+// mounting it at its host path would make bubblewrap auto-create the parent
+// /home/<user>, leaking the host home directory's existence into the
+// sandbox.
+const modCacheMount = homeMount + "/.gomodcache"
+
 // modCacheSandboxPath returns the sandbox-visible path of the read-only Go
 // module cache. When the cache is disabled ("-") or the directory does not
 // exist (the bind is skipped), it falls back to the sandbox-local default
@@ -143,7 +151,7 @@ func modCacheSandboxPath(spec Spec) string {
 	if _, err := os.Stat(mc); err != nil {
 		return homeMount + "/go/pkg/mod"
 	}
-	return filepath.Clean(mc)
+	return modCacheMount
 }
 
 // hostModCache returns the host Go module cache. exe.dev VMs pin GOFLAGS
@@ -307,11 +315,12 @@ func Args(spec Spec) ([]string, error) {
 
 	// Go toolchain and module cache (read-only; the writable build cache is
 	// separate). GOFLAGS=-mod=mod keeps "go build" usable with a read-only
-	// module cache on Go >= 1.16.
+	// module cache on Go >= 1.16. The module cache is mounted at the fixed
+	// modCacheMount (see modCacheSandboxPath), never at its host path.
 	args = roBindIfExists(args, "/usr/local/go", "/usr/local/go", &notes)
 	if spec.ModCache != "-" && spec.ModCache != "" {
 		mc := filepath.Clean(spec.ModCache)
-		args = roBindIfExists(args, mc, mc, &notes)
+		args = roBindIfExists(args, mc, modCacheMount, &notes)
 	}
 
 	// Writable request mounts. Mount ORDER IS LOAD-BEARING:
