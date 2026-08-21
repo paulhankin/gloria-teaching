@@ -131,7 +131,7 @@ type DB struct{ sql *sql.DB }
 
 // Open opens (and migrates) the database at path.
 func Open(path string) (*DB, error) {
-	d, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)")
+	d, err := sql.Open("sqlite", path+"?_pragma=busy_timeout(5000)&_pragma=journal_mode(WAL)&_pragma=foreign_keys(1)")
 	if err != nil {
 		return nil, err
 	}
@@ -233,6 +233,25 @@ CREATE INDEX IF NOT EXISTS worksheet_shares_email ON worksheet_shares(email);`
 	if _, err := d.Exec("ALTER TABLE worksheets ADD COLUMN finished INTEGER NOT NULL DEFAULT 0"); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("store: adding column finished: %w", err)
+	}
+	// Tags are per-owner navigation categories; parent_id builds sub-tags.
+	const tagSchema = `
+CREATE TABLE IF NOT EXISTS tags (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  owner_email TEXT NOT NULL COLLATE NOCASE,
+  name        TEXT NOT NULL,
+  parent_id   INTEGER REFERENCES tags(id) ON DELETE CASCADE,
+  position    INTEGER NOT NULL DEFAULT 0,
+  created_at  INTEGER NOT NULL
+);
+CREATE INDEX IF NOT EXISTS tags_owner ON tags(owner_email, parent_id);
+CREATE TABLE IF NOT EXISTS worksheet_tags (
+  worksheet TEXT NOT NULL REFERENCES worksheets(worksheet) ON DELETE CASCADE,
+  tag_id    INTEGER NOT NULL REFERENCES tags(id) ON DELETE CASCADE,
+  PRIMARY KEY (worksheet, tag_id)
+);`
+	if _, err := d.Exec(tagSchema); err != nil {
+		return fmt.Errorf("store: tag schema: %w", err)
 	}
 	return nil
 }
@@ -763,4 +782,171 @@ func requireChanged(result sql.Result, message string) error {
 		return fmt.Errorf("store: %s", message)
 	}
 	return nil
+}
+
+// Tag is a per-owner navigation category. ParentID groups sub-tags under a
+// top-level tag (e.g. "Mathematics" under "First Grade"); zero means top level.
+type Tag struct {
+	ID         int64
+	OwnerEmail string
+	Name       string
+	ParentID   int64
+	Position   int
+	Children   []Tag
+}
+
+// CreateTag adds a tag for owner below parentID (0 = top level).
+func (db *DB) CreateTag(owner, name string, parentID int64) (int64, error) {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return 0, fmt.Errorf("store: tag name is empty")
+	}
+	if parentID != 0 {
+		var ok bool
+		err := db.sql.QueryRow(
+			`SELECT EXISTS (SELECT 1 FROM tags WHERE id = ? AND owner_email = ?)`, parentID, owner).Scan(&ok)
+		if err != nil {
+			return 0, err
+		}
+		if !ok {
+			return 0, fmt.Errorf("store: parent tag not found")
+		}
+	}
+	res, err := db.sql.Exec(
+		`INSERT INTO tags (owner_email, name, parent_id, created_at) VALUES (?,?,?,?)`,
+		owner, name, nullableID(parentID), time.Now().Unix())
+	if err != nil {
+		return 0, err
+	}
+	return res.LastInsertId()
+}
+
+// nullableID maps the top-level sentinel 0 to NULL so the parent foreign key
+// only applies to real sub-tags.
+func nullableID(id int64) any {
+	if id == 0 {
+		return nil
+	}
+	return id
+}
+
+// RenameTag changes a tag's name; the tag must belong to owner.
+func (db *DB) RenameTag(id int64, owner, name string) error {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return fmt.Errorf("store: tag name is empty")
+	}
+	res, err := db.sql.Exec(
+		`UPDATE tags SET name = ? WHERE id = ? AND owner_email = ?`, name, id, owner)
+	if err != nil {
+		return err
+	}
+	return requireChanged(res, "tag not found or not owned by user")
+}
+
+// DeleteTag removes a tag and its assignments; the tag must belong to owner.
+func (db *DB) DeleteTag(id int64, owner string) error {
+	res, err := db.sql.Exec(`DELETE FROM tags WHERE id = ? AND owner_email = ?`, id, owner)
+	if err != nil {
+		return err
+	}
+	return requireChanged(res, "tag not found or not owned by user")
+}
+
+// Tags returns the owner's tags as a tree: top-level tags with Children set.
+func (db *DB) Tags(owner string) ([]Tag, error) {
+	rows, err := db.sql.Query(
+		`SELECT id, owner_email, name, parent_id, position FROM tags
+		 WHERE owner_email = ? ORDER BY position, id`, owner)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	byID := make(map[int64]*Tag)
+	var all []*Tag
+	for rows.Next() {
+		var t Tag
+		var parent any
+		if err := rows.Scan(&t.ID, &t.OwnerEmail, &t.Name, &parent, &t.Position); err != nil {
+			return nil, err
+		}
+		if pid, ok := parent.(int64); ok {
+			t.ParentID = pid
+		}
+		cp := t
+		byID[t.ID] = &cp
+		all = append(all, &cp)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	var top []Tag
+	for _, t := range all {
+		if t.ParentID == 0 {
+			top = append(top, *t)
+			byID[t.ID] = &top[len(top)-1]
+		}
+	}
+	// Second pass: attach children to their parent's Children slice. byID now
+	// points at the copies inside top for top-level tags, so the appended
+	// children land on the returned tree.
+	for _, t := range all {
+		if t.ParentID != 0 {
+			if p, ok := byID[t.ParentID]; ok {
+				p.Children = append(p.Children, *t)
+			}
+		}
+	}
+	return top, nil
+}
+
+// WorksheetTagIDs returns the tag IDs assigned to a worksheet.
+func (db *DB) WorksheetTagIDs(worksheet string) (map[int64]bool, error) {
+	rows, err := db.sql.Query(`SELECT tag_id FROM worksheet_tags WHERE worksheet = ?`, worksheet)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := make(map[int64]bool)
+	for rows.Next() {
+		var id int64
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		out[id] = true
+	}
+	return out, rows.Err()
+}
+
+// SetWorksheetTags replaces the tags of a worksheet owned by owner.
+func (db *DB) SetWorksheetTags(worksheet, owner string, tagIDs []int64) error {
+	var owned bool
+	err := db.sql.QueryRow(
+		`SELECT EXISTS (SELECT 1 FROM worksheets WHERE worksheet = ? AND owner_email = ?)`,
+		worksheet, owner).Scan(&owned)
+	if err != nil {
+		return err
+	}
+	if !owned {
+		return fmt.Errorf("store: worksheet not found or not owned by user")
+	}
+	tx, err := db.sql.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+	if _, err := tx.Exec(`DELETE FROM worksheet_tags WHERE worksheet = ?`, worksheet); err != nil {
+		return err
+	}
+	seen := make(map[int64]bool)
+	for _, id := range tagIDs {
+		if seen[id] {
+			continue
+		}
+		seen[id] = true
+		if _, err := tx.Exec(`INSERT INTO worksheet_tags (worksheet, tag_id) VALUES (?,?)`, worksheet, id); err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }

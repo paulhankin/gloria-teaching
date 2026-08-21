@@ -157,6 +157,77 @@ func TestMigrateAssignsExistingUsernames(t *testing.T) {
 	}
 }
 
+func TestTagTreeAndWorksheetAssignment(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	if err := db.EnsureWorksheets([]string{"math/venn", "math/prices"}, "owner@example.com"); err != nil {
+		t.Fatal(err)
+	}
+
+	grade, err := db.CreateTag("owner@example.com", "First Grade", 0)
+	if err != nil {
+		t.Fatal(err)
+	}
+	maths, err := db.CreateTag("owner@example.com", "Mathematics", grade)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.CreateTag("owner@example.com", "Music", grade); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.CreateTag("owner@example.com", "  ", 0); err == nil {
+		t.Fatal("empty tag name accepted")
+	}
+	if _, err := db.CreateTag("owner@example.com", "Orphan", 9999); err == nil {
+		t.Fatal("tag with unknown parent accepted")
+	}
+
+	tags, err := db.Tags("owner@example.com")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(tags) != 1 || tags[0].Name != "First Grade" || len(tags[0].Children) != 2 {
+		t.Fatalf("tag tree = %#v", tags)
+	}
+	if tags[0].Children[0].Name != "Mathematics" || tags[0].Children[1].Name != "Music" {
+		t.Fatalf("children = %#v", tags[0].Children)
+	}
+
+	if err := db.RenameTag(maths, "owner@example.com", "Maths"); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.RenameTag(maths, "other@example.com", "Nope"); err == nil {
+		t.Fatal("foreign owner renamed a tag")
+	}
+
+	if err := db.SetWorksheetTags("math/venn", "owner@example.com", []int64{maths}); err != nil {
+		t.Fatal(err)
+	}
+	ids, err := db.WorksheetTagIDs("math/venn")
+	if err != nil || !ids[maths] || len(ids) != 1 {
+		t.Fatalf("worksheet tags = %v, %v", ids, err)
+	}
+	if err := db.SetWorksheetTags("math/venn", "other@example.com", nil); err == nil {
+		t.Fatal("foreign owner tagged a worksheet")
+	}
+
+	// Deleting the parent cascades to children and assignments.
+	if err := db.DeleteTag(grade, "owner@example.com"); err != nil {
+		t.Fatal(err)
+	}
+	tags, err = db.Tags("owner@example.com")
+	if err != nil || len(tags) != 0 {
+		t.Fatalf("after delete tags = %#v, %v", tags, err)
+	}
+	ids, err = db.WorksheetTagIDs("math/venn")
+	if err != nil || len(ids) != 0 {
+		t.Fatalf("after delete worksheet tags = %v, %v", ids, err)
+	}
+}
+
 func TestCanViewWorksheet(t *testing.T) {
 	db, err := Open(filepath.Join(t.TempDir(), "test.db"))
 	if err != nil {

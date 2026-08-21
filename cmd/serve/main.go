@@ -86,6 +86,32 @@ func index(w http.ResponseWriter, r *http.Request) {
 		User:           account.Username(r),
 		Actor:          account.ActorUsername(r),
 		CanImpersonate: account.IsAdmin(r),
+		WorksheetTags:  make(map[string]map[int64]bool),
+	}
+	owner := account.Email(r)
+	tags, err := db.Tags(owner)
+	if err != nil {
+		http.Error(w, "tags: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	d.Tags = tags
+	for _, ws := range worksheets {
+		ids, err := db.WorksheetTagIDs(ws.Path())
+		if err != nil {
+			http.Error(w, "worksheet tags: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		d.WorksheetTags[ws.Path()] = ids
+	}
+	// Navigation state: ?manage=1 for the manage view, ?tag=<id> for a category.
+	q := r.URL.Query()
+	if q.Get("manage") == "1" {
+		d.Manage = true
+	} else if tagID, err := strconv.ParseInt(q.Get("tag"), 10, 64); err == nil && tagID != 0 {
+		if name, ok := findTag(tags, tagID); ok {
+			d.ActiveTagID = tagID
+			d.ActiveTagName = name
+		}
 	}
 	if d.CanImpersonate {
 		users, err := db.Users()
@@ -143,6 +169,8 @@ func flash(w http.ResponseWriter, r *http.Request) string {
 		return "Worksheet moved to the finished list."
 	case "unfinished":
 		return "Worksheet moved back to the active list."
+	case "tag":
+		return "Categories saved."
 	}
 	return ""
 }
@@ -403,6 +431,99 @@ func worksheetFinished(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
+// findTag returns the name of the tag with id within the owner's tree.
+func findTag(tags []store.Tag, id int64) (string, bool) {
+	for _, t := range tags {
+		if t.ID == id {
+			return t.Name, true
+		}
+		if name, ok := findTag(t.Children, id); ok {
+			return name, true
+		}
+	}
+	return "", false
+}
+
+// tagCreate adds a navigation category (optionally a sub-category).
+func tagCreate(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	parent, _ := strconv.ParseInt(r.FormValue("parent"), 10, 64)
+	if _, err := db.CreateTag(account.Email(r), r.FormValue("name"), parent); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "tag")
+	http.Redirect(w, r, "/?manage=1", http.StatusSeeOther)
+}
+
+// tagRename renames a category.
+func tagRename(w http.ResponseWriter, r *http.Request) {
+	tagMutate(w, r, func(id int64, owner string) error {
+		return db.RenameTag(id, owner, r.FormValue("name"))
+	})
+}
+
+// tagDelete removes a category and its sub-categories.
+func tagDelete(w http.ResponseWriter, r *http.Request) {
+	tagMutate(w, r, func(id int64, owner string) error {
+		return db.DeleteTag(id, owner)
+	})
+}
+
+// tagMutate runs an owner-scoped tag operation identified by an id field.
+func tagMutate(w http.ResponseWriter, r *http.Request, fn func(id int64, owner string) error) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
+		return
+	}
+	if err := fn(id, account.Email(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "tag")
+	http.Redirect(w, r, "/?manage=1", http.StatusSeeOther)
+}
+
+// worksheetTags saves the category checkboxes of one worksheet.
+func worksheetTags(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	var ids []int64
+	for _, v := range r.Form["tag"] {
+		if id, err := strconv.ParseInt(v, 10, 64); err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if err := db.SetWorksheetTags(r.FormValue("worksheet"), account.Email(r), ids); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	setFlash(w, "tag")
+	http.Redirect(w, r, "/?manage=1", http.StatusSeeOther)
+}
+
 func worksheetShare(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
 		http.Error(w, "POST only", http.StatusMethodNotAllowed)
@@ -646,7 +767,11 @@ func main() {
 	mux.HandleFunc("/requests/delete", deleteRequest)
 	mux.HandleFunc("/worksheets/visibility", worksheetVisibility)
 	mux.HandleFunc("/worksheets/finished", worksheetFinished)
+	mux.HandleFunc("/worksheets/tags", worksheetTags)
 	mux.HandleFunc("/worksheets/revert", worksheetRevert)
+	mux.HandleFunc("/tags", tagCreate)
+	mux.HandleFunc("/tags/rename", tagRename)
+	mux.HandleFunc("/tags/delete", tagDelete)
 	mux.HandleFunc("/worksheets/shares", worksheetShare)
 	mux.HandleFunc("/worksheets/shares/delete", worksheetShareDelete)
 	mux.HandleFunc("/worksheets/", worksheetRoutes)

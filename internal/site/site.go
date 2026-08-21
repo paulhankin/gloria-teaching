@@ -62,6 +62,16 @@ type Data struct {
 	Flash string
 	// Log holds recent pipeline events (admin only, newest first).
 	Log []string
+	// Tags is the owner's navigation tree (top-level tags with children).
+	Tags []store.Tag
+	// WorksheetTags maps a worksheet path to its assigned tag IDs.
+	WorksheetTags map[string]map[int64]bool
+	// ActiveTagID selects the tag whose worksheets are shown; 0 = Home (all).
+	ActiveTagID int64
+	// ActiveTagName is the heading for a selected tag.
+	ActiveTagName string
+	// Manage renders the tag-management view instead of the worksheet list.
+	Manage bool
 }
 
 func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
@@ -124,6 +134,127 @@ func (d Data) FinishedWorksheets() []Worksheet {
 		if w.Finished {
 			out = append(out, w)
 		}
+	}
+	return out
+}
+
+// activeTagIDs returns the selected tag plus its descendants, so clicking a
+// top-level tag also matches worksheets tagged with one of its sub-tags.
+func (d Data) activeTagIDs() map[int64]bool {
+	ids := map[int64]bool{d.ActiveTagID: true}
+	var walk func(tags []store.Tag)
+	walk = func(tags []store.Tag) {
+		for _, t := range tags {
+			if t.ID == d.ActiveTagID {
+				for _, c := range t.Children {
+					ids[c.ID] = true
+				}
+			}
+			walk(t.Children)
+		}
+	}
+	walk(d.Tags)
+	return ids
+}
+
+// ShownWorksheets returns the active worksheets for the current view: all on
+// Home, otherwise those tagged with the selected tag or one of its sub-tags.
+func (d Data) ShownWorksheets() []Worksheet {
+	if d.ActiveTagID == 0 {
+		return d.ActiveWorksheets()
+	}
+	ids := d.activeTagIDs()
+	var out []Worksheet
+	for _, w := range d.ActiveWorksheets() {
+		for id := range d.WorksheetTags[w.Path()] {
+			if ids[id] {
+				out = append(out, w)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// ShownFinishedWorksheets is ShownWorksheets for the finished list.
+func (d Data) ShownFinishedWorksheets() []Worksheet {
+	if d.ActiveTagID == 0 {
+		return d.FinishedWorksheets()
+	}
+	ids := d.activeTagIDs()
+	var out []Worksheet
+	for _, w := range d.FinishedWorksheets() {
+		for id := range d.WorksheetTags[w.Path()] {
+			if ids[id] {
+				out = append(out, w)
+				break
+			}
+		}
+	}
+	return out
+}
+
+// Heading is the main panel title for the current view.
+func (d Data) Heading() string {
+	if d.Manage {
+		return "Manage"
+	}
+	if d.ActiveTagID == 0 {
+		return "Worksheets"
+	}
+	return d.ActiveTagName
+}
+
+// SectionHeading titles the worksheet table below the page heading. On Home
+// it reads "Available worksheets"; on a category view it repeats the category.
+func (d Data) SectionHeading() string {
+	if d.ActiveTagID == 0 {
+		return "Available worksheets"
+	}
+	return d.ActiveTagName
+}
+
+// TagChecked reports whether a worksheet carries the given tag.
+func (d Data) TagChecked(worksheet string, tagID int64) bool {
+	return d.WorksheetTags[worksheet][tagID]
+}
+
+// tagCheck is one labelled checkbox in a worksheet's tag form.
+type tagCheck struct {
+	ID      int64
+	Name    string
+	Checked bool
+}
+
+// tagForm pairs a worksheet with the tag checkboxes for the manage view.
+type tagForm struct {
+	Title  string
+	Path   string
+	Checks []tagCheck
+}
+
+// TagForms builds the per-worksheet tag assignment forms for the manage view.
+func (d Data) TagForms() []tagForm {
+	var flat []store.Tag
+	var walk func(tags []store.Tag, depth int)
+	walk = func(tags []store.Tag, depth int) {
+		for _, t := range tags {
+			name := t.Name
+			if depth > 0 {
+				name = "— " + name
+			}
+			flat = append(flat, store.Tag{ID: t.ID, Name: name})
+			walk(t.Children, depth+1)
+		}
+	}
+	walk(d.Tags, 0)
+	out := make([]tagForm, 0, len(d.Worksheets))
+	for _, w := range d.Worksheets {
+		f := tagForm{Title: w.Title, Path: w.Path()}
+		for _, t := range flat {
+			f.Checks = append(f.Checks, tagCheck{ID: t.ID, Name: t.Name, Checked: d.TagChecked(w.Path(), t.ID)})
+		}
+		out = append(out, f)
 	}
 	return out
 }
@@ -235,8 +366,24 @@ const indexCSS = `
     --queued:#667085; --working:#b54708; --review:#175cd3; --failed:#b42318;
     --done:#067647; --rejected:#667085; }
   * { box-sizing:border-box; }
-  body { margin:0; padding:36px 20px 64px; background:#fff; color:var(--ink);
+  body { margin:0; background:#fff; color:var(--ink);
     font:15px/1.45 system-ui,sans-serif; }
+  .layout { display:flex; min-height:100vh; }
+  .sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--line);
+    padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto; }
+  .sidebar .brand { padding:0 18px 16px; font-weight:700; font-size:15px;
+    border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .nav-item { display:flex; align-items:center; gap:10px; padding:9px 18px;
+    color:var(--ink); text-decoration:none; font-size:14px; }
+  .nav-item svg { width:17px; height:17px; flex-shrink:0; color:var(--muted); }
+  .nav-item:hover { background:#f4f6f9; }
+  .nav-item.active { background:#eaf1fd; color:var(--link); font-weight:650; }
+  .nav-item.active svg { color:var(--link); }
+  .nav-item.sub { padding-left:47px; font-size:13px; color:var(--muted); }
+  .nav-item.sub.active { color:var(--link); }
+  .nav-section { padding:14px 18px 5px; color:var(--muted); font-size:11px;
+    text-transform:uppercase; letter-spacing:.05em; font-weight:650; }
+  .main { flex:1; min-width:0; padding:30px 30px 64px; }
   .wrap { max-width:1040px; margin:0 auto; }
   header { display:flex; justify-content:space-between; align-items:baseline; gap:20px;
     padding-bottom:18px; border-bottom:1px solid var(--line); }
@@ -323,10 +470,30 @@ const indexCSS = `
   .adminbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:34px;
     padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
   .adminbar form { margin:0; }
+  h3 { font-size:15px; margin:26px 0 8px; }
+  form.tag-add { display:flex; gap:7px; flex-wrap:wrap; max-width:620px; }
+  form.tag-add input[type=text] { flex:1; min-width:200px; }
+  form.tag-add select { padding:9px 10px; border:1px solid #98a2b3; border-radius:3px;
+    background:#fff; color:inherit; font:14px/1.4 system-ui,sans-serif; }
+  .tag-manage-list { list-style:none; padding:0; margin:8px 0; max-width:640px; }
+  .tag-manage-list li { padding:7px 0; border-top:1px solid var(--line); }
+  .tag-manage-list ul { list-style:none; padding-left:26px; margin:4px 0 0; }
+  .tag-manage-list .tag-name { font-weight:650; display:inline-block; min-width:140px; }
+  .tag-manage-list .tag-name.sub { color:var(--muted); font-weight:500; }
+  form.tag-rename, form.tag-delete { display:inline-flex; gap:6px; margin-left:8px; }
+  form.tag-rename input[type=text] { width:150px; padding:4px 7px; }
+  form.tag-rename button, form.tag-delete button { padding:4px 9px; font-size:13px; }
+  button.no { color:var(--failed); border-color:#f0b4ae; }
+  .tag-worksheet { border-top:1px solid var(--line); padding:10px 0; max-width:720px; }
+  .tag-assign { display:flex; gap:14px; flex-wrap:wrap; align-items:center; margin-top:5px; }
+  .tag-check { display:inline-flex; gap:6px; align-items:center; font-size:14px; color:var(--ink); }
   pre.log { background:#f7f8fa; border:1px solid var(--line); padding:10px; font-size:12px;
     color:var(--muted); max-height:220px; overflow:auto; }
   @media (max-width:720px) {
-    body { padding:24px 12px 48px; }
+    .layout { display:block; }
+    .sidebar { width:auto; height:auto; position:static; border-right:0;
+      border-bottom:1px solid var(--line); padding:12px 0; }
+    .main { padding:20px 12px 48px; }
     header { display:block; }
     .account { margin-top:10px; }
     header p { margin-top:4px; }
@@ -405,6 +572,58 @@ const worksheetRows = `
 {{end}}
 `
 
+const manageView = `
+{{define "manage"}}
+<section aria-labelledby="manage-heading">
+<h2 id="manage-heading">Manage categories</h2>
+<p class="meta">Categories appear in the left-hand menu. Create a top-level category such as "First Grade", then add sub-categories like "Mathematics" beneath it. Tag worksheets to file them under a category.</p>
+
+<h3>Add a category</h3>
+<form class="ask tag-add" method="POST" action="/tags">
+  <input type="text" name="name" required placeholder="Category name">
+  <select name="parent" aria-label="Parent category">
+    <option value="0">Top level (no parent)</option>
+    {{range .Tags}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
+  </select>
+  <button type="submit">Add category</button>
+</form>
+
+{{if .Tags}}
+<h3>Your categories</h3>
+<ul class="tag-manage-list">
+{{range .Tags}}
+  <li>
+    <span class="tag-name">{{.Name}}</span>
+    <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">Rename</button></form>
+    <form class="tag-delete" method="POST" action="/tags/delete" onsubmit="return confirm('Delete category &quot;{{.Name}}&quot; and its sub-categories? Worksheets keep their other categories.');"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">Delete</button></form>
+    {{if .Children}}<ul>{{range .Children}}
+      <li><span class="tag-name sub">{{.Name}}</span>
+        <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">Rename</button></form>
+        <form class="tag-delete" method="POST" action="/tags/delete"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">Delete</button></form>
+      </li>{{end}}</ul>{{end}}
+  </li>
+{{end}}
+</ul>
+{{end}}
+
+<h3>Tag worksheets</h3>
+{{if .Tags}}
+<p class="meta">Tick the categories each worksheet belongs to.</p>
+{{range .TagForms}}
+<div class="tag-worksheet">
+  <div class="title">{{.Title}}</div>
+  <form method="POST" action="/worksheets/tags" class="tag-assign">
+    <input type="hidden" name="worksheet" value="{{.Path}}">
+    {{range .Checks}}<label class="tag-check"><input type="checkbox" name="tag" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label>{{end}}
+    <button type="submit">Save</button>
+  </form>
+</div>
+{{end}}
+{{else}}<p class="meta">Create a category first, then tag your worksheets.</p>{{end}}
+</section>
+{{end}}
+`
+
 const requestActions = `
 {{define "actions"}}
   <div class="actions">
@@ -422,16 +641,26 @@ const requestActions = `
 {{end}}
 `
 
+// Inline SVG icons for the sidebar navigation (Feather-style strokes).
+const (
+	iconHomeSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
+	iconCogSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+	iconTagSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`
+)
+
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"statusLabel": statusLabel,
 	"statusHelp":  statusHelp,
+	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
+	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
+	"iconTag":     func() template.HTML { return template.HTML(iconTagSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
 	"row": func(s rowSet, w Worksheet) row {
 		return row{Worksheet: w, data: s.Data}
 	},
-}).Parse(worksheetRows + requestActions + `<!DOCTYPE html>
+}).Parse(worksheetRows + requestActions + manageView + `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -440,9 +669,32 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <title>Learning material</title>
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
-<body><div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<body>
+{{if .Static}}
+<div class="wrap">
+<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div></header>
+{{else}}
+<div class="layout">
+<nav class="sidebar" aria-label="Worksheet navigation">
+  <div class="brand">Worksheets</div>
+  <a class="nav-item{{if and (not .Manage) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
+  <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
+  {{if .Tags}}
+  <div class="nav-section">Categories</div>
+  {{range .Tags}}
+  <a class="nav-item{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{iconTag}} {{.Name}}</a>
+  {{range .Children}}<a class="nav-item sub{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>{{end}}
+  {{end}}
+  {{end}}
+</nav>
+<div class="main"><div class="wrap">
+<header><div><h1>{{.Heading}}</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+{{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
+
+{{if and .Manage (not .Static)}}
+{{template "manage" .}}
+{{else}}
 
 {{if not .Static}}
 {{$active := .ActiveRequests}}
@@ -469,12 +721,12 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{end}}
 
 <section aria-labelledby="worksheets-heading">
-<h2 id="worksheets-heading">Available worksheets <span class="count">({{len .ActiveWorksheets}})</span></h2>
+<h2 id="worksheets-heading">{{.SectionHeading}} <span class="count">({{len .ShownWorksheets}})</span></h2>
 <table class="worksheets">
 <thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
-<tbody>{{template "worksheet-rows" rowSet . .ActiveWorksheets}}</tbody>
+<tbody>{{template "worksheet-rows" rowSet . .ShownWorksheets}}</tbody>
 </table>
-{{$finished := .FinishedWorksheets}}
+{{$finished := .ShownFinishedWorksheets}}
 {{if $finished}}
 <details class="finished-heading"{{if .Static}} open{{end}}><summary>Finished worksheets <span class="count">({{len $finished}})</span></summary>
 <table class="worksheets">
@@ -514,5 +766,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
 {{end}}</pre>{{end}}
 {{end}}
+{{end}}{{/* end not Manage */}}
+</div></div>
 </div></body></html>
 `))
