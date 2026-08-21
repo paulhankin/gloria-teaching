@@ -262,13 +262,15 @@ const indexCSS = `
   .row-actions { text-align:right; white-space:nowrap; }
   .row-actions a { display:block; }
   .row-actions a + a { margin-top:4px; }
+  .row-actions form { margin:6px 0 0; }
+  button.finish { width:100%; color:#fff; background:var(--done); border-color:var(--done); }
   .worksheet-main td { border-bottom:0; padding-bottom:5px; }
   .worksheet-request td { padding-top:0; }
   .worksheet-request details { width:100%; }
   .worksheet-request form.ask { max-width:none; }
   .sharing { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; padding:8px 0 5px; }
   .sharing form { margin:0; }
-  .sharing .visibility, .sharing .finished { display:flex; gap:7px; align-items:center; }
+  .sharing .visibility { display:flex; gap:7px; align-items:center; }
   .sharing select, .sharing input[type=email] { padding:7px 9px; border:1px solid #98a2b3;
     border-radius:3px; background:#fff; color:inherit; font:14px/1.4 system-ui,sans-serif; }
   .sharing input[type=email] { min-width:240px; }
@@ -280,7 +282,6 @@ const indexCSS = `
   .finished-heading { margin-top:6px; }
   .finished-heading summary { font-size:18px; font-weight:650; color:var(--ink); }
   .finished-heading .count { font-size:15px; font-weight:400; }
-  .restore { margin-top:4px; }
   .revision-list { width:100%; max-width:720px; margin:8px 0 2px; padding:0; list-style:none; }
   .revision-list li { display:flex; gap:10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
   .revision-list .revision-info { flex:1; min-width:0; }
@@ -354,15 +355,11 @@ const worksheetRows = `
     {{$rs := $r.ChangeRequests}}
     {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
   </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{$r.OutputPath}}/index.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{$r.OutputPath}}/solutions.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Solutions PDF</a></td>
+  <td class="row-actions"><a class="pdf" href="{{$r.OutputPath}}/index.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{$r.OutputPath}}/solutions.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Solutions PDF</a>{{if not $static}}<form method="POST" action="/worksheets/finished"><input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="{{if $r.Finished}}off{{else}}on{{end}}"><button class="finish" type="submit">{{if $r.Finished}}Move back to active{{else}}Mark as finished{{end}}</button></form>{{end}}</td>
 </tr>
 {{if not $static}}
 <tr class="worksheet-request"><td colspan="5">
   {{if $r.Finished}}
-  <form class="restore" method="POST" action="/worksheets/finished">
-    <input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="off">
-    <button type="submit">Move back to active worksheets</button>
-  </form>
   {{else}}
   {{$revisions := $r.Revisions}}
   {{if $revisions}}<details><summary>Revision history</summary>
@@ -381,10 +378,6 @@ const worksheetRows = `
           <option value="public"{{if not $r.Private}} selected{{end}}>Public</option>
         </select>
         <button type="submit">Save</button>
-      </form>
-      <form class="finished" method="POST" action="/worksheets/finished">
-        <input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="on">
-        <button type="submit">Mark as finished</button>
       </form>
       {{if $r.Private}}
       <form class="share-form" method="POST" action="/worksheets/shares">

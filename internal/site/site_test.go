@@ -190,7 +190,7 @@ func TestFinishedWorksheetsMoveToTheirOwnSection(t *testing.T) {
 		!strings.Contains(html, "Finished worksheets <span class=\"count\">(1)</span>") {
 		t.Fatal("worksheet counts are not split into active and finished")
 	}
-	if !strings.Contains(html, "Move back to active worksheets") {
+	if !strings.Contains(html, "Move back to active") {
 		t.Fatal("finished worksheet cannot be moved back")
 	}
 	if !strings.Contains(html, "Mark as finished") {
