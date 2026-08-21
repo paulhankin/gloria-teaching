@@ -20,6 +20,7 @@ type Worksheet struct {
 	Version    string                 `json:"version,omitempty"`
 	Owner      string                 `json:"-"`
 	Visibility store.Visibility       `json:"-"`
+	Finished   bool                   `json:"-"`
 	Shares     []store.WorksheetShare `json:"-"`
 }
 
@@ -104,6 +105,51 @@ func (d Data) CompletedRequests() []store.Request {
 	}
 	return out
 }
+
+// ActiveWorksheets returns the worksheets still being worked on.
+func (d Data) ActiveWorksheets() []Worksheet {
+	var out []Worksheet
+	for _, w := range d.Worksheets {
+		if !w.Finished {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// FinishedWorksheets returns the worksheets filed away as finished.
+func (d Data) FinishedWorksheets() []Worksheet {
+	var out []Worksheet
+	for _, w := range d.Worksheets {
+		if w.Finished {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
+// rowSet carries the shared page data plus the worksheets of one index table
+// into the worksheet-rows template.
+type rowSet struct {
+	Static bool
+	Data   Data
+	Rows   []Worksheet
+}
+
+// User returns the effective account username (needed inside range loops).
+func (s rowSet) User() string { return s.Data.User }
+
+// row wraps one worksheet with the page data for the per-row lookups.
+type row struct {
+	Worksheet
+	data Data
+}
+
+// Revisions returns the worksheet's revision history.
+func (r row) Revisions() []Revision { return r.data.Revisions[r.Path()] }
+
+// ChangeRequests returns the open change requests for the worksheet.
+func (r row) ChangeRequests() []store.Request { return r.data.ChangeRequests(r.Worksheet) }
 
 // RequestTitle gives a work item a short, recognisable heading.
 func (d Data) RequestTitle(r store.Request) string {
@@ -222,7 +268,7 @@ const indexCSS = `
   .worksheet-request form.ask { max-width:none; }
   .sharing { display:flex; gap:18px; flex-wrap:wrap; align-items:flex-start; padding:8px 0 5px; }
   .sharing form { margin:0; }
-  .sharing .visibility { display:flex; gap:7px; align-items:center; }
+  .sharing .visibility, .sharing .finished { display:flex; gap:7px; align-items:center; }
   .sharing select, .sharing input[type=email] { padding:7px 9px; border:1px solid #98a2b3;
     border-radius:3px; background:#fff; color:inherit; font:14px/1.4 system-ui,sans-serif; }
   .sharing input[type=email] { min-width:240px; }
@@ -231,6 +277,10 @@ const indexCSS = `
   .share-list li { display:flex; gap:8px; align-items:center; padding:6px 0; border-top:1px solid var(--line); }
   .share-list .email { flex:1; }
   .privacy { display:inline-block; margin-top:4px; color:var(--muted); font-size:12px; }
+  .finished-heading { margin-top:6px; }
+  .finished-heading summary { font-size:18px; font-weight:650; color:var(--ink); }
+  .finished-heading .count { font-size:15px; font-weight:400; }
+  .restore { margin-top:4px; }
   .revision-list { width:100%; max-width:720px; margin:8px 0 2px; padding:0; list-style:none; }
   .revision-list li { display:flex; gap:10px; align-items:center; padding:7px 0; border-top:1px solid var(--line); }
   .revision-list .revision-info { flex:1; min-width:0; }
@@ -290,6 +340,78 @@ const indexCSS = `
   }
 `
 
+const worksheetRows = `
+{{define "worksheet-rows"}}
+{{$static := .Static}}
+{{range $i, $w := .Rows}}
+{{with $r := row $ $w}}
+{{$worksheet := $r.Path}}
+<tr{{if not $static}} class="worksheet-main"{{end}}>
+  <td><div class="title">{{$r.Title}}</div>{{if not $static}}<span class="privacy">{{if $r.Private}}Private{{else}}Public{{end}} · owner: {{$r.Owner}}</span>{{end}}</td>
+  <td class="date">{{if $r.Date}}{{$r.Date}}{{else}}—{{end}}</td>
+  <td class="meta">{{$r.Meta}}</td>
+  {{if not $static}}<td>
+    {{$rs := $r.ChangeRequests}}
+    {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
+  </td>{{end}}
+  <td class="row-actions"><a class="pdf" href="{{$r.OutputPath}}/index.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{$r.OutputPath}}/solutions.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Solutions PDF</a></td>
+</tr>
+{{if not $static}}
+<tr class="worksheet-request"><td colspan="5">
+  {{if $r.Finished}}
+  <form class="restore" method="POST" action="/worksheets/finished">
+    <input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="off">
+    <button type="submit">Move back to active worksheets</button>
+  </form>
+  {{else}}
+  {{$revisions := $r.Revisions}}
+  {{if $revisions}}<details><summary>Revision history</summary>
+    <ul class="revision-list">{{range $revisions}}<li>
+      <div class="revision-info"><code>{{.Short}}</code> · {{.Date}} · {{.Subject}}</div>
+      {{if .Current}}<span class="current">Current</span>{{else}}<form method="POST" action="/worksheets/revert"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="commit" value="{{.Commit}}"><button type="submit">Revert to this version</button></form>{{end}}
+    </li>{{end}}</ul>
+  </details>{{end}}
+  <details><summary>Worksheet settings</summary>
+    <div class="sharing">
+      <form class="visibility" method="POST" action="/worksheets/visibility">
+        <input type="hidden" name="worksheet" value="{{$r.Path}}">
+        <label for="visibility-{{$r.Name}}">Access</label>
+        <select id="visibility-{{$r.Name}}" name="visibility">
+          <option value="private"{{if $r.Private}} selected{{end}}>Private</option>
+          <option value="public"{{if not $r.Private}} selected{{end}}>Public</option>
+        </select>
+        <button type="submit">Save</button>
+      </form>
+      <form class="finished" method="POST" action="/worksheets/finished">
+        <input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="on">
+        <button type="submit">Mark as finished</button>
+      </form>
+      {{if $r.Private}}
+      <form class="share-form" method="POST" action="/worksheets/shares">
+        <input type="hidden" name="worksheet" value="{{$r.Path}}">
+        <input type="email" name="email" required placeholder="Existing user's email">
+        <select name="permission" aria-label="Permission"><option value="view">Can view</option><option value="edit">Can edit</option></select>
+        <button type="submit">Share</button>
+      </form>
+      {{if $r.Shares}}<ul class="share-list">{{range $r.Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">Remove</button></form></li>{{end}}</ul>{{end}}
+      {{else}}<span class="meta">Listed on <a href="/worksheets/{{$.User}}/index">your public page</a>.</span>{{end}}
+    </div>
+  </details>
+  <details><summary>Request an update</summary>
+    <form class="ask" method="POST" action="/requests">
+      <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{$r.Path}}">
+      <textarea name="body" required placeholder="What should change?"></textarea>
+      <button type="submit">Send request</button>
+    </form>
+  </details>
+  {{end}}
+</td></tr>
+{{end}}
+{{end}}
+{{end}}
+{{end}}
+`
+
 const requestActions = `
 {{define "actions"}}
   <div class="actions">
@@ -310,7 +432,13 @@ const requestActions = `
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"statusLabel": statusLabel,
 	"statusHelp":  statusHelp,
-}).Parse(requestActions + `<!DOCTYPE html>
+	"rowSet": func(d Data, ws []Worksheet) rowSet {
+		return rowSet{Static: d.Static, Data: d, Rows: ws}
+	},
+	"row": func(s rowSet, w Worksheet) row {
+		return row{Worksheet: w, data: s.Data}
+	},
+}).Parse(worksheetRows + requestActions + `<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="utf-8">
@@ -348,64 +476,20 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{end}}
 
 <section aria-labelledby="worksheets-heading">
-<h2 id="worksheets-heading">Available worksheets <span class="count">({{len .Worksheets}})</span></h2>
+<h2 id="worksheets-heading">Available worksheets <span class="count">({{len .ActiveWorksheets}})</span></h2>
 <table class="worksheets">
 <thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
-<tbody>
-{{range .Worksheets}}
-{{$worksheet := .Path}}
-<tr{{if not $.Static}} class="worksheet-main"{{end}}>
-  <td><div class="title">{{.Title}}</div>{{if not $.Static}}<span class="privacy">{{if .Private}}Private{{else}}Public{{end}} · owner: {{.Owner}}</span>{{end}}</td>
-  <td class="date">{{if .Date}}{{.Date}}{{else}}—{{end}}</td>
-  <td class="meta">{{.Meta}}</td>
-  {{if not $.Static}}<td>
-    {{$rs := $.ChangeRequests .}}
-    {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
-  </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{.OutputPath}}/index.pdf{{if .Version}}?v={{.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{.OutputPath}}/solutions.pdf{{if .Version}}?v={{.Version}}{{end}}">Solutions PDF</a></td>
-</tr>
-{{if not $.Static}}
-<tr class="worksheet-request"><td colspan="5">
-  {{$revisions := index $.Revisions .Path}}
-  {{if $revisions}}<details><summary>Revision history</summary>
-    <ul class="revision-list">{{range $revisions}}<li>
-      <div class="revision-info"><code>{{.Short}}</code> · {{.Date}} · {{.Subject}}</div>
-      {{if .Current}}<span class="current">Current</span>{{else}}<form method="POST" action="/worksheets/revert"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="commit" value="{{.Commit}}"><button type="submit">Revert to this version</button></form>{{end}}
-    </li>{{end}}</ul>
-  </details>{{end}}
-  <details><summary>Sharing settings</summary>
-    <div class="sharing">
-      <form class="visibility" method="POST" action="/worksheets/visibility">
-        <input type="hidden" name="worksheet" value="{{.Path}}">
-        <label for="visibility-{{.Name}}">Access</label>
-        <select id="visibility-{{.Name}}" name="visibility">
-          <option value="private"{{if .Private}} selected{{end}}>Private</option>
-          <option value="public"{{if not .Private}} selected{{end}}>Public</option>
-        </select>
-        <button type="submit">Save</button>
-      </form>
-      {{if .Private}}
-      <form class="share-form" method="POST" action="/worksheets/shares">
-        <input type="hidden" name="worksheet" value="{{.Path}}">
-        <input type="email" name="email" required placeholder="Existing user's email">
-        <select name="permission" aria-label="Permission"><option value="view">Can view</option><option value="edit">Can edit</option></select>
-        <button type="submit">Share</button>
-      </form>
-      {{if .Shares}}<ul class="share-list">{{range .Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">Remove</button></form></li>{{end}}</ul>{{end}}
-      {{else}}<span class="meta">Listed on <a href="/worksheets/{{$.User}}/index">your public page</a>.</span>{{end}}
-    </div>
-  </details>
-  <details><summary>Request an update</summary>
-    <form class="ask" method="POST" action="/requests">
-      <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{.Path}}">
-      <textarea name="body" required placeholder="What should change?"></textarea>
-      <button type="submit">Send request</button>
-    </form>
-  </details>
-</td></tr>
+<tbody>{{template "worksheet-rows" rowSet . .ActiveWorksheets}}</tbody>
+</table>
+{{$finished := .FinishedWorksheets}}
+{{if $finished}}
+<details class="finished-heading"{{if .Static}} open{{end}}><summary>Finished worksheets <span class="count">({{len $finished}})</span></summary>
+<table class="worksheets">
+<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
+<tbody>{{template "worksheet-rows" rowSet . $finished}}</tbody>
+</table>
+</details>
 {{end}}
-{{end}}
-</tbody></table>
 </section>
 
 {{if not .Static}}

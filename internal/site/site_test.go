@@ -159,8 +159,8 @@ func TestPrivateWorksheetShowsSharingControls(t *testing.T) {
 		Shares:     []store.WorksheetShare{{Email: "friend@example.com", Permission: store.PermissionEdit}},
 	}}})
 	for _, want := range []string{
-		"Private · owner: owner@example.com", "Sharing settings", `/worksheets/visibility`,
-		`/worksheets/shares`, "friend@example.com", "Can edit", "Remove",
+		"Private · owner: owner@example.com", "Worksheet settings", `/worksheets/visibility`,
+		`/worksheets/shares`, `/worksheets/finished`, "Mark as finished", "friend@example.com", "Can edit", "Remove",
 	} {
 		if !strings.Contains(html, want) {
 			t.Fatalf("sharing controls are missing %q", want)
@@ -178,6 +178,30 @@ func TestPublicWorksheetDoesNotShowShareForm(t *testing.T) {
 	}
 	if strings.Contains(html, `class="share-form"`) {
 		t.Fatal("public worksheet exposes private sharing form")
+	}
+}
+
+func TestFinishedWorksheetsMoveToTheirOwnSection(t *testing.T) {
+	html := Index(Data{User: "owner@example.com", Worksheets: []Worksheet{
+		{Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com"},
+		{Subject: "math", Name: "venn", Title: "Venn-Diagramme", Owner: "owner@example.com", Finished: true},
+	}})
+	if !strings.Contains(html, "Available worksheets <span class=\"count\">(1)</span>") ||
+		!strings.Contains(html, "Finished worksheets <span class=\"count\">(1)</span>") {
+		t.Fatal("worksheet counts are not split into active and finished")
+	}
+	if !strings.Contains(html, "Move back to active worksheets") {
+		t.Fatal("finished worksheet cannot be moved back")
+	}
+	if !strings.Contains(html, "Mark as finished") {
+		t.Fatal("active worksheet cannot be marked finished")
+	}
+	finished := html[strings.Index(html, "Finished worksheets"):]
+	if strings.Contains(finished, "Mark as finished") {
+		t.Fatal("finished worksheet can be marked finished again")
+	}
+	if strings.Contains(finished, "Request an update") || strings.Contains(finished, "Revision history") {
+		t.Fatal("finished worksheets still offer updates or revisions")
 	}
 }
 

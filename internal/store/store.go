@@ -112,6 +112,7 @@ type WorksheetAccess struct {
 	Worksheet  string
 	OwnerEmail string
 	Visibility Visibility
+	Finished   bool
 	Shares     []WorksheetShare
 	UpdatedAt  time.Time
 }
@@ -227,6 +228,11 @@ CREATE INDEX IF NOT EXISTS worksheet_shares_email ON worksheet_shares(email);`
 	}
 	if err := migrateUsernames(d); err != nil {
 		return err
+	}
+	// Databases created before finished worksheets existed lack this column.
+	if _, err := d.Exec("ALTER TABLE worksheets ADD COLUMN finished INTEGER NOT NULL DEFAULT 0"); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return fmt.Errorf("store: adding column finished: %w", err)
 	}
 	return nil
 }
@@ -591,8 +597,8 @@ func (db *DB) WorksheetByPath(path string) (WorksheetAccess, error) {
 	var visibility string
 	var updated int64
 	err := db.sql.QueryRow(
-		`SELECT worksheet, owner_email, visibility, updated_at FROM worksheets WHERE worksheet = ?`, path,
-	).Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &updated)
+		`SELECT worksheet, owner_email, visibility, finished, updated_at FROM worksheets WHERE worksheet = ?`, path,
+	).Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &ws.Finished, &updated)
 	if err != nil {
 		return WorksheetAccess{}, err
 	}
@@ -605,7 +611,7 @@ func (db *DB) WorksheetByPath(path string) (WorksheetAccess, error) {
 // WorksheetsOwnedBy returns all worksheet settings owned by an account.
 func (db *DB) WorksheetsOwnedBy(email string) ([]WorksheetAccess, error) {
 	rows, err := db.sql.Query(
-		`SELECT worksheet, owner_email, visibility, updated_at FROM worksheets WHERE owner_email = ? ORDER BY worksheet`, email)
+		`SELECT worksheet, owner_email, visibility, finished, updated_at FROM worksheets WHERE owner_email = ? ORDER BY worksheet`, email)
 	if err != nil {
 		return nil, err
 	}
@@ -615,7 +621,7 @@ func (db *DB) WorksheetsOwnedBy(email string) ([]WorksheetAccess, error) {
 		var ws WorksheetAccess
 		var visibility string
 		var updated int64
-		if err := rows.Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &updated); err != nil {
+		if err := rows.Scan(&ws.Worksheet, &ws.OwnerEmail, &visibility, &ws.Finished, &updated); err != nil {
 			return nil, err
 		}
 		ws.Visibility = Visibility(visibility)
@@ -666,6 +672,18 @@ func (db *DB) SetWorksheetVisibility(path, owner string, visibility Visibility) 
 }
 
 // SetWorksheetShare creates or updates a private worksheet share.
+
+// SetWorksheetFinished marks a worksheet owned by owner as finished or moves
+// it back into the active list.
+func (db *DB) SetWorksheetFinished(path, owner string, finished bool) error {
+	res, err := db.sql.Exec(
+		`UPDATE worksheets SET finished = ?, updated_at = ? WHERE worksheet = ? AND owner_email = ?`,
+		finished, time.Now().Unix(), path, owner)
+	if err != nil {
+		return err
+	}
+	return requireChanged(res, "worksheet not found or not owned by user")
+}
 func (db *DB) SetWorksheetShare(path, owner, email string, permission Permission) error {
 	if permission != PermissionView && permission != PermissionEdit {
 		return fmt.Errorf("store: unknown permission %q", permission)

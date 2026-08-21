@@ -139,6 +139,10 @@ func flash(w http.ResponseWriter, r *http.Request) string {
 		return "Sharing settings saved."
 	case "reverted":
 		return "Earlier revision restored and published."
+	case "finished":
+		return "Worksheet moved to the finished list."
+	case "unfinished":
+		return "Worksheet moved back to the active list."
 	}
 	return ""
 }
@@ -324,6 +328,7 @@ func ownedWorksheets(manifest []site.Worksheet, owner string) ([]site.Worksheet,
 		}
 		ws.Owner = a.OwnerEmail
 		ws.Visibility = a.Visibility
+		ws.Finished = a.Finished
 		ws.Shares = a.Shares
 		out = append(out, ws)
 	}
@@ -372,6 +377,29 @@ func worksheetVisibility(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	setFlash(w, "sharing")
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// worksheetFinished moves a worksheet between the active and finished lists.
+func worksheetFinished(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "POST only", http.StatusMethodNotAllowed)
+		return
+	}
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	finished := r.FormValue("finished") == "on"
+	if err := db.SetWorksheetFinished(r.FormValue("worksheet"), account.Email(r), finished); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if finished {
+		setFlash(w, "finished")
+	} else {
+		setFlash(w, "unfinished")
+	}
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
@@ -617,6 +645,7 @@ func main() {
 	mux.HandleFunc("/requests", postRequest)
 	mux.HandleFunc("/requests/delete", deleteRequest)
 	mux.HandleFunc("/worksheets/visibility", worksheetVisibility)
+	mux.HandleFunc("/worksheets/finished", worksheetFinished)
 	mux.HandleFunc("/worksheets/revert", worksheetRevert)
 	mux.HandleFunc("/worksheets/shares", worksheetShare)
 	mux.HandleFunc("/worksheets/shares/delete", worksheetShareDelete)
