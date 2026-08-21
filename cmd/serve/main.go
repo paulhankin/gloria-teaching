@@ -103,14 +103,20 @@ func index(w http.ResponseWriter, r *http.Request) {
 		}
 		d.WorksheetTags[ws.Path()] = ids
 	}
-	// Navigation state: ?manage=1 for the manage view, ?tag=<id> for a category.
+	// Navigation state: ?manage=1 for the manage view, ?finished=1 for the
+	// finished list, ?tag=<id> for a category.
 	q := r.URL.Query()
-	if q.Get("manage") == "1" {
+	switch {
+	case q.Get("manage") == "1":
 		d.Manage = true
-	} else if tagID, err := strconv.ParseInt(q.Get("tag"), 10, 64); err == nil && tagID != 0 {
-		if name, ok := findTag(tags, tagID); ok {
-			d.ActiveTagID = tagID
-			d.ActiveTagName = name
+	case q.Get("finished") == "1":
+		d.FinishedView = true
+	default:
+		if tagID, err := strconv.ParseInt(q.Get("tag"), 10, 64); err == nil && tagID != 0 {
+			if name, ok := findTag(tags, tagID); ok {
+				d.ActiveTagID = tagID
+				d.ActiveTagName = name
+			}
 		}
 	}
 	if d.CanImpersonate {

@@ -72,6 +72,8 @@ type Data struct {
 	ActiveTagName string
 	// Manage renders the tag-management view instead of the worksheet list.
 	Manage bool
+	// FinishedView renders only the finished-worksheets list.
+	FinishedView bool
 }
 
 func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
@@ -199,6 +201,9 @@ func (d Data) Heading() string {
 	if d.Manage {
 		return "Manage"
 	}
+	if d.FinishedView {
+		return "Finished worksheets"
+	}
 	if d.ActiveTagID == 0 {
 		return "Worksheets"
 	}
@@ -208,6 +213,9 @@ func (d Data) Heading() string {
 // SectionHeading titles the worksheet table below the page heading. On Home
 // it reads "Available worksheets"; on a category view it repeats the category.
 func (d Data) SectionHeading() string {
+	if d.FinishedView {
+		return "Finished worksheets"
+	}
 	if d.ActiveTagID == 0 {
 		return "Available worksheets"
 	}
@@ -643,15 +651,17 @@ const requestActions = `
 
 // Inline SVG icons for the sidebar navigation (Feather-style strokes).
 const (
-	iconHomeSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
-	iconCogSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
-	iconTagSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`
+	iconHomeSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
+	iconCheckSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
+	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+	iconTagSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`
 )
 
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"statusLabel": statusLabel,
 	"statusHelp":  statusHelp,
 	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
+	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
 	"iconTag":     func() template.HTML { return template.HTML(iconTagSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
@@ -677,7 +687,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
   <div class="brand">Worksheets</div>
-  <a class="nav-item{{if and (not .Manage) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
+  <a class="nav-item{{if and (not .Manage) (not .FinishedView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
+  <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} Finished Worksheets</a>
   <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
   {{if .Tags}}
   <div class="nav-section">Categories</div>
@@ -694,6 +705,18 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 
 {{if and .Manage (not .Static)}}
 {{template "manage" .}}
+{{else}}
+
+{{if and .FinishedView (not .Static)}}
+<section aria-labelledby="worksheets-heading">
+<h2 id="worksheets-heading">Finished worksheets <span class="count">({{len .FinishedWorksheets}})</span></h2>
+{{if .FinishedWorksheets}}
+<table class="worksheets">
+<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th><th>State</th><th></th></tr></thead>
+<tbody>{{template "worksheet-rows" rowSet . .FinishedWorksheets}}</tbody>
+</table>
+{{else}}<p class="meta">No finished worksheets yet. Use the "Mark as finished" button on a worksheet to file it here.</p>{{end}}
+</section>
 {{else}}
 
 {{if not .Static}}
@@ -766,6 +789,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
 {{end}}</pre>{{end}}
 {{end}}
+{{end}}{{/* end FinishedView else (Home/category list) */}}
 {{end}}{{/* end not Manage */}}
 </div></div>
 </div></body></html>
