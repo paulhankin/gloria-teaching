@@ -471,10 +471,8 @@ const indexCSS = `
   .actions a { font-size:13px; font-weight:600; }
   form.refine { display:flex; gap:7px; margin-top:8px; }
   form.refine input { flex:1; }
-  .new-request { margin:18px 0 0; padding:14px 0; border-top:1px solid var(--line);
-    border-bottom:1px solid var(--line); }
-  .new-request h2 { margin:0 0 4px; }
-  .new-request p { color:var(--muted); margin:0 0 6px; }
+  .new-request { margin:0 0 22px; padding:0 0 18px; border-bottom:1px solid var(--line); }
+  .new-request h2 { margin:0 0 10px; }
   .adminbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:34px;
     padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
   .adminbar form { margin:0; }
@@ -719,6 +717,17 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </section>
 {{else}}
 
+{{if and (not .Static) (not .FinishedView)}}
+<section class="new-request">
+<h2>What can I do for you?</h2>
+<form class="ask" method="POST" action="/requests">
+  <input type="hidden" name="kind" value="new">
+  <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
+  <button type="submit">Send request</button>
+</form>
+</section>
+{{end}}
+
 {{if not .Static}}
 {{$active := .ActiveRequests}}
 {{if $active}}
@@ -761,16 +770,6 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </section>
 
 {{if not .Static}}
-<section class="new-request">
-<h2>Request a new worksheet</h2><p>Include the subject, level and type of tasks.</p>
-<details><summary>Open request form</summary>
-<form class="ask" method="POST" action="/requests">
-  <input type="hidden" name="kind" value="new">
-  <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
-  <button type="submit">Send request</button>
-</form></details>
-</section>
-
 {{if .Admin}}
 {{$completed := .CompletedRequests}}{{if $completed}}
 <section><h2>Recent completed work</h2>
