@@ -349,9 +349,10 @@ func Index(d Data) string {
 	return b.String()
 }
 
-// colorTitle renders the site name letter by letter, each in a crayon colour
-// with a slight rotation and lift so the word looks hand-drawn. Spaces and
-// emoji pass through untouched.
+// colorTitle renders the site name letter by letter in a vintage 3D style:
+// a dark extruded back, a hatched shading layer and a light front face, each
+// in a pastel crayon colour with a gentle rotation and lift. Spaces and emoji
+// pass through untouched.
 func colorTitle(s string) template.HTML {
 	var b strings.Builder
 	i := 0
@@ -365,10 +366,15 @@ func colorTitle(s string) template.HTML {
 			continue
 		}
 		cls := i%8 + 1
-		// Alternating gentle wobble: rotate a touch either way, lift a touch.
 		rot := []string{"-2deg", "1.5deg", "-1deg", "2deg"}[i%4]
 		lift := []string{"0", "-1.5px", "0.5px", "-1px"}[i%4]
-		fmt.Fprintf(&b, `<span class="lt c%d" style="--rot:%s;--lift:%s">%c</span>`, cls, rot, lift, r)
+		ch := string(r)
+		fmt.Fprintf(&b,
+			`<span class="lt c%d" style="--rot:%s;--lift:%s">`+
+				`<span class="depth" aria-hidden="true">%s</span>`+
+				`<span class="hatch" aria-hidden="true">%s</span>`+
+				`<span class="face">%s</span></span>`,
+			cls, rot, lift, ch, ch, ch)
 		i++
 	}
 	return template.HTML(b.String())
@@ -441,33 +447,36 @@ const indexCSS = `
   /* Playful, colour-pencil brand. The name is drawn letter by letter in a
      hand-drawn face with a crayon palette and a gentle wobble. */
   .brand-title { font-family:"Caveat","Patrick Hand","Segoe Print","Bradley Hand",cursive;
-    font-size:54px; line-height:.95; margin:0; font-weight:700; letter-spacing:.5px;
-    display:inline-block; transform:rotate(-1.3deg); padding-bottom:8px; }
-  /* Each letter is a crayon block: a wobble plus a 3D extrusion built from
-     layered shadows of the same hue, and a pencil-stroke streak overlay. */
-  .brand-title .lt { display:inline-block; position:relative;
+    font-size:58px; line-height:.95; margin:0; font-weight:700; letter-spacing:1px;
+    display:inline-block; transform:rotate(-1.3deg); padding:0 6px 10px 6px; }
+  /* Vintage 3D display face: every letter is drawn three times — a dark
+     extruded back (offset down-left), a hatched shading layer, and a light
+     pastel front face — so the colour-pencil strokes stay visible. */
+  .brand-title .lt { position:relative; display:inline-block;
     transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
-    text-shadow:0 1px 0 var(--d1), 0 2px 0 var(--d1), 0 3px 0 var(--d2),
-      0 4px 0 var(--d2), 0 5px 0 var(--d3), 0 6px 5px rgba(0,0,0,.18); }
-  .brand-title .lt::after { content:""; position:absolute; left:2%; right:2%; top:14%; height:44%;
-    pointer-events:none; border-radius:50%;
-    background:repeating-linear-gradient(115deg, rgba(255,255,255,.30) 0 1.6px, rgba(255,255,255,0) 1.6px 3.6px);
-    mix-blend-mode:soft-light; }
-  .brand-title .c1 { color:#e2574c; --d1:#c0463c; --d2:#a63a31; --d3:#8a2f27; }
-  .brand-title .c2 { color:#f0932b; --d1:#d17c1f; --d2:#b3691a; --d3:#915713; }
-  .brand-title .c3 { color:#e9b949; --d1:#cfa135; --d2:#b3892b; --d3:#907022; }
-  .brand-title .c4 { color:#57a75a; --d1:#479050; --d2:#3a7a43; --d3:#2f6436; }
-  .brand-title .c5 { color:#4a90d9; --d1:#3b7cc0; --d2:#30679f; --d3:#275480; }
-  .brand-title .c6 { color:#9a67c7; --d1:#8456ad; --d2:#6f4793; --d3:#5a3a77; }
-  .brand-title .c7 { color:#e26da5; --d1:#c85a90; --d2:#ad4b7b; --d3:#8d3d63; }
-  .brand-title .c8 { color:#3aa79f; --d1:#30908a; --d2:#287974; --d3:#20615d; }
-  .brand-title .sp { display:inline-block; width:.45em; }
-  .brand-title .wand { font-size:.7em; vertical-align:14px; transform:rotate(8deg); display:inline-block; }
+    -webkit-text-stroke:1.5px var(--edge); }
+  .brand-title .lt .depth { position:absolute; left:-5px; top:5px; z-index:0;
+    color:var(--edge); -webkit-text-stroke:0; opacity:.9; }
+  .brand-title .lt .hatch { position:absolute; left:-5px; top:5px; z-index:1;
+    -webkit-text-stroke:0; color:transparent;
+    background:repeating-linear-gradient(45deg, var(--edge) 0 1.5px, transparent 1.5px 4px);
+    -webkit-background-clip:text; background-clip:text; opacity:.35; }
+  .brand-title .lt .face { position:relative; z-index:2; color:var(--fill); }
+  .brand-title .c1 { --fill:#f6b1a7; --edge:#c06055; }
+  .brand-title .c2 { --fill:#f9c98c; --edge:#cf9040; }
+  .brand-title .c3 { --fill:#f7dd8e; --edge:#c4a52e; }
+  .brand-title .c4 { --fill:#b0dcb2; --edge:#5d9c66; }
+  .brand-title .c5 { --fill:#a9cdf0; --edge:#5a86bd; }
+  .brand-title .c6 { --fill:#d4bcf0; --edge:#8f6ab4; }
+  .brand-title .c7 { --fill:#f7bcd8; --edge:#c5689c; }
+  .brand-title .c8 { --fill:#a6ded9; --edge:#4fa79e; }
+  .brand-title .sp { display:inline-block; width:.5em; }
+  .brand-title .wand { font-size:.6em; vertical-align:20px; transform:rotate(10deg); display:inline-block; margin-left:6px; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
-  .brand-under { display:block; margin-top:-2px; transform:rotate(-.6deg); }
-  .brand-sub { margin:8px 0 0; font-size:17px; font-weight:600;
+  .brand-under { display:block; margin-top:0; transform:rotate(-.6deg); }
+  .brand-sub { margin:6px 0 0; font-size:19px; font-weight:600;
     font-family:"Caveat","Patrick Hand","Segoe Print",cursive; }
-  .brand-sub .doodle { font-size:15px; padding:0 7px; }
+  .brand-sub .doodle { font-size:16px; padding:0 7px; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
   .account button, .account .impersonate-username { padding:5px 9px; }
