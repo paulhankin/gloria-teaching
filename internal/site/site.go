@@ -441,19 +441,33 @@ const indexCSS = `
   /* Playful, colour-pencil brand. The name is drawn letter by letter in a
      hand-drawn face with a crayon palette and a gentle wobble. */
   .brand-title { font-family:"Caveat","Patrick Hand","Segoe Print","Bradley Hand",cursive;
-    font-size:52px; line-height:.95; margin:0; font-weight:700; letter-spacing:.5px;
-    display:inline-block; transform:rotate(-1.3deg); }
-  .brand-title .lt { display:inline-block; transform:rotate(var(--rot,0deg)) translateY(var(--lift,0)); }
-  .brand-title .c1 { color:#e2574c; } .brand-title .c2 { color:#f0932b; }
-  .brand-title .c3 { color:#e9b949; } .brand-title .c4 { color:#57a75a; }
-  .brand-title .c5 { color:#4a90d9; } .brand-title .c6 { color:#9a67c7; }
-  .brand-title .c7 { color:#e26da5; } .brand-title .c8 { color:#3aa79f; }
+    font-size:54px; line-height:.95; margin:0; font-weight:700; letter-spacing:.5px;
+    display:inline-block; transform:rotate(-1.3deg); padding-bottom:8px; }
+  /* Each letter is a crayon block: a wobble plus a 3D extrusion built from
+     layered shadows of the same hue, and a pencil-stroke streak overlay. */
+  .brand-title .lt { display:inline-block; position:relative;
+    transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
+    text-shadow:0 1px 0 var(--d1), 0 2px 0 var(--d1), 0 3px 0 var(--d2),
+      0 4px 0 var(--d2), 0 5px 0 var(--d3), 0 6px 5px rgba(0,0,0,.18); }
+  .brand-title .lt::after { content:""; position:absolute; left:2%; right:2%; top:14%; height:44%;
+    pointer-events:none; border-radius:50%;
+    background:repeating-linear-gradient(115deg, rgba(255,255,255,.30) 0 1.6px, rgba(255,255,255,0) 1.6px 3.6px);
+    mix-blend-mode:soft-light; }
+  .brand-title .c1 { color:#e2574c; --d1:#c0463c; --d2:#a63a31; --d3:#8a2f27; }
+  .brand-title .c2 { color:#f0932b; --d1:#d17c1f; --d2:#b3691a; --d3:#915713; }
+  .brand-title .c3 { color:#e9b949; --d1:#cfa135; --d2:#b3892b; --d3:#907022; }
+  .brand-title .c4 { color:#57a75a; --d1:#479050; --d2:#3a7a43; --d3:#2f6436; }
+  .brand-title .c5 { color:#4a90d9; --d1:#3b7cc0; --d2:#30679f; --d3:#275480; }
+  .brand-title .c6 { color:#9a67c7; --d1:#8456ad; --d2:#6f4793; --d3:#5a3a77; }
+  .brand-title .c7 { color:#e26da5; --d1:#c85a90; --d2:#ad4b7b; --d3:#8d3d63; }
+  .brand-title .c8 { color:#3aa79f; --d1:#30908a; --d2:#287974; --d3:#20615d; }
   .brand-title .sp { display:inline-block; width:.45em; }
-  .brand-title .wand { font-size:.7em; vertical-align:8px; transform:rotate(8deg); display:inline-block; }
-  .brand-sub { margin:8px 0 0; font-size:15px; font-weight:600; }
-  .brand-sub .doodle { font-size:14px; padding:0 6px; }
-  .brand-sub .u1 { color:#4a90d9; } .brand-sub .u2 { color:#e2574c; }
-  .brand-sub .u3 { color:#57a75a; } .brand-sub .u4 { color:#f0932b; }
+  .brand-title .wand { font-size:.7em; vertical-align:14px; transform:rotate(8deg); display:inline-block; }
+  /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
+  .brand-under { display:block; margin-top:-2px; transform:rotate(-.6deg); }
+  .brand-sub { margin:8px 0 0; font-size:17px; font-weight:600;
+    font-family:"Caveat","Patrick Hand","Segoe Print",cursive; }
+  .brand-sub .doodle { font-size:15px; padding:0 7px; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
   .account button, .account .impersonate-username { padding:5px 9px; }
@@ -712,14 +726,19 @@ const (
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
 )
 
+// brandUnderline is a hand-drawn crayon squiggle beneath the site name — a
+// single uneven stroke whose width wobbles like a real pencil line.
+const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
+
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
-	"statusLabel": statusLabel,
-	"statusHelp":  statusHelp,
-	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
-	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
-	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
-	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
-	"colorTitle":  colorTitle,
+	"statusLabel":    statusLabel,
+	"statusHelp":     statusHelp,
+	"iconHome":       func() template.HTML { return template.HTML(iconHomeSVG) },
+	"iconGlobe":      func() template.HTML { return template.HTML(iconGlobeSVG) },
+	"iconCheck":      func() template.HTML { return template.HTML(iconCheckSVG) },
+	"iconCog":        func() template.HTML { return template.HTML(iconCogSVG) },
+	"colorTitle":     colorTitle,
+	"brandUnderline": func() template.HTML { return template.HTML(brandUnderlineSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -738,7 +757,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>PDF worksheets for printing<span class="doodle">🖍️</span></p></div></header>
+<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -756,7 +775,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>PDF worksheets for printing<span class="doodle">🖍️</span></p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
