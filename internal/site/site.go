@@ -432,10 +432,10 @@ const indexCSS = `
   /* Graph-paper (kariert) background, like a school notebook page. */
   body { margin:0; color:var(--ink);
     font:15px/1.45 system-ui,sans-serif;
-    background-color:#fbfbf8;
+    background-color:#ffffff;
     background-image:
-      linear-gradient(to right, rgba(90,140,200,.10) 1px, transparent 1px),
-      linear-gradient(to bottom, rgba(90,140,200,.10) 1px, transparent 1px);
+      linear-gradient(to right, rgba(150,190,235,.14) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(150,190,235,.14) 1px, transparent 1px);
     background-size:26px 26px; }
   .layout { display:flex; min-height:100vh; }
   .sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--line);
