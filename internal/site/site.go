@@ -566,7 +566,7 @@ const indexCSS = `
   .actions a { font-size:13px; font-weight:600; }
   form.refine { display:flex; gap:7px; margin-top:8px; }
   form.refine input { flex:1; }
-  .new-request { margin:0 0 22px; padding:0 0 18px; border-bottom:1px solid var(--line); }
+  .new-request { margin:34px 0 22px; padding:0 0 18px; border-bottom:1px solid var(--line); }
   .new-request h2 { margin:0 0 10px; }
   .adminbar { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:34px;
     padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
