@@ -740,7 +740,7 @@ const requestActions = `
     {{end}}
     <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}"><button class="no" type="submit">Reject</button></form>
   </div>
-  {{if eq .Status "failed"}}
+  {{if and .Admin (eq .Status "failed")}}
   <form class="refine" method="POST" action="/work/refine">
     <input type="hidden" name="id" value="{{.ID}}"><input type="text" name="body" required placeholder="Describe the refinement">
     <button type="submit">Refine</button>
@@ -761,6 +761,13 @@ const (
 // single uneven stroke whose width wobbles like a real pencil line.
 const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
 
+// reqActions bundles a request with whether the viewer may use the
+// admin-only actions (refine), so the actions template can decide.
+type reqActions struct {
+	store.Request
+	Admin bool
+}
+
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"statusLabel":    statusLabel,
 	"statusHelp":     statusHelp,
@@ -772,6 +779,9 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"brandUnderline": func() template.HTML { return template.HTML(brandUnderlineSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
+	},
+	"reqActions": func(d Data, r store.Request) reqActions {
+		return reqActions{r, d.Admin}
 	},
 	"row": func(s rowSet, w Worksheet) row {
 		return row{Worksheet: w, data: s.Data}
@@ -863,7 +873,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>
     <div class="request-meta">Request #{{.ID}}{{if .Author}} · {{.Author}}{{else if .Requester}} · {{.Requester}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
     {{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}
-    {{if $.Admin}}{{template "actions" .}}{{end}}
+    {{template "actions" (reqActions $ .)}}
   </td>
   <td class="date">{{.UpdatedAt.Format "2 Jan 2006, 15:04"}}</td>
 </tr>

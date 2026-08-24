@@ -275,11 +275,26 @@ func work(w http.ResponseWriter, r *http.Request) {
 		http.Redirect(w, r, "/", http.StatusSeeOther)
 		return
 	}
-	id, ok := adminPost(w, r)
-	if !ok {
+	id, err := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if err != nil {
+		http.Error(w, "bad id", http.StatusBadRequest)
 		return
 	}
-	var err error
+	// Reject and retry are safe for any signed-in user: they only discard or
+	// re-queue a request. Approve and refine publish content or drive the
+	// agent, so those stay behind admin mode.
+	switch action {
+	case "approve", "refine":
+		if !db.AdminMode() {
+			http.Error(w, "admin mode is off", http.StatusForbidden)
+			return
+		}
+	case "reject", "retry":
+		// any signed-in user
+	default:
+		http.NotFound(w, r)
+		return
+	}
 	switch action {
 	case "approve":
 		err = pipe.Approve(id)
@@ -294,9 +309,6 @@ func work(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		err = pipe.Refine(id, body)
-	default:
-		http.NotFound(w, r)
-		return
 	}
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusConflict)

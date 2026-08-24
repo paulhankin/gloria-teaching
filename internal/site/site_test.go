@@ -74,8 +74,11 @@ func TestActiveWorkStateIsProminentWithoutAdmin(t *testing.T) {
 			t.Fatalf("status wording overpromises isolation: %q", banned)
 		}
 	}
-	if strings.Contains(html, "/work/approve") || strings.Contains(html, "/work/reject") {
-		t.Fatal("admin actions are visible while admin controls are off")
+	// Reject and retry are available to any signed-in user (they only discard
+	// or re-queue a request). Publishing (approve) and driving the agent
+	// (refine) stay behind admin mode.
+	if strings.Contains(html, "/work/approve") || strings.Contains(html, "/work/refine") {
+		t.Fatal("admin-only actions are visible while admin controls are off")
 	}
 }
 
