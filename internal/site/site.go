@@ -429,10 +429,17 @@ const indexCSS = `
     --queued:#667085; --working:#b54708; --review:#175cd3; --failed:#b42318;
     --done:#067647; --rejected:#667085; }
   * { box-sizing:border-box; }
-  body { margin:0; background:#fff; color:var(--ink);
-    font:15px/1.45 system-ui,sans-serif; }
+  /* Graph-paper (kariert) background, like a school notebook page. */
+  body { margin:0; color:var(--ink);
+    font:15px/1.45 system-ui,sans-serif;
+    background-color:#fbfbf8;
+    background-image:
+      linear-gradient(to right, rgba(90,140,200,.10) 1px, transparent 1px),
+      linear-gradient(to bottom, rgba(90,140,200,.10) 1px, transparent 1px);
+    background-size:26px 26px; }
   .layout { display:flex; min-height:100vh; }
   .sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--line);
+    background:#fff;
     padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto; }
   .sidebar .brand { padding:0 18px 16px; font-weight:700; font-size:16px;
     border-bottom:1px solid var(--line); margin-bottom:10px; color:var(--ink); }
