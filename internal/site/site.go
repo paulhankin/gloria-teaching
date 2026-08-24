@@ -544,8 +544,8 @@ const indexCSS = `
   .status.done { color:var(--done); }
   .status.rejected { color:var(--rejected); }
   .status-help { display:block; margin-top:2px; color:var(--muted); font-size:12px; }
-  .active { border-top:3px solid var(--working); }
-  .active td:first-child { width:190px; }
+  table.active { border-top:3px solid var(--working); }
+  table.active td:first-child { width:190px; }
   .request-body { margin-top:5px; white-space:pre-wrap; }
   .request-note { margin:7px 0 0; color:var(--muted); font-size:13px; white-space:pre-wrap; }
   .actions { display:flex; gap:7px; flex-wrap:wrap; margin-top:10px; align-items:center; }
@@ -594,7 +594,7 @@ const indexCSS = `
     .row-actions { text-align:left; margin-top:5px; }
     .worksheet-main { border-bottom:0; padding-bottom:0; }
     .worksheet-request { padding-top:0; }
-    .active td:first-child { width:auto; margin-bottom:5px; }
+    table.active td:first-child { width:auto; margin-bottom:5px; }
   }
 `
 
