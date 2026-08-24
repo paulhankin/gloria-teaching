@@ -74,6 +74,8 @@ type Data struct {
 	Manage bool
 	// FinishedView renders only the finished-worksheets list.
 	FinishedView bool
+	// PublicView renders only the public worksheets.
+	PublicView bool
 }
 
 func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
@@ -178,6 +180,18 @@ func (d Data) ShownWorksheets() []Worksheet {
 	return out
 }
 
+// PublicWorksheets returns the worksheets visible to anyone (not private),
+// in the same order as the index.
+func (d Data) PublicWorksheets() []Worksheet {
+	var out []Worksheet
+	for _, w := range d.Worksheets {
+		if !w.Private() {
+			out = append(out, w)
+		}
+	}
+	return out
+}
+
 // ShownFinishedWorksheets is ShownWorksheets for the finished list.
 func (d Data) ShownFinishedWorksheets() []Worksheet {
 	if d.ActiveTagID == 0 {
@@ -203,6 +217,9 @@ func (d Data) Heading() string {
 	}
 	if d.FinishedView {
 		return "Finished worksheets"
+	}
+	if d.PublicView {
+		return "Public worksheets"
 	}
 	if d.ActiveTagID == 0 {
 		return "Worksheets"
@@ -650,6 +667,7 @@ const requestActions = `
 // Inline SVG icons for the sidebar navigation (Feather-style strokes).
 const (
 	iconHomeSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
+	iconGlobeSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`
 	iconCheckSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
 )
@@ -658,6 +676,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"statusLabel": statusLabel,
 	"statusHelp":  statusHelp,
 	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
+	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
@@ -683,7 +702,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
   <div class="brand">{{if .User}}{{.User}}{{else}}Worksheets{{end}}</div>
-  <a class="nav-item{{if and (not .Manage) (not .FinishedView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
+  <a class="nav-item{{if and (not .Manage) (not .FinishedView) (not .PublicView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
+  <a class="nav-item{{if .PublicView}} active{{end}}" href="/?public=1">{{iconGlobe}} Public Worksheets</a>
   <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} Finished Worksheets</a>
   <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
   {{if .Tags}}
@@ -712,6 +732,17 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <tbody>{{template "worksheet-rows" rowSet . .FinishedWorksheets}}</tbody>
 </table>
 {{else}}<p class="meta">No finished worksheets yet. Use the "Mark as finished" button on a worksheet to file it here.</p>{{end}}
+</section>
+{{else if and .PublicView (not .Static)}}
+<section aria-labelledby="worksheets-heading">
+<h2 id="worksheets-heading">Public worksheets <span class="count">({{len .PublicWorksheets}})</span></h2>
+<p class="meta">These worksheets are visible to anyone on <a href="/worksheets/{{.User}}/index">your public page</a>.</p>
+{{if .PublicWorksheets}}
+<table class="worksheets">
+<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th><th>State</th><th></th></tr></thead>
+<tbody>{{template "worksheet-rows" rowSet . .PublicWorksheets}}</tbody>
+</table>
+{{else}}<p class="meta">No public worksheets yet. Set a worksheet's visibility to "Public" under "Worksheet settings" to list it here.</p>{{end}}
 </section>
 {{else}}
 

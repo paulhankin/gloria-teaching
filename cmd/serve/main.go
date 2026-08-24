@@ -111,6 +111,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		d.Manage = true
 	case q.Get("finished") == "1":
 		d.FinishedView = true
+	case q.Get("public") == "1":
+		d.PublicView = true
 	default:
 		if tagID, err := strconv.ParseInt(q.Get("tag"), 10, 64); err == nil && tagID != 0 {
 			if name, ok := findTag(tags, tagID); ok {
