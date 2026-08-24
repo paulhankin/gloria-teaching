@@ -349,11 +349,13 @@ func Index(d Data) string {
 	return b.String()
 }
 
-// colorTitle renders the site name letter by letter in a vintage 3D style:
-// a dark extruded back, a hatched shading layer and a light front face, each
-// in a pastel crayon colour with a gentle rotation and lift. Spaces and emoji
-// pass through untouched.
+// colorTitle renders the site name letter by letter with real 3D thickness:
+// several copies of the letter are stacked at 1px offsets to form a solid
+// extruded body, with a hatched edge and a light pastel front face on top.
+// Each letter is a pastel crayon colour with a gentle rotation and lift.
+// Spaces and emoji pass through untouched.
 func colorTitle(s string) template.HTML {
+	const depth = 7
 	var b strings.Builder
 	i := 0
 	for _, r := range s {
@@ -369,12 +371,14 @@ func colorTitle(s string) template.HTML {
 		rot := []string{"-2deg", "1.5deg", "-1deg", "2deg"}[i%4]
 		lift := []string{"0", "-1.5px", "0.5px", "-1px"}[i%4]
 		ch := string(r)
-		fmt.Fprintf(&b,
-			`<span class="lt c%d" style="--rot:%s;--lift:%s">`+
-				`<span class="depth" aria-hidden="true">%s</span>`+
-				`<span class="hatch" aria-hidden="true">%s</span>`+
-				`<span class="face">%s</span></span>`,
-			cls, rot, lift, ch, ch, ch)
+		fmt.Fprintf(&b, `<span class="lt c%d" style="--rot:%s;--lift:%s">`, cls, rot, lift)
+		// Solid 3D body: stacked copies offset down-right, back to front.
+		for k := depth; k >= 1; k-- {
+			fmt.Fprintf(&b, `<span class="d" style="--k:%d" aria-hidden="true">%s</span>`, k, ch)
+		}
+		// Hatched sheen on the depth, then the pastel front face.
+		fmt.Fprintf(&b, `<span class="hatch" style="--k:%d" aria-hidden="true">%s</span>`, depth, ch)
+		fmt.Fprintf(&b, `<span class="face">%s</span></span>`, ch)
 		i++
 	}
 	return template.HTML(b.String())
@@ -452,19 +456,19 @@ const indexCSS = `
   .brand-title { font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
     font-size:min(54px,5.6vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
     text-transform:uppercase; white-space:nowrap;
-    display:inline-block; transform:rotate(-1deg); padding:0 8px 12px 4px; }
-  /* Vintage 3D display face: every letter is drawn three times — a dark
-     extruded back (offset down-right), a hatched shading layer on that depth
-     and a light pastel front face — so the colour-pencil strokes stay visible. */
+    display:inline-block; transform:rotate(-1deg); padding:0 14px 16px 4px; }
+  /* Solid 3D thickness: each letter is a stack of copies offset down-right
+     (the .d layers) forming a continuous extruded body, capped by a hatched
+     edge and the pastel front face. No drop shadow — the depth IS the body. */
   .brand-title .lt { position:relative; display:inline-block;
     transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
     -webkit-text-stroke:1.5px var(--edge); }
-  .brand-title .lt .depth { position:absolute; left:6px; top:7px; z-index:0;
-    color:var(--edge); -webkit-text-stroke:0; opacity:.9; }
-  .brand-title .lt .hatch { position:absolute; left:6px; top:7px; z-index:1;
-    -webkit-text-stroke:0; color:transparent;
+  .brand-title .lt .d { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
+    z-index:0; color:var(--edge); -webkit-text-stroke:0; }
+  .brand-title .lt .hatch { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
+    z-index:1; -webkit-text-stroke:0; color:transparent;
     background:repeating-linear-gradient(45deg, var(--edge) 0 2px, transparent 2px 5px);
-    -webkit-background-clip:text; background-clip:text; opacity:.55; }
+    -webkit-background-clip:text; background-clip:text; opacity:.45; }
   .brand-title .lt .face { position:relative; z-index:2; color:var(--fill); }
   .brand-title .c1 { --fill:#f7b3a9; --edge:#c46a5f; }
   .brand-title .c2 { --fill:#fad097; --edge:#d09a48; }
