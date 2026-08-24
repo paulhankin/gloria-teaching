@@ -376,9 +376,11 @@ func colorTitle(s string) template.HTML {
 		for k := depth; k >= 1; k-- {
 			fmt.Fprintf(&b, `<span class="d" style="--k:%d" aria-hidden="true">%s</span>`, k, ch)
 		}
-		// Hatched sheen on the depth, then the pastel front face.
+		// Hatched sheen on the depth, then the pastel front face and a light
+		// pencil-stroke wash over it.
 		fmt.Fprintf(&b, `<span class="hatch" style="--k:%d" aria-hidden="true">%s</span>`, depth, ch)
-		fmt.Fprintf(&b, `<span class="face">%s</span></span>`, ch)
+		fmt.Fprintf(&b, `<span class="face">%s</span>`, ch)
+		fmt.Fprintf(&b, `<span class="shade" aria-hidden="true">%s</span></span>`, ch)
 		i++
 	}
 	return template.HTML(b.String())
@@ -457,27 +459,32 @@ const indexCSS = `
     font-size:min(54px,5.6vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
     text-transform:uppercase; white-space:nowrap;
     display:inline-block; transform:rotate(-1deg); padding:0 14px 16px 4px; }
-  /* Solid 3D thickness: each letter is a stack of copies offset down-right
-     (the .d layers) forming a continuous extruded body, capped by a hatched
-     edge and the pastel front face. No drop shadow — the depth IS the body. */
+  /* Colour-pencil 3D face: white letters with a coloured outline and a light,
+     partial pencil-stroke wash on the face, over a solid 3D body whose depth
+     is shaded with diagonal hatching in the same colour. */
   .brand-title .lt { position:relative; display:inline-block;
     transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
-    -webkit-text-stroke:1.5px var(--edge); }
+    -webkit-text-stroke:1.6px var(--edge); }
   .brand-title .lt .d { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
     z-index:0; color:var(--edge); -webkit-text-stroke:0; }
   .brand-title .lt .hatch { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
     z-index:1; -webkit-text-stroke:0; color:transparent;
-    background:repeating-linear-gradient(45deg, var(--edge) 0 2px, transparent 2px 5px);
-    -webkit-background-clip:text; background-clip:text; opacity:.45; }
-  .brand-title .lt .face { position:relative; z-index:2; color:var(--fill); }
-  .brand-title .c1 { --fill:#f7b3a9; --edge:#c46a5f; }
-  .brand-title .c2 { --fill:#fad097; --edge:#d09a48; }
-  .brand-title .c3 { --fill:#f8e093; --edge:#c7ab2f; }
-  .brand-title .c4 { --fill:#b6e0b8; --edge:#66a06f; }
-  .brand-title .c5 { --fill:#afd3f2; --edge:#6390c0; }
-  .brand-title .c6 { --fill:#d9c2f2; --edge:#9774b8; }
-  .brand-title .c7 { --fill:#f8c2dd; --edge:#c977a4; }
-  .brand-title .c8 { --fill:#ace1db; --edge:#58aba4; }
+    background:repeating-linear-gradient(45deg, var(--edge) 0 2px, transparent 2px 4.5px);
+    -webkit-background-clip:text; background-clip:text; opacity:.75; }
+  /* The face is white with a few quick pencil strokes that do not fully colour it in. */
+  .brand-title .lt .face { position:relative; z-index:2; color:#fff; }
+  .brand-title .lt .shade { position:absolute; left:0; top:0; z-index:3; pointer-events:none;
+    -webkit-text-stroke:0; color:transparent;
+    background:repeating-linear-gradient(58deg, var(--fill) 0 2.5px, transparent 2.5px 6.5px);
+    -webkit-background-clip:text; background-clip:text; opacity:.4; }
+  .brand-title .c1 { --fill:#f19a8f; --edge:#c0392b; }
+  .brand-title .c2 { --fill:#f6c478; --edge:#b97f22; }
+  .brand-title .c3 { --fill:#f2d96b; --edge:#9c8a1e; }
+  .brand-title .c4 { --fill:#93d6a0; --edge:#3e8e52; }
+  .brand-title .c5 { --fill:#8fc1ec; --edge:#2f6fae; }
+  .brand-title .c6 { --fill:#c9a9ec; --edge:#7a4ea6; }
+  .brand-title .c7 { --fill:#f4a9cf; --edge:#b9447f; }
+  .brand-title .c8 { --fill:#8bd8d0; --edge:#2f8f86; }
   .brand-title .sp { display:inline-block; width:.55em; }
   .brand-title .wand { font-size:.5em; vertical-align:34px; transform:rotate(10deg); display:inline-block; margin-left:8px; -webkit-text-stroke:0; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
