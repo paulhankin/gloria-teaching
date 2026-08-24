@@ -379,8 +379,8 @@ const indexCSS = `
   .layout { display:flex; min-height:100vh; }
   .sidebar { width:230px; flex-shrink:0; border-right:1px solid var(--line);
     padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto; }
-  .sidebar .brand { padding:0 18px 16px; font-weight:700; font-size:15px;
-    border-bottom:1px solid var(--line); margin-bottom:10px; }
+  .sidebar .brand { padding:0 18px 16px; font-weight:700; font-size:16px;
+    border-bottom:1px solid var(--line); margin-bottom:10px; color:var(--ink); }
   .nav-item { display:flex; align-items:center; gap:10px; padding:9px 18px;
     color:var(--ink); text-decoration:none; font-size:14px; }
   .nav-item svg { width:17px; height:17px; flex-shrink:0; color:var(--muted); }
@@ -684,7 +684,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
-  <div class="brand">Worksheets</div>
+  <div class="brand">{{if .User}}{{.User}}{{else}}Worksheets{{end}}</div>
   <a class="nav-item{{if and (not .Manage) (not .FinishedView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
   <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} Finished Worksheets</a>
   <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
@@ -697,7 +697,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-<header><div><h1>{{.Heading}}</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{else}}<span>{{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1>{{.Heading}}</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
