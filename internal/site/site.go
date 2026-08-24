@@ -3,6 +3,7 @@
 package site
 
 import (
+	"fmt"
 	"html/template"
 	"strings"
 
@@ -348,6 +349,31 @@ func Index(d Data) string {
 	return b.String()
 }
 
+// colorTitle renders the site name letter by letter, each in a crayon colour
+// with a slight rotation and lift so the word looks hand-drawn. Spaces and
+// emoji pass through untouched.
+func colorTitle(s string) template.HTML {
+	var b strings.Builder
+	i := 0
+	for _, r := range s {
+		switch {
+		case r == ' ':
+			b.WriteString(`<span class="sp"></span>`)
+			continue
+		case r > 127:
+			b.WriteString(`<span class="wand">` + string(r) + `</span>`)
+			continue
+		}
+		cls := i%8 + 1
+		// Alternating gentle wobble: rotate a touch either way, lift a touch.
+		rot := []string{"-2deg", "1.5deg", "-1deg", "2deg"}[i%4]
+		lift := []string{"0", "-1.5px", "0.5px", "-1px"}[i%4]
+		fmt.Fprintf(&b, `<span class="lt c%d" style="--rot:%s;--lift:%s">%c</span>`, cls, rot, lift, r)
+		i++
+	}
+	return template.HTML(b.String())
+}
+
 func statusLabel(s store.Status) string {
 	switch s {
 	case store.StatusQueued:
@@ -410,10 +436,24 @@ const indexCSS = `
     text-transform:uppercase; letter-spacing:.05em; font-weight:650; }
   .main { flex:1; min-width:0; padding:30px 30px 64px; }
   .wrap { max-width:1040px; margin:0 auto; }
-  header { display:flex; justify-content:space-between; align-items:baseline; gap:20px;
-    padding-bottom:18px; border-bottom:1px solid var(--line); }
-  h1 { font-size:26px; line-height:1.2; margin:0; }
-  header p { color:var(--muted); margin:4px 0 0; }
+  header { display:flex; justify-content:space-between; align-items:center; gap:20px;
+    padding:14px 6px 22px; border-bottom:2px solid var(--line); }
+  /* Playful, colour-pencil brand. The name is drawn letter by letter in a
+     hand-drawn face with a crayon palette and a gentle wobble. */
+  .brand-title { font-family:"Caveat","Patrick Hand","Segoe Print","Bradley Hand",cursive;
+    font-size:52px; line-height:.95; margin:0; font-weight:700; letter-spacing:.5px;
+    display:inline-block; transform:rotate(-1.3deg); }
+  .brand-title .lt { display:inline-block; transform:rotate(var(--rot,0deg)) translateY(var(--lift,0)); }
+  .brand-title .c1 { color:#e2574c; } .brand-title .c2 { color:#f0932b; }
+  .brand-title .c3 { color:#e9b949; } .brand-title .c4 { color:#57a75a; }
+  .brand-title .c5 { color:#4a90d9; } .brand-title .c6 { color:#9a67c7; }
+  .brand-title .c7 { color:#e26da5; } .brand-title .c8 { color:#3aa79f; }
+  .brand-title .sp { display:inline-block; width:.45em; }
+  .brand-title .wand { font-size:.7em; vertical-align:8px; transform:rotate(8deg); display:inline-block; }
+  .brand-sub { margin:8px 0 0; font-size:15px; font-weight:600; }
+  .brand-sub .doodle { font-size:14px; padding:0 6px; }
+  .brand-sub .u1 { color:#4a90d9; } .brand-sub .u2 { color:#e2574c; }
+  .brand-sub .u3 { color:#57a75a; } .brand-sub .u4 { color:#f0932b; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
   .account button, .account .impersonate-username { padding:5px 9px; }
@@ -679,6 +719,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
+	"colorTitle":  colorTitle,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -697,7 +738,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div><h1>Worksheets</h1><p>PDF worksheets for printing</p></div></header>
+<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>PDF worksheets for printing<span class="doodle">🖍️</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -715,7 +756,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-<header><div><h1>{{.Heading}}</h1><p>PDF worksheets for printing</p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>PDF worksheets for printing<span class="doodle">🖍️</span></p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
