@@ -387,7 +387,7 @@ const indexCSS = `
   .nav-item:hover { background:#f4f6f9; }
   .nav-item.active { background:#eaf1fd; color:var(--link); font-weight:650; }
   .nav-item.active svg { color:var(--link); }
-  .nav-item.sub { padding-left:47px; font-size:13px; color:var(--muted); }
+  .nav-item.sub { padding-left:36px; font-size:13px; color:var(--muted); }
   .nav-item.sub.active { color:var(--link); }
   .nav-section { padding:14px 18px 5px; color:var(--muted); font-size:11px;
     text-transform:uppercase; letter-spacing:.05em; font-weight:650; }
@@ -652,7 +652,6 @@ const (
 	iconHomeSVG  = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg>`
 	iconCheckSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
-	iconTagSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.59 13.41l-7.17 7.17a2 2 0 0 1-2.83 0L2 12V2h10l8.59 8.59a2 2 0 0 1 0 2.82z"></path><line x1="7" y1="7" x2="7.01" y2="7"></line></svg>`
 )
 
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
@@ -661,7 +660,6 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
-	"iconTag":     func() template.HTML { return template.HTML(iconTagSVG) },
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -691,7 +689,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{if .Tags}}
   <div class="nav-section">My worksheets</div>
   {{range .Tags}}
-  <a class="nav-item{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{iconTag}} {{.Name}}</a>
+  <a class="nav-item{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>
   {{range .Children}}<a class="nav-item sub{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>{{end}}
   {{end}}
   {{end}}
