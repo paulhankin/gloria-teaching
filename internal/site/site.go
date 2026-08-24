@@ -442,13 +442,16 @@ const indexCSS = `
     text-transform:uppercase; letter-spacing:.05em; font-weight:650; }
   .main { flex:1; min-width:0; padding:30px 30px 64px; }
   .wrap { max-width:1040px; margin:0 auto; }
-  header { display:flex; justify-content:space-between; align-items:center; gap:20px;
-    padding:14px 6px 22px; border-bottom:2px solid var(--line); }
+  /* Slim top bar holding the account controls, above the full-width title. */
+  .topbar { display:flex; justify-content:flex-end; align-items:center;
+    padding:2px 0 14px; }
+  header { display:flex; justify-content:center; text-align:center;
+    padding:6px 6px 22px; border-bottom:2px solid var(--line); }
   /* Playful, colour-pencil brand. The name is drawn letter by letter in a
      hand-drawn face with a crayon palette and a gentle wobble. */
   .brand-title { font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
-    font-size:56px; line-height:.9; margin:0; font-weight:900; letter-spacing:2px;
-    text-transform:uppercase;
+    font-size:min(54px,5.6vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
+    text-transform:uppercase; white-space:nowrap;
     display:inline-block; transform:rotate(-1deg); padding:0 8px 12px 4px; }
   /* Vintage 3D display face: every letter is drawn three times — a dark
      extruded back (offset down-right), a hatched shading layer on that depth
@@ -581,9 +584,9 @@ const indexCSS = `
     .sidebar { width:auto; height:auto; position:static; border-right:0;
       border-bottom:1px solid var(--line); padding:12px 0; }
     .main { padding:20px 12px 48px; }
-    header { display:block; }
-    .account { margin-top:10px; }
-    header p { margin-top:4px; }
+    .topbar { justify-content:flex-start; }
+    .brand-title { font-size:clamp(26px,9vw,40px); white-space:normal; }
+    .brand-under { width:80%; height:auto; }
     table, tbody, tr, td { display:block; }
     thead { display:none; }
     tr { border-bottom:1px solid var(--line); padding:10px 0; }
@@ -785,7 +788,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div>{{if .User}}<div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div>{{end}}</header>
+{{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
+<header><div><h1 class="brand-title">{{colorTitle "Worksheet Wizard ✨"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
