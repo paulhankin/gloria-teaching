@@ -689,7 +689,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} Finished Worksheets</a>
   <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
   {{if .Tags}}
-  <div class="nav-section">Categories</div>
+  <div class="nav-section">My worksheets</div>
   {{range .Tags}}
   <a class="nav-item{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{iconTag}} {{.Name}}</a>
   {{range .Children}}<a class="nav-item sub{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>{{end}}
