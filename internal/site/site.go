@@ -446,32 +446,33 @@ const indexCSS = `
     padding:14px 6px 22px; border-bottom:2px solid var(--line); }
   /* Playful, colour-pencil brand. The name is drawn letter by letter in a
      hand-drawn face with a crayon palette and a gentle wobble. */
-  .brand-title { font-family:"Caveat","Patrick Hand","Segoe Print","Bradley Hand",cursive;
-    font-size:58px; line-height:.95; margin:0; font-weight:700; letter-spacing:1px;
-    display:inline-block; transform:rotate(-1.3deg); padding:0 6px 10px 6px; }
+  .brand-title { font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
+    font-size:56px; line-height:.9; margin:0; font-weight:900; letter-spacing:2px;
+    text-transform:uppercase;
+    display:inline-block; transform:rotate(-1deg); padding:0 8px 12px 4px; }
   /* Vintage 3D display face: every letter is drawn three times — a dark
-     extruded back (offset down-left), a hatched shading layer, and a light
-     pastel front face — so the colour-pencil strokes stay visible. */
+     extruded back (offset down-right), a hatched shading layer on that depth
+     and a light pastel front face — so the colour-pencil strokes stay visible. */
   .brand-title .lt { position:relative; display:inline-block;
     transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
     -webkit-text-stroke:1.5px var(--edge); }
-  .brand-title .lt .depth { position:absolute; left:-5px; top:5px; z-index:0;
+  .brand-title .lt .depth { position:absolute; left:6px; top:7px; z-index:0;
     color:var(--edge); -webkit-text-stroke:0; opacity:.9; }
-  .brand-title .lt .hatch { position:absolute; left:-5px; top:5px; z-index:1;
+  .brand-title .lt .hatch { position:absolute; left:6px; top:7px; z-index:1;
     -webkit-text-stroke:0; color:transparent;
-    background:repeating-linear-gradient(45deg, var(--edge) 0 1.5px, transparent 1.5px 4px);
-    -webkit-background-clip:text; background-clip:text; opacity:.35; }
+    background:repeating-linear-gradient(45deg, var(--edge) 0 2px, transparent 2px 5px);
+    -webkit-background-clip:text; background-clip:text; opacity:.55; }
   .brand-title .lt .face { position:relative; z-index:2; color:var(--fill); }
-  .brand-title .c1 { --fill:#f6b1a7; --edge:#c06055; }
-  .brand-title .c2 { --fill:#f9c98c; --edge:#cf9040; }
-  .brand-title .c3 { --fill:#f7dd8e; --edge:#c4a52e; }
-  .brand-title .c4 { --fill:#b0dcb2; --edge:#5d9c66; }
-  .brand-title .c5 { --fill:#a9cdf0; --edge:#5a86bd; }
-  .brand-title .c6 { --fill:#d4bcf0; --edge:#8f6ab4; }
-  .brand-title .c7 { --fill:#f7bcd8; --edge:#c5689c; }
-  .brand-title .c8 { --fill:#a6ded9; --edge:#4fa79e; }
-  .brand-title .sp { display:inline-block; width:.5em; }
-  .brand-title .wand { font-size:.6em; vertical-align:20px; transform:rotate(10deg); display:inline-block; margin-left:6px; }
+  .brand-title .c1 { --fill:#f7b3a9; --edge:#c46a5f; }
+  .brand-title .c2 { --fill:#fad097; --edge:#d09a48; }
+  .brand-title .c3 { --fill:#f8e093; --edge:#c7ab2f; }
+  .brand-title .c4 { --fill:#b6e0b8; --edge:#66a06f; }
+  .brand-title .c5 { --fill:#afd3f2; --edge:#6390c0; }
+  .brand-title .c6 { --fill:#d9c2f2; --edge:#9774b8; }
+  .brand-title .c7 { --fill:#f8c2dd; --edge:#c977a4; }
+  .brand-title .c8 { --fill:#ace1db; --edge:#58aba4; }
+  .brand-title .sp { display:inline-block; width:.55em; }
+  .brand-title .wand { font-size:.5em; vertical-align:34px; transform:rotate(10deg); display:inline-block; margin-left:8px; -webkit-text-stroke:0; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
   .brand-under { display:block; margin-top:0; transform:rotate(-.6deg); }
   .brand-sub { margin:6px 0 0; font-size:19px; font-weight:600;
