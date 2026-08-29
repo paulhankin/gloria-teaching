@@ -765,9 +765,10 @@ const (
 // single uneven stroke whose width wobbles like a real pencil line.
 const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
 
-// brandLogoSVG is the site icon: a small stack of worksheets with a heart
-// sticker, drawn in the same hand-coloured pencil style as the title.
-const brandLogoSVG = `<svg class="brand-logo" viewBox="0 0 120 120" fill="none" aria-hidden="true"><rect x="26" y="34" width="62" height="66" rx="3" transform="rotate(-4 26 34)" fill="#eaf1fd" stroke="#6390c0" stroke-width="3"/><rect x="30" y="26" width="62" height="66" rx="3" fill="#fff" stroke="#6390c0" stroke-width="3"/><path d="M38 40 H 82" stroke="#6390c0" stroke-width="3" stroke-linecap="round" opacity=".5"/><path d="M38 50 H 74" stroke="#6390c0" stroke-width="3" stroke-linecap="round" opacity=".5"/><path d="M60 96 C 44 84, 38 74, 43 66 C 47 60, 56 60, 60 68 C 64 60, 73 60, 77 66 C 82 74, 76 84, 60 96 Z" fill="#f7b6c8" stroke="#e2574c" stroke-width="3.5" stroke-linejoin="round"/></svg>`
+// brandLogoSVG is the site icon: two hands shaking beneath a floating heart,
+// in the hand-coloured pencil palette of the title — the friendly, helping
+// each other side of Teacher's Friend.
+const brandLogoSVG = `<svg class="brand-logo" viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 42 C 50 33, 43 27, 46.5 20 C 49.5 14.5, 56.5 14.5, 60 22 C 63.5 14.5, 70.5 14.5, 73.5 20 C 77 27, 70 33, 60 42 Z" fill="#f7b6c8" stroke="#e2574c" stroke-width="5"/><path d="M4 86 L 28 78 C 42 73, 52 68, 62 58 L 70 68 C 62 78, 50 84, 38 88 L 12 95 Z" fill="#a9cdf0" stroke="#6390c0" stroke-width="4"/><path d="M116 86 L 92 78 C 78 73, 68 68, 58 58 L 50 68 C 58 78, 70 84, 82 88 L 108 95 Z" fill="#f6b1a7" stroke="#e2574c" stroke-width="4"/><path d="M54 66 C 57 71, 63 73, 68 71" stroke="#6390c0" stroke-width="4.5" fill="none"/><path d="M66 66 C 63 71, 57 73, 52 71" stroke="#e2574c" stroke-width="4.5" fill="none"/></svg>`
 
 // reqActions bundles a request with whether the viewer may use the
 // admin-only actions (refine), so the actions template can decide.
