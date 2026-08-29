@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-//go:embed assets/fonts.css assets/rough.js
+//go:embed assets/fonts.css assets/rough.js assets/logo.png
 var assets embed.FS
 
 // Asset returns an embedded file from internal/sheet/assets.
@@ -23,6 +23,15 @@ func Asset(name string) string {
 		panic(err)
 	}
 	return string(b)
+}
+
+// AssetBytes returns an embedded binary asset (images) from internal/sheet/assets.
+func AssetBytes(name string) []byte {
+	b, err := assets.ReadFile("assets/" + name)
+	if err != nil {
+		panic(err)
+	}
+	return b
 }
 
 // Worksheet describes a worksheet for the registry and the index page.

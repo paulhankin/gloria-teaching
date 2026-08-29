@@ -19,6 +19,7 @@ import (
 
 	"learningmaterial/internal/account"
 	"learningmaterial/internal/pipeline"
+	"learningmaterial/internal/sheet"
 	"learningmaterial/internal/site"
 	"learningmaterial/internal/store"
 )
@@ -316,6 +317,13 @@ func work(w http.ResponseWriter, r *http.Request) {
 	}
 	setFlash(w, action)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// serveLogo serves the embedded Teacher's Friend logo (the handshake image).
+func serveLogo(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "image/png")
+	w.Header().Set("Cache-Control", "public, max-age=86400")
+	w.Write(sheet.AssetBytes("logo.png"))
 }
 
 // postAdmin toggles admin mode.
@@ -820,6 +828,8 @@ func main() {
 	accounts := account.New(db, secret, allowedEmails(), adminEmails(), account.GatewayMailer{}, siteBaseURL())
 	public := http.NewServeMux()
 	accounts.Register(public)
+	// The logo is public: it decorates the sign-in page too.
+	public.HandleFunc("/logo.png", serveLogo)
 	public.Handle("/", accounts.RequireAccess(mux))
 
 	log.Printf("serving %s on %s (db %s)", *dir, *addr, *dbPath)

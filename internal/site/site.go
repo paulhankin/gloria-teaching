@@ -3,6 +3,7 @@
 package site
 
 import (
+	"encoding/base64"
 	"fmt"
 	"html/template"
 	"strings"
@@ -468,8 +469,8 @@ const indexCSS = `
     display:flex; align-items:center; justify-content:center;
     transform:rotate(-1deg); padding:0 4px 16px 4px; }
   .brand-gap { display:inline-block; width:.28em; }
-  .brand-logo { height:1.05em; width:auto; flex-shrink:0;
-    transform:rotate(2deg) translateY(.04em); }
+  .brand-logo { height:1.5em; width:auto; flex-shrink:0;
+    transform:rotate(1.5deg) translateY(.06em); }
   /* Colour-pencil 3D face: white letters with a coloured outline and a light,
      partial pencil-stroke wash on the face, over a solid 3D body whose depth
      is shaded with diagonal hatching in the same colour. */
@@ -765,10 +766,15 @@ const (
 // single uneven stroke whose width wobbles like a real pencil line.
 const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
 
-// brandLogoSVG is the site icon: two hands shaking beneath a floating heart,
-// in the hand-coloured pencil palette of the title — the friendly, helping
-// each other side of Teacher's Friend.
-const brandLogoSVG = `<svg class="brand-logo" viewBox="0 0 120 120" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M60 42 C 50 33, 43 27, 46.5 20 C 49.5 14.5, 56.5 14.5, 60 22 C 63.5 14.5, 70.5 14.5, 73.5 20 C 77 27, 70 33, 60 42 Z" fill="#f7b6c8" stroke="#e2574c" stroke-width="5"/><path d="M4 86 L 28 78 C 42 73, 52 68, 62 58 L 70 68 C 62 78, 50 84, 38 88 L 12 95 Z" fill="#a9cdf0" stroke="#6390c0" stroke-width="4"/><path d="M116 86 L 92 78 C 78 73, 68 68, 58 58 L 50 68 C 58 78, 70 84, 82 88 L 108 95 Z" fill="#f6b1a7" stroke="#e2574c" stroke-width="4"/><path d="M54 66 C 57 71, 63 73, 68 71" stroke="#6390c0" stroke-width="4.5" fill="none"/><path d="M66 66 C 63 71, 57 73, 52 71" stroke="#e2574c" stroke-width="4.5" fill="none"/></svg>`
+// brandLogoImg is the Teacher's Friend logo (the handshake image), embedded
+// and served at /logo.png. Static copies inline it as a data URL instead.
+func brandLogoImg(static bool) template.HTML {
+	src := "/logo.png"
+	if static {
+		src = "data:image/png;base64," + base64.StdEncoding.EncodeToString(sheet.AssetBytes("logo.png"))
+	}
+	return template.HTML(`<img class="brand-logo" src="` + src + `" alt="Teacher's Friend logo: two hands shaking beneath a heart">`)
+}
 
 // reqActions bundles a request with whether the viewer may use the
 // admin-only actions (refine), so the actions template can decide.
@@ -786,7 +792,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconCog":        func() template.HTML { return template.HTML(iconCogSVG) },
 	"colorTitle":     colorTitle,
 	"brandUnderline": func() template.HTML { return template.HTML(brandUnderlineSVG) },
-	"brandLogo":      func() template.HTML { return template.HTML(brandLogoSVG) },
+	"brandLogo":      brandLogoImg,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -808,7 +814,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -827,7 +833,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </nav>
 <div class="main"><div class="wrap">
 {{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
