@@ -3,6 +3,7 @@
 package site
 
 import (
+	"crypto/sha256"
 	"encoding/base64"
 	"fmt"
 	"html/template"
@@ -767,9 +768,15 @@ const (
 const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
 
 // brandLogoImg is the Teacher's Friend logo (the handshake image), embedded
-// and served at /logo.png. Static copies inline it as a data URL instead.
+// and served at /logo.png. The URL carries a content fingerprint so a new logo
+// busts the browser cache automatically. Static copies inline it as a data URL.
+var brandLogoSrc = "/logo.png?v=" + func() string {
+	sum := sha256.Sum256(sheet.AssetBytes("logo.png"))
+	return fmt.Sprintf("%x", sum[:6])
+}()
+
 func brandLogoImg(static bool) template.HTML {
-	src := "/logo.png"
+	src := brandLogoSrc
 	if static {
 		src = "data:image/png;base64," + base64.StdEncoding.EncodeToString(sheet.AssetBytes("logo.png"))
 	}
