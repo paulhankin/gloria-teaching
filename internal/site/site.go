@@ -386,6 +386,28 @@ func colorTitle(s string) template.HTML {
 	return template.HTML(b.String())
 }
 
+// rainbowText renders s letter by letter, each in the next rainbow colour, so
+// the tagline looks hand-coloured. Spaces and emoji pass through untouched.
+var rainbowColors = []string{"#e2574c", "#f0932b", "#e5c100", "#3da35d", "#2f8fd6", "#7a5fd0", "#d64f9b"}
+
+func rainbowText(s string) template.HTML {
+	var b strings.Builder
+	i := 0
+	for _, r := range s {
+		if r == ' ' {
+			b.WriteString(" ")
+			continue
+		}
+		if r > 127 {
+			b.WriteString(string(r))
+			continue
+		}
+		fmt.Fprintf(&b, `<span style="color:%s">%s</span>`, rainbowColors[i%len(rainbowColors)], template.HTMLEscapeString(string(r)))
+		i++
+	}
+	return template.HTML(b.String())
+}
+
 func statusLabel(s store.Status) string {
 	switch s {
 	case store.StatusQueued:
@@ -483,9 +505,10 @@ const indexCSS = `
      depth is shaded with diagonal pencil hatching in dark grey. */
   .brand-title .lt .face { position:relative; z-index:2; color:#fff; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
-  .brand-sub { margin:6px 0 0; font-size:19px; font-weight:600;
+  .brand-sub { margin:10px 0 0; font-size:30px; font-weight:800;
+    font-family:Caveat,"Segoe Print","Bradley Hand",cursive; letter-spacing:.5px; }
     font-family:"Caveat","Patrick Hand","Segoe Print",cursive; }
-  .brand-sub .doodle { font-size:16px; padding:0 7px; }
+  .brand-sub .doodle { font-size:24px; padding:0 10px; }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
   .account button, .account .impersonate-username { padding:5px 9px; }
@@ -774,6 +797,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
 	"colorTitle":  colorTitle,
+	"rainbowText": rainbowText,
 	"brandLogo":   brandLogoImg,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
@@ -796,7 +820,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>{{rainbowText "Unleash your creativity"}}<span class="doodle">🖍️</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -815,7 +839,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </nav>
 <div class="main"><div class="wrap">
 {{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>{{rainbowText "Unleash your creativity"}}<span class="doodle">🖍️</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
