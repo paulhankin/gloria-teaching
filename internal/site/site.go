@@ -370,10 +370,8 @@ func colorTitle(s string) template.HTML {
 			continue
 		}
 		cls := i%8 + 1
-		rot := []string{"-2deg", "1.5deg", "-1deg", "2deg"}[i%4]
-		lift := []string{"0", "-1.5px", "0.5px", "-1px"}[i%4]
 		ch := string(r)
-		fmt.Fprintf(&b, `<span class="lt c%d" style="--rot:%s;--lift:%s">`, cls, rot, lift)
+		fmt.Fprintf(&b, `<span class="lt c%d">`, cls)
 		// Solid 3D body: stacked copies offset down-right, back to front.
 		for k := depth; k >= 1; k-- {
 			fmt.Fprintf(&b, `<span class="d" style="--k:%d" aria-hidden="true">%s</span>`, k, ch)
@@ -468,12 +466,11 @@ const indexCSS = `
     font-size:min(62px,6.2vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
     text-transform:uppercase; white-space:nowrap;
     display:flex; align-items:center; justify-content:center;
-    transform:rotate(-1deg); padding:0 4px 16px 4px; }
+    padding:0 4px 16px 4px; }
   .brand-gap { display:inline-block; width:.28em; }
   .brand-logo { height:1.5em; width:auto; flex-shrink:0;
-    transform:rotate(1.5deg) translateY(.06em); }
+    transform:translateY(.06em); }
   .brand-title .lt { position:relative; display:inline-block;
-    transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
     -webkit-text-stroke:1.6px #20242e; }
   .brand-title .lt .d { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
     z-index:0; color:#20242e; -webkit-text-stroke:0; }
@@ -486,7 +483,6 @@ const indexCSS = `
      depth is shaded with diagonal pencil hatching in dark grey. */
   .brand-title .lt .face { position:relative; z-index:2; color:#fff; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
-  .brand-under { display:block; margin-top:0; transform:rotate(-.6deg); }
   .brand-sub { margin:6px 0 0; font-size:19px; font-weight:600;
     font-family:"Caveat","Patrick Hand","Segoe Print",cursive; }
   .brand-sub .doodle { font-size:16px; padding:0 7px; }
@@ -595,7 +591,6 @@ const indexCSS = `
     .main { padding:20px 12px 48px; }
     .topbar { justify-content:flex-start; }
     .brand-title { font-size:clamp(26px,9vw,40px); white-space:normal; }
-    .brand-under { width:80%; height:auto; }
     table, tbody, tr, td { display:block; }
     thead { display:none; }
     tr { border-bottom:1px solid var(--line); padding:10px 0; }
@@ -748,10 +743,6 @@ const (
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
 )
 
-// brandUnderline is a hand-drawn crayon squiggle beneath the site name — a
-// single uneven stroke whose width wobbles like a real pencil line.
-const brandUnderlineSVG = `<svg class="brand-under" width="330" height="12" viewBox="0 0 330 12" fill="none"><path d="M4 8 C 40 3, 70 10, 105 6 S 170 2, 205 7 S 275 10, 326 5" stroke="#e2574c" stroke-width="4" stroke-linecap="round" opacity="0.55"/><path d="M6 9 C 42 4, 74 11, 108 7 S 172 3, 207 8 S 278 11, 324 6" stroke="#f0932b" stroke-width="2.4" stroke-linecap="round" opacity="0.7"/></svg>`
-
 // brandLogoImg is the Teacher's Friend logo (the handshake image), embedded
 // and served at /logo.png. The URL carries a content fingerprint so a new logo
 // busts the browser cache automatically. Static copies inline it as a data URL.
@@ -776,15 +767,14 @@ type reqActions struct {
 }
 
 var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
-	"statusLabel":    statusLabel,
-	"statusHelp":     statusHelp,
-	"iconHome":       func() template.HTML { return template.HTML(iconHomeSVG) },
-	"iconGlobe":      func() template.HTML { return template.HTML(iconGlobeSVG) },
-	"iconCheck":      func() template.HTML { return template.HTML(iconCheckSVG) },
-	"iconCog":        func() template.HTML { return template.HTML(iconCogSVG) },
-	"colorTitle":     colorTitle,
-	"brandUnderline": func() template.HTML { return template.HTML(brandUnderlineSVG) },
-	"brandLogo":      brandLogoImg,
+	"statusLabel": statusLabel,
+	"statusHelp":  statusHelp,
+	"iconHome":    func() template.HTML { return template.HTML(iconHomeSVG) },
+	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
+	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
+	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
+	"colorTitle":  colorTitle,
+	"brandLogo":   brandLogoImg,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -806,7 +796,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -825,7 +815,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </nav>
 <div class="main"><div class="wrap">
 {{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1>{{brandUnderline}}<p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>Unleash your creativity<span class="doodle">🖍️</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
