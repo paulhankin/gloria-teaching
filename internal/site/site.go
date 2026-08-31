@@ -231,13 +231,13 @@ func (d Data) Heading() string {
 }
 
 // SectionHeading titles the worksheet table below the page heading. On Home
-// it reads "Available worksheets"; on a category view it repeats the category.
+// it reads "My worksheets"; on a category view it repeats the category.
 func (d Data) SectionHeading() string {
 	if d.FinishedView {
 		return "Finished worksheets"
 	}
 	if d.ActiveTagID == 0 {
-		return "Available worksheets"
+		return "My worksheets"
 	}
 	return d.ActiveTagName
 }

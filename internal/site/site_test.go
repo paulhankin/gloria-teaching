@@ -189,7 +189,7 @@ func TestFinishedWorksheetsMoveToTheirOwnSection(t *testing.T) {
 		{Subject: "math", Name: "fractions", Title: "Brüche", Owner: "owner@example.com"},
 		{Subject: "math", Name: "venn", Title: "Venn-Diagramme", Owner: "owner@example.com", Finished: true},
 	}})
-	if !strings.Contains(html, "Available worksheets <span class=\"count\">(1)</span>") ||
+	if !strings.Contains(html, "My worksheets <span class=\"count\">(1)</span>") ||
 		!strings.Contains(html, "Finished worksheets <span class=\"count\">(1)</span>") {
 		t.Fatal("worksheet counts are not split into active and finished")
 	}
