@@ -79,7 +79,17 @@ type Data struct {
 	FinishedView bool
 	// PublicView renders only the public worksheets.
 	PublicView bool
+	// Lang is the UI language: "en" or "de" (defaults to English).
+	Lang string
+	// RequestPath is the current request path + query, so the language picker
+	// can redirect back to the same page.
+	RequestPath string
 }
+
+// T returns the UI string for key in the current language (d.Lang).
+// Worksheet content itself stays German; only the surrounding site UI is
+// translated.
+func (d Data) T(key string) string { return translate(d.Lang, key) }
 
 func (d Data) openRequests(kind store.Kind, worksheet string) []store.Request {
 	var out []store.Request
@@ -216,16 +226,16 @@ func (d Data) ShownFinishedWorksheets() []Worksheet {
 // Heading is the main panel title for the current view.
 func (d Data) Heading() string {
 	if d.Manage {
-		return "Manage"
+		return d.T("nav.manage")
 	}
 	if d.FinishedView {
-		return "Finished worksheets"
+		return d.T("section.finished")
 	}
 	if d.PublicView {
-		return "Public worksheets"
+		return d.T("section.public")
 	}
 	if d.ActiveTagID == 0 {
-		return "Worksheets"
+		return d.T("section.myworksheets")
 	}
 	return d.ActiveTagName
 }
@@ -234,10 +244,10 @@ func (d Data) Heading() string {
 // it reads "My worksheets"; on a category view it repeats the category.
 func (d Data) SectionHeading() string {
 	if d.FinishedView {
-		return "Finished worksheets"
+		return d.T("section.finished")
 	}
 	if d.ActiveTagID == 0 {
-		return "My worksheets"
+		return d.T("section.myworksheets")
 	}
 	return d.ActiveTagName
 }
@@ -313,7 +323,7 @@ func (r row) ChangeRequests() []store.Request { return r.data.ChangeRequests(r.W
 // RequestTitle gives a work item a short, recognisable heading.
 func (d Data) RequestTitle(r store.Request) string {
 	if r.Kind == store.KindNew {
-		return "New worksheet"
+		return d.T("request.new")
 	}
 	for _, w := range d.Worksheets {
 		if w.Path() == r.Worksheet {
@@ -413,39 +423,39 @@ func rainbowText(s string) template.HTML {
 // colours echo the rainbow letters.
 const paintStrokeSVG = `<svg class="paint-stroke" viewBox="0 0 360 26" fill="none" aria-hidden="true"><path d="M6 16 C 60 9, 150 20, 230 13 C 280 9, 320 14, 352 12" stroke="#f0932b" stroke-width="7" stroke-linecap="round" opacity=".45"/><path d="M4 18 C 70 12, 160 22, 250 15 C 300 11, 330 15, 356 13" stroke="#2f8fd6" stroke-width="3" stroke-linecap="round" opacity=".5"/><circle cx="40" cy="6" r="3" fill="#e2574c" opacity=".6"/><circle cx="300" cy="4" r="2.4" fill="#3da35d" opacity=".6"/><circle cx="330" cy="22" r="2.8" fill="#7a5fd0" opacity=".6"/><circle cx="120" cy="23" r="2" fill="#e2574c" opacity=".55"/><circle cx="210" cy="3" r="1.8" fill="#f0932b" opacity=".6"/></svg>`
 
-func statusLabel(s store.Status) string {
+func statusLabel(lang string, s store.Status) string {
 	switch s {
 	case store.StatusQueued:
-		return "Queued"
+		return translate(lang, "status.queued")
 	case store.StatusWorking:
-		return "Work in progress"
+		return translate(lang, "status.working")
 	case store.StatusReview:
-		return "Ready to publish"
+		return translate(lang, "status.review")
 	case store.StatusFailed:
-		return "Needs attention"
+		return translate(lang, "status.failed")
 	case store.StatusDone:
-		return "Published"
+		return translate(lang, "status.done")
 	case store.StatusRejected:
-		return "Rejected"
+		return translate(lang, "status.rejected")
 	default:
 		return string(s)
 	}
 }
 
-func statusHelp(s store.Status) string {
+func statusHelp(lang string, s store.Status) string {
 	switch s {
 	case store.StatusQueued:
-		return "Waiting to start"
+		return translate(lang, "statushelp.queued")
 	case store.StatusWorking:
-		return "The worksheet is being updated now, in a disposable isolated workspace"
+		return translate(lang, "statushelp.working")
 	case store.StatusReview:
-		return "The update is finished and will be published automatically"
+		return translate(lang, "statushelp.review")
 	case store.StatusFailed:
-		return "The update could not be completed"
+		return translate(lang, "statushelp.failed")
 	case store.StatusDone:
-		return "The update is live"
+		return translate(lang, "statushelp.done")
 	case store.StatusRejected:
-		return "The update was not published"
+		return translate(lang, "statushelp.rejected")
 	default:
 		return ""
 	}
@@ -524,6 +534,13 @@ const indexCSS = `
   .account button, .account .impersonate-username { padding:5px 9px; }
   .account .impersonate-username { width:230px; border:1px solid #98a2b3; border-radius:3px; background:#fff; color:inherit; font:inherit; }
   .impersonation { color:#b54708; font-weight:650; }
+  /* Language picker (EN/DE) at the far right of the top bar. */
+  .lang-picker { display:flex; gap:2px; margin-left:6px; }
+  .lang-picker .lang { padding:5px 8px; border:1px solid #c6cfdd; background:#fff;
+    color:var(--muted); cursor:pointer; font-weight:650; font-size:12px; }
+  .lang-picker .lang:first-child { border-radius:5px 0 0 5px; }
+  .lang-picker .lang:last-child { border-radius:0 5px 5px 0; }
+  .lang-picker .lang.on { background:#2f6fae; border-color:#2f6fae; color:#fff; }
   h2 { font-size:18px; margin:30px 0 10px; }
   .count { color:var(--muted); font-weight:400; }
   .flash { border:1px solid #86c9a8; color:#05603a; padding:10px 12px; margin:18px 0 0; }
@@ -642,53 +659,53 @@ const worksheetRows = `
 {{with $r := row $ $w}}
 {{$worksheet := $r.Path}}
 <tr{{if not $static}} class="worksheet-main"{{end}}>
-  <td><div class="title">{{$r.Title}}</div>{{if not $static}}<span class="privacy">{{if $r.Private}}Private{{else}}Public{{end}} · owner: {{$r.Owner}}</span>{{end}}</td>
+  <td><div class="title">{{$r.Title}}</div>{{if not $static}}<span class="privacy">{{if $r.Private}}{{T . "settings.private"}}{{else}}{{T . "settings.public"}}{{end}} · {{T . "label.owner"}}: {{$r.Owner}}</span>{{end}}</td>
   <td class="date">{{if $r.Date}}{{$r.Date}}{{else}}—{{end}}</td>
   <td class="meta">{{$r.Meta}}</td>
   {{if not $static}}<td>
     {{$rs := $r.ChangeRequests}}
-    {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel .Status}}</span><br>{{end}}{{else}}<span class="meta">Current</span>{{end}}
+    {{if $rs}}{{range $rs}}<span class="status {{.Status}}">{{statusLabel $.Data.Lang .Status}}</span><br>{{end}}{{else}}<span class="meta">{{T . "link.current"}}</span>{{end}}
   </td>{{end}}
-  <td class="row-actions"><a class="pdf" href="{{$r.OutputPath}}/index.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Worksheet PDF</a><a class="pdf" href="{{$r.OutputPath}}/solutions.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">Solutions PDF</a>{{if not $static}}<form method="POST" action="/worksheets/finished"><input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="{{if $r.Finished}}off{{else}}on{{end}}"><button class="finish" type="submit">{{if $r.Finished}}Move back to active{{else}}Mark as finished{{end}}</button></form>{{end}}</td>
+  <td class="row-actions"><a class="pdf" href="{{$r.OutputPath}}/index.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">{{T . "link.worksheetpdf"}}</a><a class="pdf" href="{{$r.OutputPath}}/solutions.pdf{{if $r.Version}}?v={{$r.Version}}{{end}}">{{T . "link.solutionspdf"}}</a>{{if not $static}}<form method="POST" action="/worksheets/finished"><input type="hidden" name="worksheet" value="{{$r.Path}}"><input type="hidden" name="finished" value="{{if $r.Finished}}off{{else}}on{{end}}"><button class="finish" type="submit">{{if $r.Finished}}{{T . "action.moveback"}}{{else}}{{T . "action.markfinished"}}{{end}}</button></form>{{end}}</td>
 </tr>
 {{if not $static}}
 <tr class="worksheet-request"><td colspan="5">
   {{if $r.Finished}}
   {{else}}
   {{$revisions := $r.Revisions}}
-  {{if $revisions}}<details><summary>Revision history</summary>
+  {{if $revisions}}<details><summary>{{T . "history.title"}}</summary>
     <ul class="revision-list">{{range $revisions}}<li>
       <div class="revision-info"><code>{{.Short}}</code> · {{.Date}} · {{.Subject}}</div>
-      {{if .Current}}<span class="current">Current</span>{{else}}<form method="POST" action="/worksheets/revert"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="commit" value="{{.Commit}}"><button type="submit">Revert to this version</button></form>{{end}}
+      {{if .Current}}<span class="current">{{T . "link.current"}}</span>{{else}}<form method="POST" action="/worksheets/revert"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="commit" value="{{.Commit}}"><button type="submit">{{T . "history.revert"}}</button></form>{{end}}
     </li>{{end}}</ul>
   </details>{{end}}
-  <details><summary>Worksheet settings</summary>
+  <details><summary>{{T . "settings.title"}}</summary>
     <div class="sharing">
       <form class="visibility" method="POST" action="/worksheets/visibility">
         <input type="hidden" name="worksheet" value="{{$r.Path}}">
-        <label for="visibility-{{$r.Name}}">Access</label>
+        <label for="visibility-{{$r.Name}}">{{T . "settings.access"}}</label>
         <select id="visibility-{{$r.Name}}" name="visibility">
-          <option value="private"{{if $r.Private}} selected{{end}}>Private</option>
-          <option value="public"{{if not $r.Private}} selected{{end}}>Public</option>
+          <option value="private"{{if $r.Private}} selected{{end}}>{{T . "settings.private"}}</option>
+          <option value="public"{{if not $r.Private}} selected{{end}}>{{T . "settings.public"}}</option>
         </select>
-        <button type="submit">Save</button>
+        <button type="submit">{{T . "settings.save"}}</button>
       </form>
       {{if $r.Private}}
       <form class="share-form" method="POST" action="/worksheets/shares">
         <input type="hidden" name="worksheet" value="{{$r.Path}}">
-        <input type="email" name="email" required placeholder="Existing user's email">
-        <select name="permission" aria-label="Permission"><option value="view">Can view</option><option value="edit">Can edit</option></select>
-        <button type="submit">Share</button>
+        <input type="email" name="email" required placeholder="{{T . "ph.useremail"}}">
+        <select name="permission" aria-label="Permission"><option value="view">{{T . "settings.canview"}}</option><option value="edit">{{T . "settings.canedit"}}</option></select>
+        <button type="submit">{{T . "settings.share"}}</button>
       </form>
-      {{if $r.Shares}}<ul class="share-list">{{range $r.Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">Remove</button></form></li>{{end}}</ul>{{end}}
-      {{else}}<span class="meta">Listed on <a href="/worksheets/{{$.User}}/index">your public page</a>.</span>{{end}}
+      {{if $r.Shares}}<ul class="share-list">{{range $r.Shares}}<li><span class="email">{{.Email}}</span><span>{{if eq .Permission "edit"}}Can edit{{else}}Can view{{end}}</span><form method="POST" action="/worksheets/shares/delete"><input type="hidden" name="worksheet" value="{{$worksheet}}"><input type="hidden" name="email" value="{{.Email}}"><button type="submit">{{T . "settings.remove"}}</button></form></li>{{end}}</ul>{{end}}
+      {{else}}<span class="meta">{{T . "settings.listed"}} <a href="/worksheets/{{$.User}}/index">{{T . "settings.publicpage"}}</a>.</span>{{end}}
     </div>
   </details>
-  <details><summary>Request an update</summary>
+  <details><summary>{{T . "settings.requestupdate"}}</summary>
     <form class="ask" method="POST" action="/requests">
       <input type="hidden" name="kind" value="change"><input type="hidden" name="worksheet" value="{{$r.Path}}">
-      <textarea name="body" required placeholder="What should change?"></textarea>
-      <button type="submit">Send request</button>
+      <textarea name="body" required placeholder="{{T . "ph.whatchange"}}"></textarea>
+      <button type="submit">{{T . "button.sendrequest"}}</button>
     </form>
   </details>
   {{end}}
@@ -702,51 +719,51 @@ const worksheetRows = `
 const manageView = `
 {{define "manage"}}
 <section aria-labelledby="manage-heading">
-<h2 id="manage-heading">Manage categories</h2>
+<h2 id="manage-heading">{{T . "tags.manage"}}</h2>
 <p class="meta">Categories appear in the left-hand menu. Create a top-level category such as "First Grade", then add sub-categories like "Mathematics" beneath it. Tag worksheets to file them under a category.</p>
 
-<h3>Add a category</h3>
+<h3>{{T . "tags.add"}}</h3>
 <form class="ask tag-add" method="POST" action="/tags">
-  <input type="text" name="name" required placeholder="Category name">
+  <input type="text" name="name" required placeholder="{{T . "ph.catname"}}">
   <select name="parent" aria-label="Parent category">
-    <option value="0">Top level (no parent)</option>
+    <option value="0">{{T . "tags.toplevel"}}</option>
     {{range .Tags}}<option value="{{.ID}}">{{.Name}}</option>{{end}}
   </select>
-  <button type="submit">Add category</button>
+  <button type="submit">{{T . "tags.addbutton"}}</button>
 </form>
 
 {{if .Tags}}
-<h3>Your categories</h3>
+<h3>{{T . "tags.yours"}}</h3>
 <ul class="tag-manage-list">
 {{range .Tags}}
   <li>
     <span class="tag-name">{{.Name}}</span>
-    <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">Rename</button></form>
-    <form class="tag-delete" method="POST" action="/tags/delete" onsubmit="return confirm('Delete category &quot;{{.Name}}&quot; and its sub-categories? Worksheets keep their other categories.');"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">Delete</button></form>
+    <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">{{T . "tags.rename"}}</button></form>
+    <form class="tag-delete" method="POST" action="/tags/delete" onsubmit="return confirm('Delete category &quot;{{.Name}}&quot; and its sub-categories? Worksheets keep their other categories.');"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">{{T . "tags.delete"}}</button></form>
     {{if .Children}}<ul>{{range .Children}}
       <li><span class="tag-name sub">{{.Name}}</span>
-        <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">Rename</button></form>
-        <form class="tag-delete" method="POST" action="/tags/delete"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">Delete</button></form>
+        <form class="tag-rename" method="POST" action="/tags/rename"><input type="hidden" name="id" value="{{.ID}}"><input type="text" name="name" value="{{.Name}}" required><button type="submit">{{T . "tags.rename"}}</button></form>
+        <form class="tag-delete" method="POST" action="/tags/delete"><input type="hidden" name="id" value="{{.ID}}"><button type="submit" class="no">{{T . "tags.delete"}}</button></form>
       </li>{{end}}</ul>{{end}}
   </li>
 {{end}}
 </ul>
 {{end}}
 
-<h3>Tag worksheets</h3>
+<h3>{{T . "tags.tagworksheets"}}</h3>
 {{if .Tags}}
-<p class="meta">Tick the categories each worksheet belongs to.</p>
+<p class="meta">{{T . "tags.tick"}}</p>
 {{range .TagForms}}
 <div class="tag-worksheet">
   <div class="title">{{.Title}}</div>
   <form method="POST" action="/worksheets/tags" class="tag-assign">
     <input type="hidden" name="worksheet" value="{{.Path}}">
     {{range .Checks}}<label class="tag-check"><input type="checkbox" name="tag" value="{{.ID}}"{{if .Checked}} checked{{end}}> {{.Name}}</label>{{end}}
-    <button type="submit">Save</button>
+    <button type="submit">{{T . "settings.save"}}</button>
   </form>
 </div>
 {{end}}
-{{else}}<p class="meta">Create a category first, then tag your worksheets.</p>{{end}}
+{{else}}<p class="meta">{{T . "tags.createfirst"}}</p>{{end}}
 </section>
 {{end}}
 `
@@ -755,14 +772,14 @@ const requestActions = `
 {{define "actions"}}
   <div class="actions">
     {{if eq .Status "failed"}}
-    <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">Retry</button></form>
+    <form method="POST" action="/work/retry"><input type="hidden" name="id" value="{{.ID}}"><button type="submit">{{T . "action.retry"}}</button></form>
     {{end}}
-    <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}"><button class="no" type="submit">Reject</button></form>
+    <form method="POST" action="/work/reject"><input type="hidden" name="id" value="{{.ID}}"><button class="no" type="submit">{{T . "action.reject"}}</button></form>
   </div>
   {{if and .Admin (eq .Status "failed")}}
   <form class="refine" method="POST" action="/work/refine">
-    <input type="hidden" name="id" value="{{.ID}}"><input type="text" name="body" required placeholder="Describe the refinement">
-    <button type="submit">Refine</button>
+    <input type="hidden" name="id" value="{{.ID}}"><input type="text" name="body" required placeholder="{{T . "ph.refine"}}">
+    <button type="submit">{{T . "action.refine"}}</button>
   </form>
   {{end}}
 {{end}}
@@ -809,7 +826,21 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"colorTitle":  colorTitle,
 	"rainbowText": rainbowText,
 	"paintStroke": func() template.HTML { return template.HTML(paintStrokeSVG) },
-	"brandLogo":   brandLogoImg,
+	// T translates a UI key into the page's language: {{T . "nav.home"}}. It
+	// accepts Data, row or rowSet (the context inside table rows), all of which
+	// carry the language.
+	"T": func(v any, key string) string {
+		switch d := v.(type) {
+		case Data:
+			return d.T(key)
+		case row:
+			return d.data.T(key)
+		case rowSet:
+			return d.Data.T(key)
+		}
+		return translate("en", key)
+	},
+	"brandLogo": brandLogoImg,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
 	},
@@ -820,12 +851,12 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 		return row{Worksheet: w, data: s.Data}
 	},
 }).Parse(worksheetRows + requestActions + manageView + `<!DOCTYPE html>
-<html lang="en">
+<html lang="{{if eq .Lang "de"}}de{{else}}en{{end}}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 {{if .Busy}}<meta http-equiv="refresh" content="10">{{end}}
-<title>Learning material</title>
+<title>{{T . "page.title"}}</title>
 <style>{{.Fonts}}` + indexCSS + `</style>
 </head>
 <body>
@@ -835,13 +866,13 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
-  <div class="brand">{{if .User}}{{.User}}{{else}}Worksheets{{end}}</div>
-  <a class="nav-item{{if and (not .Manage) (not .FinishedView) (not .PublicView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} Home</a>
-  <a class="nav-item{{if .PublicView}} active{{end}}" href="/?public=1">{{iconGlobe}} Public Worksheets</a>
-  <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} Finished Worksheets</a>
-  <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} Manage</a>
+  <div class="brand">{{if .User}}{{.User}}{{else}}{{T . "page.title"}}{{end}}</div>
+  <a class="nav-item{{if and (not .Manage) (not .FinishedView) (not .PublicView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} {{T . "nav.home"}}</a>
+  <a class="nav-item{{if .PublicView}} active{{end}}" href="/?public=1">{{iconGlobe}} {{T . "nav.public"}}</a>
+  <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} {{T . "nav.finished"}}</a>
+  <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} {{T . "nav.manage"}}</a>
   {{if .Tags}}
-  <div class="nav-section">My worksheets</div>
+  <div class="nav-section">{{T . "section.myworksheets"}}</div>
   {{range .Tags}}
   <a class="nav-item{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>
   {{range .Children}}<a class="nav-item sub{{if eq $.ActiveTagID .ID}} active{{end}}" href="/?tag={{.ID}}">{{.Name}}</a>{{end}}
@@ -849,7 +880,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-{{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
+{{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">{{T . "topbar.viewingas"}} {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="{{T . "ph.username"}}" aria-label="{{T . "ph.viewasuser"}}"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">{{T . "topbar.viewas"}}</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">{{T . "topbar.stop"}}</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">{{T . "topbar.publicpage"}}</a><form method="POST" action="/account/sign-out"><button type="submit">{{T . "topbar.signout"}}</button></form><form class="lang-picker" method="POST" action="/language"><input type="hidden" name="next" value="{{$.RequestPath}}"><button type="submit" name="lang" value="en" class="lang{{if ne .Lang "de"}} on{{end}}" aria-label="English">EN</button><button type="submit" name="lang" value="de" class="lang{{if eq .Lang "de"}} on{{end}}" aria-label="Deutsch">DE</button></form></div></div>{{end}}
 <header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="paint-line">{{rainbowText "Unleash your creativity!"}}<span class="paintbrush" aria-hidden="true">🖌️</span>{{paintStroke}}</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
@@ -860,34 +891,34 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 
 {{if and .FinishedView (not .Static)}}
 <section aria-labelledby="worksheets-heading">
-<h2 id="worksheets-heading">Finished worksheets <span class="count">({{len .FinishedWorksheets}})</span></h2>
+<h2 id="worksheets-heading">{{T . "section.finished"}} <span class="count">({{len .FinishedWorksheets}})</span></h2>
 {{if .FinishedWorksheets}}
 <table class="worksheets">
-<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th><th>State</th><th></th></tr></thead>
+<thead><tr><th>{{T . "col.worksheet"}}</th><th>{{T . "col.updated"}}</th><th>{{T . "col.details"}}</th><th>{{T . "col.state"}}</th><th></th></tr></thead>
 <tbody>{{template "worksheet-rows" rowSet . .FinishedWorksheets}}</tbody>
 </table>
-{{else}}<p class="meta">No finished worksheets yet. Use the "Mark as finished" button on a worksheet to file it here.</p>{{end}}
+{{else}}<p class="meta">{{T . "empty.finished"}}</p>{{end}}
 </section>
 {{else if and .PublicView (not .Static)}}
 <section aria-labelledby="worksheets-heading">
-<h2 id="worksheets-heading">Public worksheets <span class="count">({{len .PublicWorksheets}})</span></h2>
-<p class="meta">These worksheets are visible to anyone on <a href="/worksheets/{{.User}}/index">your public page</a>.</p>
+<h2 id="worksheets-heading">{{T . "section.public"}} <span class="count">({{len .PublicWorksheets}})</span></h2>
+<p class="meta">{{T . "public.visible"}} <a href="/worksheets/{{.User}}/index">{{T . "settings.publicpage"}}</a>.</p>
 {{if .PublicWorksheets}}
 <table class="worksheets">
-<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th><th>State</th><th></th></tr></thead>
+<thead><tr><th>{{T . "col.worksheet"}}</th><th>{{T . "col.updated"}}</th><th>{{T . "col.details"}}</th><th>{{T . "col.state"}}</th><th></th></tr></thead>
 <tbody>{{template "worksheet-rows" rowSet . .PublicWorksheets}}</tbody>
 </table>
-{{else}}<p class="meta">No public worksheets yet. Set a worksheet's visibility to "Public" under "Worksheet settings" to list it here.</p>{{end}}
+{{else}}<p class="meta">{{T . "empty.public"}}</p>{{end}}
 </section>
 {{else}}
 
 {{if and (not .Static) (not .FinishedView)}}
 <section class="new-request">
-<h2>What can I do for you?</h2>
+<h2>{{T . "prompt.newrequest"}}</h2>
 <form class="ask" method="POST" action="/requests">
   <input type="hidden" name="kind" value="new">
-  <textarea name="body" required placeholder="Which subject, topic and level? What should the tasks look like?"></textarea>
-  <button type="submit">Send request</button>
+  <textarea name="body" required placeholder="{{T . "ph.newworksheet"}}"></textarea>
+  <button type="submit">{{T . "button.sendrequest"}}</button>
 </form>
 </section>
 {{end}}
@@ -896,13 +927,13 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{$active := .ActiveRequests}}
 {{if $active}}
 <section aria-labelledby="updates-heading">
-<h2 id="updates-heading">Updates in progress <span class="count">({{len $active}})</span></h2>
+<h2 id="updates-heading">{{T . "updates.inprogress"}} <span class="count">({{len $active}})</span></h2>
 <table class="active">
-<thead><tr><th>State</th><th>Request</th><th>Last update</th></tr></thead>
+<thead><tr><th>{{T . "col.state"}}</th><th>{{T . "col.request"}}</th><th>{{T . "col.lastupdate"}}</th></tr></thead>
 <tbody>
 {{range $active}}
 <tr id="request-{{.ID}}">
-  <td><span class="status {{.Status}}">{{statusLabel .Status}}</span><span class="status-help">{{statusHelp .Status}}</span></td>
+  <td><span class="status {{.Status}}">{{statusLabel $.Lang .Status}}</span><span class="status-help">{{statusHelp $.Lang .Status}}</span></td>
   <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>
     <div class="request-meta">Request #{{.ID}}{{if .Author}} · {{.Author}}{{else if .Requester}} · {{.Requester}}{{end}} · submitted {{.CreatedAt.Format "2 Jan 2006, 15:04"}}</div>
     {{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}
@@ -919,14 +950,14 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <section aria-labelledby="worksheets-heading">
 <h2 id="worksheets-heading">{{.SectionHeading}} <span class="count">({{len .ShownWorksheets}})</span></h2>
 <table class="worksheets">
-<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
+<thead><tr><th>{{T . "col.worksheet"}}</th><th>{{T . "col.updated"}}</th><th>{{T . "col.details"}}</th>{{if not .Static}}<th>{{T . "col.state"}}</th>{{end}}<th></th></tr></thead>
 <tbody>{{template "worksheet-rows" rowSet . .ShownWorksheets}}</tbody>
 </table>
 {{$finished := .ShownFinishedWorksheets}}
 {{if $finished}}
-<details class="finished-heading"{{if .Static}} open{{end}}><summary>Finished worksheets <span class="count">({{len $finished}})</span></summary>
+<details class="finished-heading"{{if .Static}} open{{end}}><summary>{{T . "section.finished"}} <span class="count">({{len $finished}})</span></summary>
 <table class="worksheets">
-<thead><tr><th>Worksheet</th><th>Updated</th><th>Details</th>{{if not .Static}}<th>State</th>{{end}}<th></th></tr></thead>
+<thead><tr><th>{{T . "col.worksheet"}}</th><th>{{T . "col.updated"}}</th><th>{{T . "col.details"}}</th>{{if not .Static}}<th>{{T . "col.state"}}</th>{{end}}<th></th></tr></thead>
 <tbody>{{template "worksheet-rows" rowSet . $finished}}</tbody>
 </table>
 </details>
@@ -936,9 +967,9 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{if not .Static}}
 {{if .Admin}}
 {{$completed := .CompletedRequests}}{{if $completed}}
-<section><h2>Recent completed work</h2>
-<table><thead><tr><th>State</th><th>Request</th><th>Date</th></tr></thead><tbody>
-{{range $completed}}<tr><td><span class="status {{.Status}}">{{statusLabel .Status}}</span></td>
+<section><h2>{{T . "updates.recent"}}</h2>
+<table><thead><tr><th>{{T . "col.state"}}</th><th>{{T . "col.request"}}</th><th>{{T . "col.date"}}</th></tr></thead><tbody>
+{{range $completed}}<tr><td><span class="status {{.Status}}">{{statusLabel $.Lang .Status}}</span></td>
 <td><div class="title">{{$.RequestTitle .}}</div><div class="request-body">{{.Body}}</div>{{if .Note}}<p class="request-note">{{.Note}}</p>{{end}}</td>
 <td class="date">{{.UpdatedAt.Format "2 Jan 2006, 15:04"}}</td></tr>{{end}}
 </tbody></table></section>
@@ -947,7 +978,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <div class="adminbar">
 <span>{{if .Admin}}Admin controls are on.{{else}}Admin controls are off.{{end}}</span>
 <form method="POST" action="/admin"><input type="hidden" name="admin" value="{{if .Admin}}off{{else}}on{{end}}"><button type="submit">{{if .Admin}}Turn off admin controls{{else}}Turn on admin controls{{end}}</button></form>
-{{if .Admin}}<form method="POST" action="/work/rebuild"><button type="submit">Rebuild PDFs</button></form>{{end}}
+{{if .Admin}}<form method="POST" action="/work/rebuild"><button type="submit">{{T . "action.rebuild"}}</button></form>{{end}}
 </div>
 {{if and .Admin .Log}}<pre class="log">{{range .Log}}{{.}}
 {{end}}</pre>{{end}}

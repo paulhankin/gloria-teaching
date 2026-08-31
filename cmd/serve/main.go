@@ -88,6 +88,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		Actor:          account.ActorUsername(r),
 		CanImpersonate: account.IsAdmin(r),
 		WorksheetTags:  make(map[string]map[int64]bool),
+		Lang:           langOf(r),
+		RequestPath:    r.URL.RequestURI(),
 	}
 	owner := account.Email(r)
 	tags, err := db.Tags(owner)
@@ -147,6 +149,29 @@ func index(w http.ResponseWriter, r *http.Request) {
 }
 
 // flash reads and clears the one-shot confirmation message.
+// langOf returns the UI language cookie ("de" or anything else = English).
+func langOf(r *http.Request) string {
+	if c, err := r.Cookie("lm_lang"); err == nil && c.Value == "de" {
+		return "de"
+	}
+	return "en"
+}
+
+// setLanguage stores the chosen UI language and returns to the page the user
+// was on.
+func setLanguage(w http.ResponseWriter, r *http.Request) {
+	lang := r.FormValue("lang")
+	if lang != "de" {
+		lang = "en"
+	}
+	http.SetCookie(w, &http.Cookie{Name: "lm_lang", Value: lang, Path: "/", MaxAge: 365 * 24 * 3600})
+	next := r.FormValue("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/"
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
+}
+
 func flash(w http.ResponseWriter, r *http.Request) string {
 	c, err := r.Cookie("lm_flash")
 	if err != nil || c.Value == "" {
@@ -805,6 +830,7 @@ func main() {
 	mux.HandleFunc("/worksheets/", worksheetRoutes)
 	mux.HandleFunc("/work/", work)
 	mux.HandleFunc("/admin", postAdmin)
+	mux.HandleFunc("/language", setLanguage)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/" || r.URL.Path == "/index.html":
