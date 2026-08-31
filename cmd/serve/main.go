@@ -91,6 +91,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 		Lang:           langOf(r),
 		RequestPath:    r.URL.RequestURI(),
 	}
+	if me, err := db.UserByEmail(account.Email(r)); err == nil {
+		d.HasAvatar = len(me.Avatar) > 0
+	}
 	owner := account.Email(r)
 	tags, err := db.Tags(owner)
 	if err != nil {
@@ -342,6 +345,56 @@ func work(w http.ResponseWriter, r *http.Request) {
 	}
 	setFlash(w, action)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// serveAvatar serves a user's profile picture.
+func serveAvatar(w http.ResponseWriter, r *http.Request) {
+	username := strings.TrimPrefix(r.URL.Path, "/avatar/")
+	user, err := db.UserByUsername(username)
+	if err != nil || len(user.Avatar) == 0 {
+		http.NotFound(w, r)
+		return
+	}
+	w.Header().Set("Content-Type", http.DetectContentType(user.Avatar))
+	w.Header().Set("Cache-Control", "public, max-age=300")
+	w.Write(user.Avatar)
+}
+
+// setAvatar stores the signed-in user's uploaded profile picture.
+func setAvatar(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseMultipartForm(4 << 20); err != nil { // 4 MiB cap
+		http.Error(w, "upload too large", http.StatusBadRequest)
+		return
+	}
+	file, _, err := r.FormFile("avatar")
+	if err != nil {
+		http.Error(w, "choose an image", http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+	data, err := io.ReadAll(io.LimitReader(file, 4<<20))
+	if err != nil || len(data) == 0 {
+		http.Error(w, "could not read image", http.StatusBadRequest)
+		return
+	}
+	if ct := http.DetectContentType(data); !strings.HasPrefix(ct, "image/") {
+		http.Error(w, "that is not an image", http.StatusBadRequest)
+		return
+	}
+	user, err := db.UserByEmail(account.Email(r))
+	if err != nil {
+		http.Error(w, "account not found", http.StatusBadRequest)
+		return
+	}
+	if err := db.SetUserAvatar(user.ID, data); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	next := r.FormValue("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/"
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 // serveLogo serves the embedded Teacher's Friend logo (the handshake image).
@@ -831,6 +884,8 @@ func main() {
 	mux.HandleFunc("/work/", work)
 	mux.HandleFunc("/admin", postAdmin)
 	mux.HandleFunc("/language", setLanguage)
+	mux.HandleFunc("/account/avatar", setAvatar)
+	mux.HandleFunc("/avatar/", serveAvatar)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/" || r.URL.Path == "/index.html":

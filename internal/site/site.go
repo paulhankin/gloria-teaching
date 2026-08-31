@@ -84,6 +84,17 @@ type Data struct {
 	// RequestPath is the current request path + query, so the language picker
 	// can redirect back to the same page.
 	RequestPath string
+	// HasAvatar reports whether the signed-in user has a profile picture.
+	HasAvatar bool
+}
+
+// AvatarURL is the signed-in user's profile picture (with a cache-buster when
+// it exists), or empty when there is none.
+func (d Data) AvatarURL() string {
+	if !d.HasAvatar || d.User == "" {
+		return ""
+	}
+	return "/avatar/" + d.User
 }
 
 // T returns the UI string for key in the current language (d.Lang).
@@ -480,6 +491,18 @@ const indexCSS = `
     padding:20px 0; position:sticky; top:0; height:100vh; overflow-y:auto; }
   .sidebar .brand { padding:0 18px 16px; font-weight:700; font-size:16px;
     border-bottom:1px solid var(--line); margin-bottom:10px; color:var(--ink); }
+  .sidebar .brand .who { display:flex; align-items:center; gap:9px; }
+  /* Round profile picture (or initial placeholder) next to the username. */
+  .avatar { width:34px; height:34px; border-radius:50%; object-fit:cover;
+    box-shadow:0 0 0 2px #fff, 0 0 0 3.5px #b9c6da; flex-shrink:0; }
+  .avatar-empty { display:inline-flex; align-items:center; justify-content:center;
+    background:#eaf1fd; color:#2f6fae; font-weight:800; font-size:16px; }
+  .avatar-form { margin:6px 0 0; }
+  .avatar-edit { display:inline-flex; align-items:center; justify-content:center;
+    width:24px; height:24px; border-radius:50%; background:#eef2f7; color:#667085;
+    cursor:pointer; font-size:12px; }
+  .avatar-edit:hover { background:#e0e7f0; color:var(--ink); }
+  .avatar-edit input { display:none; }
   .nav-item { display:flex; align-items:center; gap:10px; padding:9px 18px;
     color:var(--ink); text-decoration:none; font-size:14px; }
   .nav-item svg { width:17px; height:17px; flex-shrink:0; color:var(--muted); }
@@ -831,6 +854,12 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
 	"flagEN":      func() template.HTML { return template.HTML(flagENSVG) },
 	"flagDE":      func() template.HTML { return template.HTML(flagDESVG) },
+	"avatarInitial": func(username string) string {
+		for _, r := range username {
+			return strings.ToUpper(string(r))
+		}
+		return "?"
+	},
 	"colorTitle":  colorTitle,
 	"rainbowText": rainbowText,
 	"paintStroke": func() template.HTML { return template.HTML(paintStrokeSVG) },
@@ -874,7 +903,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
-  <div class="brand">{{if .User}}{{.User}}{{else}}{{T . "page.title"}}{{end}}</div>
+  <div class="brand">{{if .User}}<span class="who">{{if .HasAvatar}}<img class="avatar" src="{{.AvatarURL}}" alt="">{{else}}<span class="avatar avatar-empty" aria-hidden="true">{{avatarInitial .User}}</span>{{end}}{{.User}}</span><form class="avatar-form" method="POST" action="/account/avatar" enctype="multipart/form-data"><input type="hidden" name="next" value="{{.RequestPath}}"><label class="avatar-edit" title="{{T . "avatar.change"}}">✎<input type="file" name="avatar" accept="image/*" onchange="this.form.submit()"></label></form>{{else}}{{T . "page.title"}}{{end}}</div>
   <a class="nav-item{{if and (not .Manage) (not .FinishedView) (not .PublicView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} {{T . "nav.home"}}</a>
   <a class="nav-item{{if .PublicView}} active{{end}}" href="/?public=1">{{iconGlobe}} {{T . "nav.public"}}</a>
   <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} {{T . "nav.finished"}}</a>

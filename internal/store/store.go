@@ -79,6 +79,7 @@ type User struct {
 	Email        string
 	PasswordHash []byte
 	Verified     bool
+	Avatar       []byte // profile picture (image bytes), empty = none
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 }
@@ -174,6 +175,7 @@ CREATE TABLE IF NOT EXISTS users (
   email         TEXT NOT NULL COLLATE NOCASE UNIQUE,
   password_hash BLOB NOT NULL,
   verified_at   INTEGER NOT NULL DEFAULT 0,
+  avatar        BLOB NOT NULL DEFAULT '',
   created_at    INTEGER NOT NULL,
   updated_at    INTEGER NOT NULL
 );
@@ -225,6 +227,11 @@ CREATE INDEX IF NOT EXISTS worksheet_shares_email ON worksheet_shares(email);`
 	if _, err := d.Exec("ALTER TABLE users ADD COLUMN username TEXT NOT NULL DEFAULT ''"); err != nil &&
 		!strings.Contains(err.Error(), "duplicate column") {
 		return fmt.Errorf("store: adding column username: %w", err)
+	}
+	// Profile pictures: databases created before avatars lack this column.
+	if _, err := d.Exec("ALTER TABLE users ADD COLUMN avatar BLOB NOT NULL DEFAULT ''"); err != nil &&
+		!strings.Contains(err.Error(), "duplicate column") {
+		return fmt.Errorf("store: adding column avatar: %w", err)
 	}
 	if err := migrateUsernames(d); err != nil {
 		return err
@@ -467,24 +474,24 @@ func (db *DB) CreateUser(username, email string, passwordHash []byte) (User, err
 
 // UserByID returns an account by ID.
 func (db *DB) UserByID(id int64) (User, error) {
-	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE id = ?`, id)
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, avatar, created_at, updated_at FROM users WHERE id = ?`, id)
 }
 
 // UserByEmail returns an account by its case-insensitive email address.
 func (db *DB) UserByEmail(email string) (User, error) {
-	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE email = ?`, email)
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, avatar, created_at, updated_at FROM users WHERE email = ?`, email)
 }
 
 // UserByUsername returns an account by its unique username.
 func (db *DB) UserByUsername(username string) (User, error) {
-	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users WHERE username = ?`, username)
+	return db.scanUser(`SELECT id, username, email, password_hash, verified_at, avatar, created_at, updated_at FROM users WHERE username = ?`, username)
 }
 
 func (db *DB) scanUser(query string, arg any) (User, error) {
 	var u User
 	var verified, created, updated int64
 	err := db.sql.QueryRow(query, arg).Scan(
-		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &created, &updated)
+		&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &u.Avatar, &created, &updated)
 	if err != nil {
 		return User{}, err
 	}
@@ -494,9 +501,16 @@ func (db *DB) scanUser(query string, arg any) (User, error) {
 	return u, nil
 }
 
+// SetUserAvatar stores a user's profile picture (empty clears it).
+func (db *DB) SetUserAvatar(id int64, avatar []byte) error {
+	_, err := db.sql.Exec(`UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?`,
+		avatar, time.Now().Unix(), id)
+	return err
+}
+
 // Users returns all accounts ordered by username.
 func (db *DB) Users() ([]User, error) {
-	rows, err := db.sql.Query(`SELECT id, username, email, password_hash, verified_at, created_at, updated_at FROM users ORDER BY username`)
+	rows, err := db.sql.Query(`SELECT id, username, email, password_hash, verified_at, avatar, created_at, updated_at FROM users ORDER BY username`)
 	if err != nil {
 		return nil, err
 	}
@@ -505,7 +519,7 @@ func (db *DB) Users() ([]User, error) {
 	for rows.Next() {
 		var u User
 		var verified, created, updated int64
-		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &created, &updated); err != nil {
+		if err := rows.Scan(&u.ID, &u.Username, &u.Email, &u.PasswordHash, &verified, &u.Avatar, &created, &updated); err != nil {
 			return nil, err
 		}
 		u.Verified = verified != 0

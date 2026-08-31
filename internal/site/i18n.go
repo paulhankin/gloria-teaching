@@ -16,6 +16,7 @@ var translations = map[string]map[string]string{
 		"topbar.stop":       "Stop impersonating",
 		"topbar.publicpage": "Public page",
 		"topbar.signout":    "Sign out",
+		"avatar.change":     "Change profile picture",
 		"lang.label":        "Language",
 
 		"section.myworksheets": "My worksheets",
@@ -112,6 +113,7 @@ var translations = map[string]map[string]string{
 		"topbar.stop":       "Imitation beenden",
 		"topbar.publicpage": "Öffentliche Seite",
 		"topbar.signout":    "Abmelden",
+		"avatar.change":     "Profilbild ändern",
 		"lang.label":        "Sprache",
 
 		"section.myworksheets": "Meine Arbeitsblätter",
