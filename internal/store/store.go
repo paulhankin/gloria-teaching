@@ -260,6 +260,23 @@ CREATE TABLE IF NOT EXISTS worksheet_tags (
 	if _, err := d.Exec(tagSchema); err != nil {
 		return fmt.Errorf("store: tag schema: %w", err)
 	}
+	// Friendships connect two users. A row is created by the requester with
+	// status 'pending' and flipped to 'accepted' (or deleted) by the recipient.
+	// user_a < user_b keeps one row per pair.
+	const friendSchema = `
+CREATE TABLE IF NOT EXISTS friendships (
+  id         INTEGER PRIMARY KEY AUTOINCREMENT,
+  user_a     TEXT NOT NULL COLLATE NOCASE REFERENCES users(username) ON DELETE CASCADE,
+  user_b     TEXT NOT NULL COLLATE NOCASE REFERENCES users(username) ON DELETE CASCADE,
+  status     TEXT NOT NULL DEFAULT 'pending',
+  requester  TEXT NOT NULL COLLATE NOCASE,
+  created_at INTEGER NOT NULL,
+  updated_at INTEGER NOT NULL,
+  UNIQUE (user_a, user_b)
+);`
+	if _, err := d.Exec(friendSchema); err != nil {
+		return fmt.Errorf("store: friendship schema: %w", err)
+	}
 	return nil
 }
 
@@ -506,6 +523,103 @@ func (db *DB) SetUserAvatar(id int64, avatar []byte) error {
 	_, err := db.sql.Exec(`UPDATE users SET avatar = ?, updated_at = ? WHERE id = ?`,
 		avatar, time.Now().Unix(), id)
 	return err
+}
+
+// Friendship is one row of the friendships table: a pending request or an
+// accepted friendship between two usernames (user_a < user_b).
+type Friendship struct {
+	ID        int64
+	UserA     string
+	UserB     string
+	Status    string // "pending" or "accepted"
+	Requester string // username who sent the request
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// FriendOf returns the other party's username from the perspective of `me`.
+func (f Friendship) FriendOf(me string) string {
+	if strings.EqualFold(f.UserA, me) {
+		return f.UserB
+	}
+	return f.UserA
+}
+
+// pairOrders two usernames so user_a < user_b, keeping one row per pair.
+func friendPair(x, y string) (a, b string) {
+	if strings.ToLower(x) < strings.ToLower(y) {
+		return x, y
+	}
+	return y, x
+}
+
+// RequestFriendship records a pending friend request from `from` to `to`.
+// It is a no-op (returns the existing row) if a row already exists.
+func (db *DB) RequestFriendship(from, to string) error {
+	a, b := friendPair(from, to)
+	now := time.Now().Unix()
+	_, err := db.sql.Exec(
+		`INSERT INTO friendships (user_a, user_b, status, requester, created_at, updated_at)
+		 VALUES (?,?,?,?,?,?)
+		 ON CONFLICT (user_a, user_b) DO NOTHING`,
+		a, b, "pending", from, now, now)
+	return err
+}
+
+// AcceptFriendship marks a pending request as accepted. Only the recipient
+// (not the requester) may accept.
+func (db *DB) AcceptFriendship(id int64, recipient string) error {
+	res, err := db.sql.Exec(
+		`UPDATE friendships SET status = 'accepted', updated_at = ?
+		 WHERE id = ? AND status = 'pending' AND requester <> ?`,
+		time.Now().Unix(), id, recipient)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("store: no such pending request for %s", recipient)
+	}
+	return nil
+}
+
+// DeleteFriendship removes a friendship row (declining a request, cancelling
+// one you sent, or unfriending). Either party may remove it.
+func (db *DB) DeleteFriendship(id int64, party string) error {
+	res, err := db.sql.Exec(
+		`DELETE FROM friendships WHERE id = ? AND (user_a = ? OR user_b = ?)`,
+		id, party, party)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return fmt.Errorf("store: no such friendship for %s", party)
+	}
+	return nil
+}
+
+// Friendships returns every friendship row that involves `username`,
+// newest first. Callers split it into friends / incoming / outgoing.
+func (db *DB) Friendships(username string) ([]Friendship, error) {
+	rows, err := db.sql.Query(
+		`SELECT id, user_a, user_b, status, requester, created_at, updated_at
+		 FROM friendships WHERE user_a = ? OR user_b = ? ORDER BY updated_at DESC`,
+		username, username)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var out []Friendship
+	for rows.Next() {
+		var f Friendship
+		var created, updated int64
+		if err := rows.Scan(&f.ID, &f.UserA, &f.UserB, &f.Status, &f.Requester, &created, &updated); err != nil {
+			return nil, err
+		}
+		f.CreatedAt = time.Unix(created, 0)
+		f.UpdatedAt = time.Unix(updated, 0)
+		out = append(out, f)
+	}
+	return out, rows.Err()
 }
 
 // Users returns all accounts ordered by username.

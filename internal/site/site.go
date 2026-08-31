@@ -89,6 +89,21 @@ type Data struct {
 	// AvatarVersion is a short fingerprint of the picture, used to bust the
 	// browser cache when it changes.
 	AvatarVersion string
+	// FriendsView renders the friends page instead of the worksheet list.
+	FriendsView bool
+	// Friends, IncomingRequests and OutgoingRequests are the signed-in user's
+	// friendships, split by state, for the friends page.
+	Friends          []FriendEntry
+	IncomingRequests []FriendEntry
+	OutgoingRequests []FriendEntry
+}
+
+// FriendEntry is one friendship on the friends page: the other user's name and
+// avatar, and the friendship row's ID (for accept/decline/remove).
+type FriendEntry struct {
+	ID        int64  // friendship row
+	Username  string // the friend / requester / recipient
+	HasAvatar bool
 }
 
 // AvatarURL is the signed-in user's profile picture (with a cache-buster when
@@ -645,6 +660,18 @@ const indexCSS = `
     padding-top:14px; border-top:1px solid var(--line); color:var(--muted); font-size:13px; }
   .adminbar form { margin:0; }
   h3 { font-size:15px; margin:26px 0 8px; }
+  /* Friends page: rows of people with their avatar and an action button. */
+  .friend-list { list-style:none; margin:0; padding:0; }
+  .friend-list li { display:flex; align-items:center; justify-content:space-between;
+    gap:12px; padding:9px 0; border-bottom:1px solid var(--line); }
+  .friend-who { display:flex; align-items:center; gap:10px; }
+  .friend-who .meta { font-weight:400; }
+  .avatar-sm { width:30px; height:30px; box-shadow:0 0 0 2px #fff, 0 0 0 3px #b9c6da;
+    font-size:14px; }
+  .friend-actions { display:flex; gap:8px; }
+  .friend-actions form { margin:0; }
+  .friend-add { display:flex; gap:8px; max-width:520px; }
+  .friend-add input { flex:1; }
   form.tag-add { display:flex; gap:7px; flex-wrap:wrap; max-width:620px; }
   form.tag-add input[type=text] { flex:1; min-width:200px; }
   form.tag-add select { padding:9px 10px; border:1px solid #98a2b3; border-radius:3px;
@@ -745,6 +772,65 @@ const worksheetRows = `
 {{end}}
 `
 
+const friendsView = `
+{{define "friends"}}
+<section aria-labelledby="friends-heading">
+<h2 id="friends-heading">{{T . "friends.title"}}</h2>
+
+<h3>{{T . "friends.add"}}</h3>
+<form class="ask friend-add" method="POST" action="/friends/request">
+  <input type="hidden" name="next" value="/?friends=1">
+  <input type="text" name="username" list="friend-users" required placeholder="{{T . "ph.username"}}">
+  <datalist id="friend-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist>
+  <button type="submit">{{T . "friends.send"}}</button>
+</form>
+
+{{if .IncomingRequests}}
+<h3>{{T . "friends.incoming"}} <span class="count">({{len .IncomingRequests}})</span></h3>
+<ul class="friend-list">
+{{range .IncomingRequests}}
+<li>
+  <span class="friend-who">{{if .HasAvatar}}<img class="avatar avatar-sm" src="/avatar/{{.Username}}" alt="">{{else}}<span class="avatar avatar-sm avatar-empty" aria-hidden="true">{{avatarInitial .Username}}</span>{{end}}<strong>{{.Username}}</strong> <span class="meta">{{T $ "friends.wants"}}</span></span>
+  <span class="friend-actions">
+    <form method="POST" action="/friends/accept"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/?friends=1"><button type="submit">{{T $ "friends.accept"}}</button></form>
+    <form method="POST" action="/friends/decline"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/?friends=1"><button class="reject" type="submit">{{T $ "friends.decline"}}</button></form>
+  </span>
+</li>
+{{end}}
+</ul>
+{{end}}
+
+<h3>{{T . "friends.yours"}} <span class="count">({{len .Friends}})</span></h3>
+{{if .Friends}}
+<ul class="friend-list">
+{{range .Friends}}
+<li>
+  <span class="friend-who">{{if .HasAvatar}}<img class="avatar avatar-sm" src="/avatar/{{.Username}}" alt="">{{else}}<span class="avatar avatar-sm avatar-empty" aria-hidden="true">{{avatarInitial .Username}}</span>{{end}}<strong>{{.Username}}</strong></span>
+  <span class="friend-actions">
+    <form method="POST" action="/friends/decline"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/?friends=1"><button class="reject" type="submit">{{T $ "friends.remove"}}</button></form>
+  </span>
+</li>
+{{end}}
+</ul>
+{{else}}<p class="meta">{{T . "friends.none"}}</p>{{end}}
+
+{{if .OutgoingRequests}}
+<h3>{{T . "friends.outgoing"}} <span class="count">({{len .OutgoingRequests}})</span></h3>
+<ul class="friend-list">
+{{range .OutgoingRequests}}
+<li>
+  <span class="friend-who">{{if .HasAvatar}}<img class="avatar avatar-sm" src="/avatar/{{.Username}}" alt="">{{else}}<span class="avatar avatar-sm avatar-empty" aria-hidden="true">{{avatarInitial .Username}}</span>{{end}}<strong>{{.Username}}</strong> <span class="meta">{{T $ "friends.pending"}}</span></span>
+  <span class="friend-actions">
+    <form method="POST" action="/friends/decline"><input type="hidden" name="id" value="{{.ID}}"><input type="hidden" name="next" value="/?friends=1"><button class="reject" type="submit">{{T $ "friends.cancel"}}</button></form>
+  </span>
+</li>
+{{end}}
+</ul>
+{{end}}
+</section>
+{{end}}
+`
+
 const manageView = `
 {{define "manage"}}
 <section aria-labelledby="manage-heading">
@@ -820,6 +906,7 @@ const (
 	iconGlobeSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`
 	iconCheckSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+	iconHeartSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>`
 	// flagEN is the Union Jack; flagDE is half German tricolour, half Swiss flag.
 	flagENSVG = `<svg class="flag" viewBox="0 0 60 40" aria-hidden="true"><rect width="60" height="40" fill="#012169"/><path d="M0,0 L60,40 M60,0 L0,40" stroke="#fff" stroke-width="8"/><path d="M0,0 L60,40 M60,0 L0,40" stroke="#C8102E" stroke-width="4"/><path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13"/><path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="8"/></svg>`
 	flagDESVG = `<svg class="flag" viewBox="0 0 60 40" aria-hidden="true"><rect x="0" y="0" width="30" height="13.33" fill="#000"/><rect x="0" y="13.33" width="30" height="13.33" fill="#DD0000"/><rect x="0" y="26.66" width="30" height="13.34" fill="#FFCC00"/><rect x="30" y="0" width="30" height="40" fill="#DA291C"/><rect x="42" y="9" width="6" height="22" fill="#fff"/><rect x="34" y="17" width="22" height="6" fill="#fff"/><line x1="30" y1="0" x2="30" y2="40" stroke="#999" stroke-width="1"/></svg>`
@@ -855,6 +942,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
+	"iconHeart":   func() template.HTML { return template.HTML(iconHeartSVG) },
 	"flagEN":      func() template.HTML { return template.HTML(flagENSVG) },
 	"flagDE":      func() template.HTML { return template.HTML(flagDESVG) },
 	"avatarInitial": func(username string) string {
@@ -890,7 +978,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"row": func(s rowSet, w Worksheet) row {
 		return row{Worksheet: w, data: s.Data}
 	},
-}).Parse(worksheetRows + requestActions + manageView + `<!DOCTYPE html>
+}).Parse(worksheetRows + requestActions + manageView + friendsView + `<!DOCTYPE html>
 <html lang="{{if eq .Lang "de"}}de{{else}}en{{end}}">
 <head>
 <meta charset="utf-8">
@@ -910,6 +998,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   <a class="nav-item{{if and (not .Manage) (not .FinishedView) (not .PublicView) (eq .ActiveTagID 0)}} active{{end}}" href="/">{{iconHome}} {{T . "nav.home"}}</a>
   <a class="nav-item{{if .PublicView}} active{{end}}" href="/?public=1">{{iconGlobe}} {{T . "nav.public"}}</a>
   <a class="nav-item{{if .FinishedView}} active{{end}}" href="/?finished=1">{{iconCheck}} {{T . "nav.finished"}}</a>
+  <a class="nav-item{{if .FriendsView}} active{{end}}" href="/?friends=1">{{iconHeart}} {{T . "nav.friends"}}</a>
   <a class="nav-item{{if .Manage}} active{{end}}" href="/?manage=1">{{iconCog}} {{T . "nav.manage"}}</a>
   {{if .Tags}}
   <div class="nav-section">{{T . "section.myworksheets"}}</div>
@@ -927,6 +1016,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 
 {{if and .Manage (not .Static)}}
 {{template "manage" .}}
+{{else if and .FriendsView (not .Static)}}
+{{template "friends" .}}
 {{else}}
 
 {{if and .FinishedView (not .Static)}}

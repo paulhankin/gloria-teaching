@@ -265,3 +265,62 @@ func TestCanViewWorksheet(t *testing.T) {
 		}
 	}
 }
+
+func TestFriendshipRequestAcceptDecline(t *testing.T) {
+	db, err := Open(filepath.Join(t.TempDir(), "test.db"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+	for _, u := range [][2]string{{"alice", "alice@example.com"}, {"bob", "bob@example.com"}, {"carol", "carol@example.com"}} {
+		if _, err := db.CreateUser(u[0], u[1], []byte("hash")); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	// alice befriends bob.
+	if err := db.RequestFriendship("alice", "bob"); err != nil {
+		t.Fatal(err)
+	}
+	// Duplicate request is a no-op.
+	if err := db.RequestFriendship("alice", "bob"); err != nil {
+		t.Fatal(err)
+	}
+	fs, err := db.Friendships("bob")
+	if err != nil || len(fs) != 1 {
+		t.Fatalf("bob friendships = %#v, %v", fs, err)
+	}
+	pending := fs[0]
+	if pending.Status != "pending" || pending.Requester != "alice" || pending.FriendOf("bob") != "alice" {
+		t.Fatalf("pending = %#v", pending)
+	}
+
+	// The requester may not accept their own request.
+	if err := db.AcceptFriendship(pending.ID, "alice"); err == nil {
+		t.Fatal("requester accepted their own request")
+	}
+	// The recipient accepts.
+	if err := db.AcceptFriendship(pending.ID, "bob"); err != nil {
+		t.Fatal(err)
+	}
+	fs, _ = db.Friendships("alice")
+	if len(fs) != 1 || fs[0].Status != "accepted" {
+		t.Fatalf("after accept = %#v", fs)
+	}
+
+	// carol declines alice's request: the row is removed.
+	if err := db.RequestFriendship("alice", "carol"); err != nil {
+		t.Fatal(err)
+	}
+	fs, _ = db.Friendships("carol")
+	if len(fs) != 1 {
+		t.Fatalf("carol friendships = %#v", fs)
+	}
+	if err := db.DeleteFriendship(fs[0].ID, "carol"); err != nil {
+		t.Fatal(err)
+	}
+	fs, _ = db.Friendships("carol")
+	if len(fs) != 0 {
+		t.Fatalf("after decline = %#v", fs)
+	}
+}

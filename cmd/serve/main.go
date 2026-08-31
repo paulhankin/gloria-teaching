@@ -116,11 +116,13 @@ func index(w http.ResponseWriter, r *http.Request) {
 		d.WorksheetTags[ws.Path()] = ids
 	}
 	// Navigation state: ?manage=1 for the manage view, ?finished=1 for the
-	// finished list, ?tag=<id> for a category.
+	// finished list, ?friends=1 for the friends page, ?tag=<id> for a category.
 	q := r.URL.Query()
 	switch {
 	case q.Get("manage") == "1":
 		d.Manage = true
+	case q.Get("friends") == "1":
+		d.FriendsView = true
 	case q.Get("finished") == "1":
 		d.FinishedView = true
 	case q.Get("public") == "1":
@@ -133,7 +135,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}
-	if d.CanImpersonate {
+	// The friends page and the admin impersonation switcher both need the user
+	// list (for autocompleting usernames).
+	if d.CanImpersonate || d.FriendsView {
 		users, err := db.Users()
 		if err != nil {
 			http.Error(w, "users: "+err.Error(), http.StatusInternalServerError)
@@ -142,6 +146,9 @@ func index(w http.ResponseWriter, r *http.Request) {
 		for _, user := range users {
 			d.Users = append(d.Users, user.Username)
 		}
+	}
+	if d.FriendsView {
+		loadFriendships(&d, account.Username(r))
 	}
 	rs, err := db.All()
 	if err != nil {
@@ -351,6 +358,95 @@ func work(w http.ResponseWriter, r *http.Request) {
 	}
 	setFlash(w, action)
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// loadFriendships fills the friends page: accepted friends, incoming requests
+// (to accept/decline) and outgoing requests (waiting), each with the other
+// user's avatar.
+func loadFriendships(d *site.Data, me string) {
+	fs, err := db.Friendships(me)
+	if err != nil {
+		return
+	}
+	entry := func(f store.Friendship) site.FriendEntry {
+		other := f.FriendOf(me)
+		e := site.FriendEntry{ID: f.ID, Username: other}
+		if u, err := db.UserByUsername(other); err == nil {
+			e.HasAvatar = len(u.Avatar) > 0
+		}
+		return e
+	}
+	for _, f := range fs {
+		switch {
+		case f.Status == "accepted":
+			d.Friends = append(d.Friends, entry(f))
+		case strings.EqualFold(f.Requester, me):
+			d.OutgoingRequests = append(d.OutgoingRequests, entry(f))
+		default:
+			d.IncomingRequests = append(d.IncomingRequests, entry(f))
+		}
+	}
+}
+
+// requestFriend sends a friend request to another user (by username).
+func requestFriend(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	me := account.Username(r)
+	to := strings.TrimSpace(r.FormValue("username"))
+	if strings.EqualFold(to, me) {
+		http.Error(w, "cannot befriend yourself", http.StatusBadRequest)
+		return
+	}
+	target, err := db.UserByUsername(to)
+	if err != nil || !target.Verified {
+		http.Error(w, "no such user", http.StatusBadRequest)
+		return
+	}
+	if err := db.RequestFriendship(me, target.Username); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+	redirectBack(w, r)
+}
+
+// acceptFriend accepts a pending request addressed to the signed-in user.
+func acceptFriend(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if err := db.AcceptFriendship(id, account.Username(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	redirectBack(w, r)
+}
+
+// removeFriend declines a request, cancels one you sent, or unfriends.
+func removeFriend(w http.ResponseWriter, r *http.Request) {
+	if err := r.ParseForm(); err != nil {
+		http.Error(w, "bad form", http.StatusBadRequest)
+		return
+	}
+	id, _ := strconv.ParseInt(r.FormValue("id"), 10, 64)
+	if err := db.DeleteFriendship(id, account.Username(r)); err != nil {
+		http.Error(w, err.Error(), http.StatusBadRequest)
+		return
+	}
+	redirectBack(w, r)
+}
+
+// redirectBack returns to the page named by the form's next field (or home).
+func redirectBack(w http.ResponseWriter, r *http.Request) {
+	next := r.FormValue("next")
+	if next == "" || !strings.HasPrefix(next, "/") {
+		next = "/"
+	}
+	http.Redirect(w, r, next, http.StatusSeeOther)
 }
 
 // serveAvatar serves a user's profile picture.
@@ -892,6 +988,9 @@ func main() {
 	mux.HandleFunc("/language", setLanguage)
 	mux.HandleFunc("/account/avatar", setAvatar)
 	mux.HandleFunc("/avatar/", serveAvatar)
+	mux.HandleFunc("/friends/request", requestFriend)
+	mux.HandleFunc("/friends/accept", acceptFriend)
+	mux.HandleFunc("/friends/decline", removeFriend)
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		switch {
 		case r.URL.Path == "/" || r.URL.Path == "/index.html":
