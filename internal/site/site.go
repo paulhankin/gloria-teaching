@@ -537,7 +537,10 @@ const indexCSS = `
   /* Language picker (EN/DE) at the far right of the top bar. */
   .lang-picker { display:flex; gap:2px; margin-left:6px; }
   .lang-picker .lang { padding:5px 8px; border:1px solid #c6cfdd; background:#fff;
-    color:var(--muted); cursor:pointer; font-weight:650; font-size:12px; }
+    color:var(--muted); cursor:pointer; font-weight:650; font-size:12px;
+    display:inline-flex; align-items:center; gap:5px; }
+  .lang-picker .lang .flag { width:18px; height:12px; border-radius:2px;
+    box-shadow:0 0 0 1px rgba(0,0,0,.12); flex-shrink:0; }
   .lang-picker .lang:first-child { border-radius:5px 0 0 5px; }
   .lang-picker .lang:last-child { border-radius:0 5px 5px 0; }
   .lang-picker .lang.on { background:#2f6fae; border-color:#2f6fae; color:#fff; }
@@ -791,6 +794,9 @@ const (
 	iconGlobeSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><line x1="2" y1="12" x2="22" y2="12"></line><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>`
 	iconCheckSVG = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path><polyline points="22 4 12 14.01 9 11.01"></polyline></svg>`
 	iconCogSVG   = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>`
+	// flagEN is the Union Jack; flagDE is half German tricolour, half Swiss flag.
+	flagENSVG = `<svg class="flag" viewBox="0 0 60 40" aria-hidden="true"><rect width="60" height="40" fill="#012169"/><path d="M0,0 L60,40 M60,0 L0,40" stroke="#fff" stroke-width="8"/><path d="M0,0 L60,40 M60,0 L0,40" stroke="#C8102E" stroke-width="4"/><path d="M30,0 V40 M0,20 H60" stroke="#fff" stroke-width="13"/><path d="M30,0 V40 M0,20 H60" stroke="#C8102E" stroke-width="8"/></svg>`
+	flagDESVG = `<svg class="flag" viewBox="0 0 60 40" aria-hidden="true"><rect x="0" y="0" width="30" height="13.33" fill="#000"/><rect x="0" y="13.33" width="30" height="13.33" fill="#DD0000"/><rect x="0" y="26.66" width="30" height="13.34" fill="#FFCC00"/><rect x="30" y="0" width="30" height="40" fill="#DA291C"/><rect x="42" y="9" width="6" height="22" fill="#fff"/><rect x="34" y="17" width="22" height="6" fill="#fff"/><line x1="30" y1="0" x2="30" y2="40" stroke="#999" stroke-width="1"/></svg>`
 )
 
 // brandLogoImg is the Teacher's Friend logo (the handshake image), embedded
@@ -823,6 +829,8 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconGlobe":   func() template.HTML { return template.HTML(iconGlobeSVG) },
 	"iconCheck":   func() template.HTML { return template.HTML(iconCheckSVG) },
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
+	"flagEN":      func() template.HTML { return template.HTML(flagENSVG) },
+	"flagDE":      func() template.HTML { return template.HTML(flagDESVG) },
 	"colorTitle":  colorTitle,
 	"rainbowText": rainbowText,
 	"paintStroke": func() template.HTML { return template.HTML(paintStrokeSVG) },
@@ -880,7 +888,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
   {{end}}
 </nav>
 <div class="main"><div class="wrap">
-{{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">{{T . "topbar.viewingas"}} {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="{{T . "ph.username"}}" aria-label="{{T . "ph.viewasuser"}}"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">{{T . "topbar.viewas"}}</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">{{T . "topbar.stop"}}</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">{{T . "topbar.publicpage"}}</a><form method="POST" action="/account/sign-out"><button type="submit">{{T . "topbar.signout"}}</button></form><form class="lang-picker" method="POST" action="/language"><input type="hidden" name="next" value="{{$.RequestPath}}"><button type="submit" name="lang" value="en" class="lang{{if ne .Lang "de"}} on{{end}}" aria-label="English">EN</button><button type="submit" name="lang" value="de" class="lang{{if eq .Lang "de"}} on{{end}}" aria-label="Deutsch">DE</button></form></div></div>{{end}}
+{{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">{{T . "topbar.viewingas"}} {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="{{T . "ph.username"}}" aria-label="{{T . "ph.viewasuser"}}"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">{{T . "topbar.viewas"}}</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">{{T . "topbar.stop"}}</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">{{T . "topbar.publicpage"}}</a><form method="POST" action="/account/sign-out"><button type="submit">{{T . "topbar.signout"}}</button></form><form class="lang-picker" method="POST" action="/language"><input type="hidden" name="next" value="{{$.RequestPath}}"><button type="submit" name="lang" value="en" class="lang{{if ne .Lang "de"}} on{{end}}" aria-label="English">{{flagEN}}EN</button><button type="submit" name="lang" value="de" class="lang{{if eq .Lang "de"}} on{{end}}" aria-label="Deutsch (Schweiz)">{{flagDE}}DE</button></form></div></div>{{end}}
 <header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="paint-line">{{rainbowText "Unleash your creativity!"}}<span class="paintbrush" aria-hidden="true">🖌️</span>{{paintStroke}}</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
