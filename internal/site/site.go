@@ -408,6 +408,11 @@ func rainbowText(s string) template.HTML {
 	return template.HTML(b.String())
 }
 
+// paintStroke is a brush stroke with paint splashes that underlines the
+// tagline, as if the paintbrush just swept the words onto the page. The
+// colours echo the rainbow letters.
+const paintStrokeSVG = `<svg class="paint-stroke" viewBox="0 0 360 26" fill="none" aria-hidden="true"><path d="M6 16 C 60 9, 150 20, 230 13 C 280 9, 320 14, 352 12" stroke="#f0932b" stroke-width="7" stroke-linecap="round" opacity=".45"/><path d="M4 18 C 70 12, 160 22, 250 15 C 300 11, 330 15, 356 13" stroke="#2f8fd6" stroke-width="3" stroke-linecap="round" opacity=".5"/><circle cx="40" cy="6" r="3" fill="#e2574c" opacity=".6"/><circle cx="300" cy="4" r="2.4" fill="#3da35d" opacity=".6"/><circle cx="330" cy="22" r="2.8" fill="#7a5fd0" opacity=".6"/><circle cx="120" cy="23" r="2" fill="#e2574c" opacity=".55"/><circle cx="210" cy="3" r="1.8" fill="#f0932b" opacity=".6"/></svg>`
+
 func statusLabel(s store.Status) string {
 	switch s {
 	case store.StatusQueued:
@@ -505,10 +510,15 @@ const indexCSS = `
      depth is shaded with diagonal pencil hatching in dark grey. */
   .brand-title .lt .face { position:relative; z-index:2; color:#fff; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
-  .brand-sub { margin:10px 0 0; font-size:30px; font-weight:800;
+  .brand-sub { margin:14px 0 0; font-size:30px; font-weight:800;
     font-family:Caveat,"Segoe Print","Bradley Hand",cursive; letter-spacing:.5px; }
-    font-family:"Caveat","Patrick Hand","Segoe Print",cursive; }
-  .brand-sub .doodle { font-size:24px; padding:0 10px; }
+  /* The tagline sits on a paint stroke with splashes, with a brush at the end
+     as if it just painted the words. */
+  .paint-line { position:relative; display:inline-block; padding:0 6px 14px 6px; }
+  .paint-line .paint-stroke { position:absolute; left:0; right:0; bottom:0;
+    width:100%; height:26px; }
+  .paintbrush { display:inline-block; font-size:30px; margin-left:6px;
+    transform:rotate(-28deg) translateY(-6px); }
   .account { display:flex; align-items:center; justify-content:flex-end; gap:10px; color:var(--muted); font-size:13px; flex-wrap:wrap; }
   .account form { margin:0; }
   .account button, .account .impersonate-username { padding:5px 9px; }
@@ -798,6 +808,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 	"iconCog":     func() template.HTML { return template.HTML(iconCogSVG) },
 	"colorTitle":  colorTitle,
 	"rainbowText": rainbowText,
+	"paintStroke": func() template.HTML { return template.HTML(paintStrokeSVG) },
 	"brandLogo":   brandLogoImg,
 	"rowSet": func(d Data, ws []Worksheet) rowSet {
 		return rowSet{Static: d.Static, Data: d, Rows: ws}
@@ -820,7 +831,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 <body>
 {{if .Static}}
 <div class="wrap">
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>{{rainbowText "Unleash your creativity"}}<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="paint-line">{{rainbowText "Unleash your creativity!"}}<span class="paintbrush" aria-hidden="true">🖌️</span>{{paintStroke}}</span></p></div></header>
 {{else}}
 <div class="layout">
 <nav class="sidebar" aria-label="Worksheet navigation">
@@ -839,7 +850,7 @@ var indexTmpl = template.Must(template.New("index").Funcs(template.FuncMap{
 </nav>
 <div class="main"><div class="wrap">
 {{if .User}}<div class="topbar"><div class="account">{{if .Impersonating}}<span class="impersonation">Viewing as {{.User}}</span>{{end}}{{if .CanImpersonate}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input class="impersonate-username" type="text" name="username" list="impersonation-users" required placeholder="Username" aria-label="View site as user"><datalist id="impersonation-users">{{range .Users}}<option value="{{.}}">{{end}}</datalist><button type="submit">View as</button></form>{{if .Impersonating}}<form method="POST" action="/account/impersonate"><input type="hidden" name="next" value="/"><input type="hidden" name="username" value="{{.Actor}}"><button type="submit">Stop impersonating</button></form>{{end}}{{end}}<a href="/worksheets/{{.User}}/index">Public page</a><form method="POST" action="/account/sign-out"><button type="submit">Sign out</button></form></div></div>{{end}}
-<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="doodle">✏️</span>{{rainbowText "Unleash your creativity"}}<span class="doodle">🖍️</span></p></div></header>
+<header><div class="brand-block"><h1 class="brand-title">{{colorTitle "Teacher's"}}<span class="brand-gap"></span>{{brandLogo .Static}}<span class="brand-gap"></span>{{colorTitle "Friend"}}</h1><p class="brand-sub"><span class="paint-line">{{rainbowText "Unleash your creativity!"}}<span class="paintbrush" aria-hidden="true">🖌️</span>{{paintStroke}}</span></p></div></header>
 {{end}}
 {{if .Flash}}<div class="flash">{{.Flash}}</div>{{end}}
 
