@@ -465,41 +465,26 @@ const indexCSS = `
   /* Playful, colour-pencil brand. The name is drawn letter by letter in a
      hand-drawn face with a crayon palette and a gentle wobble. */
   .brand-title { font-family:"Arial Black","Helvetica Neue",Arial,sans-serif;
-    font-size:min(50px,5vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
+    font-size:min(62px,6.2vw); line-height:.9; margin:0; font-weight:900; letter-spacing:1.5px;
     text-transform:uppercase; white-space:nowrap;
     display:flex; align-items:center; justify-content:center;
     transform:rotate(-1deg); padding:0 4px 16px 4px; }
   .brand-gap { display:inline-block; width:.28em; }
   .brand-logo { height:1.5em; width:auto; flex-shrink:0;
     transform:rotate(1.5deg) translateY(.06em); }
-  /* Colour-pencil 3D face: white letters with a coloured outline and a light,
-     partial pencil-stroke wash on the face, over a solid 3D body whose depth
-     is shaded with diagonal hatching in the same colour. */
   .brand-title .lt { position:relative; display:inline-block;
     transform:rotate(var(--rot,0deg)) translateY(var(--lift,0));
-    -webkit-text-stroke:1.6px var(--edge); }
+    -webkit-text-stroke:1.6px #20242e; }
   .brand-title .lt .d { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
-    z-index:0; color:var(--edge); -webkit-text-stroke:0; }
+    z-index:0; color:#20242e; -webkit-text-stroke:0; }
   .brand-title .lt .hatch { position:absolute; left:calc(var(--k)*1px); top:calc(var(--k)*1px);
     z-index:1; -webkit-text-stroke:0; color:transparent;
-    background:repeating-linear-gradient(45deg, var(--edge) 0 2px, transparent 2px 4.5px);
+    background:repeating-linear-gradient(45deg, #3a3f4d 0 2px, transparent 2px 4.5px);
     -webkit-background-clip:text; background-clip:text; opacity:.75; }
-  /* The face is white with a few quick pencil strokes that do not fully colour it in. */
+  .brand-title .lt .shade { display:none; }
+  /* Monochrome 3D: white faces, a black outline, and a black 3D body whose
+     depth is shaded with diagonal pencil hatching in dark grey. */
   .brand-title .lt .face { position:relative; z-index:2; color:#fff; }
-  .brand-title .lt .shade { position:absolute; left:0; top:0; z-index:3; pointer-events:none;
-    -webkit-text-stroke:0; color:transparent;
-    background:repeating-linear-gradient(58deg, var(--fill) 0 2.5px, transparent 2.5px 6.5px);
-    -webkit-background-clip:text; background-clip:text; opacity:.4; }
-  .brand-title .c1 { --fill:#f19a8f; --edge:#c0392b; }
-  .brand-title .c2 { --fill:#f6c478; --edge:#b97f22; }
-  .brand-title .c3 { --fill:#f2d96b; --edge:#9c8a1e; }
-  .brand-title .c4 { --fill:#93d6a0; --edge:#3e8e52; }
-  .brand-title .c5 { --fill:#8fc1ec; --edge:#2f6fae; }
-  .brand-title .c6 { --fill:#c9a9ec; --edge:#7a4ea6; }
-  .brand-title .c7 { --fill:#f4a9cf; --edge:#b9447f; }
-  .brand-title .c8 { --fill:#8bd8d0; --edge:#2f8f86; }
-  .brand-title .sp { display:inline-block; width:.55em; }
-  .brand-title .wand { font-size:.5em; vertical-align:34px; transform:rotate(10deg); display:inline-block; margin-left:8px; -webkit-text-stroke:0; }
   /* Hand-drawn squiggle underline, like a crayon stroke gone wavy. */
   .brand-under { display:block; margin-top:0; transform:rotate(-.6deg); }
   .brand-sub { margin:6px 0 0; font-size:19px; font-weight:600;
