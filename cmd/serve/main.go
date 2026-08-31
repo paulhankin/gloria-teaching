@@ -6,7 +6,9 @@ package main
 
 import (
 	"crypto/rand"
+	"crypto/sha256"
 	"flag"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -93,6 +95,10 @@ func index(w http.ResponseWriter, r *http.Request) {
 	}
 	if me, err := db.UserByEmail(account.Email(r)); err == nil {
 		d.HasAvatar = len(me.Avatar) > 0
+		if d.HasAvatar {
+			sum := sha256.Sum256(me.Avatar)
+			d.AvatarVersion = fmt.Sprintf("%x", sum[:6])
+		}
 	}
 	owner := account.Email(r)
 	tags, err := db.Tags(owner)

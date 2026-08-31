@@ -86,6 +86,9 @@ type Data struct {
 	RequestPath string
 	// HasAvatar reports whether the signed-in user has a profile picture.
 	HasAvatar bool
+	// AvatarVersion is a short fingerprint of the picture, used to bust the
+	// browser cache when it changes.
+	AvatarVersion string
 }
 
 // AvatarURL is the signed-in user's profile picture (with a cache-buster when
@@ -94,7 +97,7 @@ func (d Data) AvatarURL() string {
 	if !d.HasAvatar || d.User == "" {
 		return ""
 	}
-	return "/avatar/" + d.User
+	return "/avatar/" + d.User + "?v=" + d.AvatarVersion
 }
 
 // T returns the UI string for key in the current language (d.Lang).
